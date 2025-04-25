@@ -9,9 +9,12 @@ import hashlib
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
 
-# CHANNELS
+# ============================================================================
+# Channel Analytics Functions
+# ============================================================================
 
 def get_channel_data(youtube_data_client, discrete_mode=False):
+    """Get basic channel information."""
     account_info = youtube_data_client.channels().list(
         part="snippet,contentDetails,statistics",
         mine=True
@@ -33,6 +36,7 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
     return channel_info
 
 def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, dimensions=""):
+    """Get comprehensive channel analytics including traffic sources."""
     if end_date is None:
         end_date = datetime.today().strftime('%Y-%m-%d')
         
@@ -67,10 +71,135 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
         analytics_data = analytics_response["rows"][0]
         analytics_info = dict(zip(metric_names, analytics_data))
 
+    # Get traffic source data for views
+    traffic_source_views = get_traffic_source_views_analytics(youtube_analytics_client, start_date, end_date)
+    # Get traffic source data for minutes watched
+    traffic_source_minutes = get_traffic_source_minutes_analytics(youtube_analytics_client, start_date, end_date)
+    # Get country data for views
+    country_views = get_country_views_analytics(youtube_analytics_client, start_date, end_date)
+    # Get country data for minutes watched
+    country_minutes = get_country_minutes_analytics(youtube_analytics_client, start_date, end_date)
+    
+    if isinstance(analytics_info, dict):
+        analytics_info["trafficSourceViews"] = traffic_source_views
+        analytics_info["trafficSourceMinutes"] = traffic_source_minutes
+        analytics_info["countryViews"] = country_views
+        analytics_info["countryMinutes"] = country_minutes
+    else:
+        for entry in analytics_info:
+            entry["trafficSourceViews"] = traffic_source_views
+            entry["trafficSourceMinutes"] = traffic_source_minutes
+            entry["countryViews"] = country_views
+            entry["countryMinutes"] = country_minutes
+
     return analytics_info
 
+def get_traffic_source_views_analytics(youtube_analytics_client, start_date, end_date):
+    """Get traffic source analytics for views."""
+    try:
+        traffic_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="insightTrafficSourceType",
+            metrics="views"
+        ).execute()
+
+        if not traffic_response.get("rows"):
+            return {}
+
+        traffic_sources = {}
+        for row in traffic_response.get("rows", []):
+            source_type = row[0]
+            views = row[1]
+            traffic_sources[source_type] = views
+
+        return traffic_sources
+    except Exception as e:
+        bt.logging.warning(f"Error getting traffic source views analytics: {e}")
+        return {}
+
+def get_traffic_source_minutes_analytics(youtube_analytics_client, start_date, end_date):
+    """Get traffic source analytics for minutes watched."""
+    try:
+        traffic_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="insightTrafficSourceType",
+            metrics="estimatedMinutesWatched"
+        ).execute()
+
+        if not traffic_response.get("rows"):
+            return {}
+
+        traffic_sources = {}
+        for row in traffic_response.get("rows", []):
+            source_type = row[0]
+            minutes = row[1]
+            traffic_sources[source_type] = minutes
+
+        return traffic_sources
+    except Exception as e:
+        bt.logging.warning(f"Error getting traffic source minutes analytics: {e}")
+        return {}
+
+def get_country_views_analytics(youtube_analytics_client, start_date, end_date):
+    """Get views analytics by country."""
+    try:
+        country_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="country",
+            metrics="views"
+        ).execute()
+
+        if not country_response.get("rows"):
+            return {}
+
+        country_data = {}
+        for row in country_response.get("rows", []):
+            country_code = row[0]
+            views = row[1]
+            country_data[country_code] = views
+
+        return country_data
+    except Exception as e:
+        bt.logging.warning(f"Error getting country views analytics: {e}")
+        return {}
+
+def get_country_minutes_analytics(youtube_analytics_client, start_date, end_date):
+    """Get minutes watched analytics by country."""
+    try:
+        country_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="country",
+            metrics="estimatedMinutesWatched"
+        ).execute()
+
+        if not country_response.get("rows"):
+            return {}
+
+        country_data = {}
+        for row in country_response.get("rows", []):
+            country_code = row[0]
+            minutes = row[1]
+            country_data[country_code] = minutes
+
+        return country_data
+    except Exception as e:
+        bt.logging.warning(f"Error getting country minutes analytics: {e}")
+        return {}
+
+# ============================================================================
+# Video Playlist and List Management
+# ============================================================================
+
 def get_uploads_playlist_id(youtube):
-    # Retrieve the channel's uploads playlist id
+    """Retrieve the channel's uploads playlist id."""
     channels_response = youtube.channels().list(
         mine=True,
         part="contentDetails"
@@ -83,6 +212,7 @@ def get_uploads_playlist_id(youtube):
     return uploads_playlist_id
 
 def list_all_videos(youtube, uploads_playlist_id):
+    """List all videos in the uploads playlist."""
     videos = []
     nextPageToken = None
 
@@ -100,6 +230,7 @@ def list_all_videos(youtube, uploads_playlist_id):
     return videos
 
 def get_all_uploads(youtube_data_client, max_age_days=365):
+    """Get all video IDs uploaded within the specified time period."""
     uploads_playlist_id = get_uploads_playlist_id(youtube_data_client)
     videos = list_all_videos(youtube_data_client, uploads_playlist_id)
 
@@ -116,9 +247,12 @@ def get_all_uploads(youtube_data_client, max_age_days=365):
     bt.logging.info(f"Found {len(video_ids)} videos uploaded in the last {max_age_days} days")
     return video_ids
 
-# VIDEOS
+# ============================================================================
+# Video Analytics Functions
+# ============================================================================
 
 def get_video_data(youtube_data_client, video_id, discrete_mode=False):
+    """Get basic video information."""
     video_response = youtube_data_client.videos().list(
         part="snippet,statistics,contentDetails,status",
         id=video_id
@@ -147,7 +281,7 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
     return stats
 
 def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, dimensions=""):
-
+    """Get comprehensive video analytics including traffic sources."""
     if end_date is None:
         end_date = datetime.today().strftime('%Y-%m-%d')
 
@@ -186,10 +320,140 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
         analytics_data = analytics_response.get("rows", [])[0]
         analytics_info = dict(zip(metric_names, analytics_data))
 
+    # Get traffic source data for views
+    traffic_source_views = get_video_traffic_source_views_analytics(youtube_analytics_client, video_id, start_date, end_date)
+    # Get traffic source data for minutes watched
+    traffic_source_minutes = get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date)
+    # Get country data for views
+    country_views = get_video_country_views_analytics(youtube_analytics_client, video_id, start_date, end_date)
+    # Get country data for minutes watched
+    country_minutes = get_video_country_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date)
+    
+    if isinstance(analytics_info, dict):
+        analytics_info["trafficSourceViews"] = traffic_source_views
+        analytics_info["trafficSourceMinutes"] = traffic_source_minutes
+        analytics_info["countryViews"] = country_views
+        analytics_info["countryMinutes"] = country_minutes
+    else:
+        for entry in analytics_info:
+            entry["trafficSourceViews"] = traffic_source_views
+            entry["trafficSourceMinutes"] = traffic_source_minutes
+            entry["countryViews"] = country_views
+            entry["countryMinutes"] = country_minutes
+
     return analytics_info
+
+def get_video_traffic_source_views_analytics(youtube_analytics_client, video_id, start_date, end_date):
+    """Get traffic source analytics for views for a specific video."""
+    try:
+        traffic_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="insightTrafficSourceType",
+            metrics="views",
+            filters=f"video=={video_id}"
+        ).execute()
+
+        if not traffic_response.get("rows"):
+            return {}
+
+        traffic_sources = {}
+        for row in traffic_response.get("rows", []):
+            source_type = row[0]
+            views = row[1]
+            traffic_sources[source_type] = views
+
+        return traffic_sources
+    except Exception as e:
+        bt.logging.warning(f"Error getting traffic source views analytics for video {video_id}: {e}")
+        return {}
+
+def get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date):
+    """Get traffic source analytics for minutes watched for a specific video."""
+    try:
+        traffic_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="insightTrafficSourceType",
+            metrics="estimatedMinutesWatched",
+            filters=f"video=={video_id}"
+        ).execute()
+
+        if not traffic_response.get("rows"):
+            return {}
+
+        traffic_sources = {}
+        for row in traffic_response.get("rows", []):
+            source_type = row[0]
+            minutes = row[1]
+            traffic_sources[source_type] = minutes
+
+        return traffic_sources
+    except Exception as e:
+        bt.logging.warning(f"Error getting traffic source minutes analytics for video {video_id}: {e}")
+        return {}
+
+def get_video_country_views_analytics(youtube_analytics_client, video_id, start_date, end_date):
+    """Get views analytics by country for a specific video."""
+    try:
+        country_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="country",
+            metrics="views",
+            filters=f"video=={video_id}"
+        ).execute()
+
+        if not country_response.get("rows"):
+            return {}
+
+        country_data = {}
+        for row in country_response.get("rows", []):
+            country_code = row[0]
+            views = row[1]
+            country_data[country_code] = views
+
+        return country_data
+    except Exception as e:
+        bt.logging.warning(f"Error getting country views analytics for video {video_id}: {e}")
+        return {}
+
+def get_video_country_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date):
+    """Get minutes watched analytics by country for a specific video."""
+    try:
+        country_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="country",
+            metrics="estimatedMinutesWatched",
+            filters=f"video=={video_id}"
+        ).execute()
+
+        if not country_response.get("rows"):
+            return {}
+
+        country_data = {}
+        for row in country_response.get("rows", []):
+            country_code = row[0]
+            minutes = row[1]
+            country_data[country_code] = minutes
+
+        return country_data
+    except Exception as e:
+        bt.logging.warning(f"Error getting country minutes analytics for video {video_id}: {e}")
+        return {}
+
+# ============================================================================
+# Transcript Functions
+# ============================================================================
 
 @retry(stop=stop_after_attempt(TRANSCRIPT_MAX_RETRY), wait=wait_fixed(1), reraise=True)
 def _fetch_transcript(video_id, rapid_api_key):
+    """Internal function to fetch video transcript with retry logic."""
     url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
     headers = {"x-rapidapi-key": rapid_api_key, "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com"}
     querystring = {"video_id": video_id}
@@ -208,6 +472,7 @@ def _fetch_transcript(video_id, rapid_api_key):
         raise Exception("Error retrieving transcript")
 
 def get_video_transcript(video_id, rapid_api_key):
+    """Get video transcript with error handling."""
     try:
         return _fetch_transcript(video_id, rapid_api_key)
     except RetryError:
