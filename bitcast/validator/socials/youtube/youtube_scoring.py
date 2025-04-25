@@ -44,9 +44,18 @@ def eval_youtube(creds, briefs):
         "scores": scores
     }
 
-    # Get channel data and analytics
-    channel_data, channel_analytics, youtube_data_client, youtube_analytics_client = get_channel_data_and_analytics(creds, result)
-    if channel_data is None:
+    try:
+        youtube_data_client = build("youtube", "v3", credentials=creds)
+        youtube_analytics_client_client = build("youtubeAnalytics", "v2", credentials=creds)
+
+        channel_data = youtube_utils.get_channel_data(youtube_data_client, DISCRETE_MODE)
+        channel_analytics = youtube_utils.get_channel_analytics(youtube_analytics_client_client, start_date="1995-01-01", end_date="2025-03-31")
+        
+        # Store channel details in the result
+        result["yt_account"]["details"] = channel_data
+        result["yt_account"]["analytics"] = channel_analytics
+    except Exception as e:
+        bt.logging.warning(f"An error occurred while retrieving YouTube data: {e}")
         return result
 
     # Vet the channel and store the result
@@ -57,36 +66,11 @@ def eval_youtube(creds, briefs):
     if not channel_vet_result:
         return result
 
-    # Process videos and calculate scores
-    process_videos(youtube_data_client, youtube_analytics_client, briefs, result, scores)
-
-    return result
-
-def get_channel_data_and_analytics(creds, result):
-    """Get YouTube channel data and analytics."""
-    try:
-        youtube_data_client = build("youtube", "v3", credentials=creds)
-        youtube_analytics_client = build("youtubeAnalytics", "v2", credentials=creds)
-
-        channel_data = youtube_utils.get_channel_data(youtube_data_client, DISCRETE_MODE)
-        channel_analytics = youtube_utils.get_channel_analytics(youtube_analytics_client, start_date="1995-01-01", end_date="2025-03-31")
-        
-        # Store channel details in the result
-        result["yt_account"]["details"] = channel_data
-        result["yt_account"]["analytics"] = channel_analytics
-        
-        return channel_data, channel_analytics, youtube_data_client, youtube_analytics_client
-    except Exception as e:
-        bt.logging.warning(f"An error occurred while retrieving YouTube data: {e}")
-        return None, None, None, None
-
-def process_videos(youtube_data_client, youtube_analytics_client, briefs, result, scores):
-    """Process videos, calculate scores, and update the result."""
     try:
         video_ids = youtube_utils.get_all_uploads(youtube_data_client, YT_VIDEO_LOOKBACK)
 
         # Vet videos and store the results
-        video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
+        video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client_client)
 
         # Add all videos to the result, regardless of whether they match any briefs
         for video_id in video_ids:
@@ -116,7 +100,7 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
                 
                 # Calculate and store the score if the video matches a brief
                 if matches_any_brief:
-                    video_score_result = calculate_video_score(video_id, youtube_analytics_client)
+                    video_score_result = calculate_video_score(video_id, youtube_analytics_client_client)
                     video_score = video_score_result["score"]
                     result["videos"][video_id]["score"] = video_score
                     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
@@ -132,6 +116,8 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
     except Exception as e:
         bt.logging.error(f"Error during video evaluation: {e}")
         # We'll return the partial result with the data we've collected so far
+
+    return result
 
 def vet_channel(channel_data, channel_analytics):
     bt.logging.info(f"Checking channel")
