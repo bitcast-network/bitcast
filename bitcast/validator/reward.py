@@ -24,13 +24,15 @@ from google.oauth2.credentials import Credentials
 from bitcast.validator.briefs import get_briefs
 from bitcast.validator.socials.youtube.youtube_scoring import eval_youtube, reset_scored_videos
 
-def reward(briefs, response) -> dict:
+def reward(uid, briefs, response) -> dict:
     """
     Returns:
     - dict: The YouTube statistics dictionary for the miner.
     """
+    bt.logging.info(f"===== Reward function called for UID: {uid} =====")
 
     if not response:
+        bt.logging.info("No response provided, returning default scores.")
         return {"scores": [0.0] * len(briefs)}
     
     yt_stats = {"scores": [0.0] * len(briefs)}  # Initialize yt_stats outside the try block
@@ -47,11 +49,15 @@ def reward(briefs, response) -> dict:
 
     except Exception as e:
         bt.logging.error(f"Error in reward calculation: {e}")
+        # Instead of discarding the partial data, we'll keep the yt_stats object
+        # that was initialized above, which will have the default scores
+        # but will be properly structured for the publish_stats function
 
     return yt_stats
 
 def get_rewards(
     self,
+    uids,
     responses: List[str],
 ) -> np.ndarray:
     """
@@ -61,7 +67,7 @@ def get_rewards(
     """
     briefs = get_briefs()
 
-    yt_stats_list = [reward(briefs, response) for response in responses]
+    yt_stats_list = [reward(uid, briefs, response) for uid, response in zip(uids, responses)]
     scores_matrix = np.array([yt_stats["scores"] for yt_stats in yt_stats_list])
 
     reset_scored_videos()

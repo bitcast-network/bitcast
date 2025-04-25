@@ -99,18 +99,21 @@ def list_all_videos(youtube, uploads_playlist_id):
             break
     return videos
 
-def get_all_uploads(youtube_data_client):
+def get_all_uploads(youtube_data_client, max_age_days=365):
     uploads_playlist_id = get_uploads_playlist_id(youtube_data_client)
     videos = list_all_videos(youtube_data_client, uploads_playlist_id)
-    
+
+    cutoff_date = datetime.utcnow() - timedelta(days=max_age_days)
     video_ids = []
-    # Collect each video's title and URL
     for video in videos:
         snippet = video["snippet"]
-        title = snippet["title"]
-        video_id = snippet["resourceId"]["videoId"]
-        video_ids.append(video_id)
-    
+        published_at = datetime.strptime(
+            snippet["publishedAt"], "%Y-%m-%dT%H:%M:%SZ"
+        )
+        if published_at >= cutoff_date:
+            video_ids.append(snippet["resourceId"]["videoId"])
+
+    bt.logging.info(f"Found {len(video_ids)} videos uploaded in the last {max_age_days} days")
     return video_ids
 
 # VIDEOS

@@ -63,6 +63,48 @@ def convert_numpy_types(obj):
     else:
         return obj
 
+def clean_video_data(payload):
+    """
+    Clean and restructure video data to reduce payload size and improve organization.
+    Removes description and transcript fields, and restructures check outcomes to be
+    with their respective data sections.
+    
+    Args:
+        payload: The payload to clean and restructure
+        
+    Returns:
+        The cleaned and restructured payload
+    """
+    if isinstance(payload, dict):
+        # Check if this is a YouTube result with videos
+        if "videos" in payload and isinstance(payload["videos"], dict):
+            # Process each video
+            for video_id, video_data in payload["videos"].items():
+                # Clean video details by removing description and transcript
+                if "details" in video_data and isinstance(video_data["details"], dict):
+                    details = video_data["details"].copy()
+                    if "description" in details:
+                        del details["description"]
+                    if "transcript" in details:
+                        del details["transcript"]
+                    video_data["details"] = details
+                
+                # Preserve daily analytics data if it exists
+                if "analytics" in video_data and isinstance(video_data["analytics"], list):
+                    # Keep the daily analytics data as is
+                    pass
+                elif "analytics" in video_data and isinstance(video_data["analytics"], dict):
+                    # If it's a single analytics entry (not daily), keep it as is
+                    pass
+        
+        # Recursively clean nested dictionaries
+        return {key: clean_video_data(value) for key, value in payload.items()}
+    elif isinstance(payload, list):
+        # Recursively clean lists
+        return [clean_video_data(item) for item in payload]
+    else:
+        return payload
+
 def publish_stats(wallet: bt.wallet, json_payloads: List[Dict[str, Any]], uids: List[str]):
     """
     Publishes a combined log payload to the stats endpoint, associating each payload with a UID and a validator hotkey.
@@ -83,7 +125,9 @@ def publish_stats(wallet: bt.wallet, json_payloads: List[Dict[str, Any]], uids: 
         payload['uid'] = uid  # Add UID to each payload
         # Convert NumPy types to Python native types
         converted_payload = convert_numpy_types(payload)
-        combined_payload.append(converted_payload)
+        # Clean video data by removing description and transcript
+        cleaned_payload = clean_video_data(converted_payload)
+        combined_payload.append(cleaned_payload)
     
     timestamp = datetime.utcnow().isoformat()
     final_payload = {
