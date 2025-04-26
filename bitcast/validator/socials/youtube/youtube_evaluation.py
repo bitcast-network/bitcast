@@ -13,14 +13,6 @@ from bitcast.validator.config import (
     RAPID_API_KEY
 )
 
-# Global list to track which videos have already been scored
-scored_video_ids = []
-
-def reset_scored_videos():
-    """Reset the global scored_video_ids list."""
-    global scored_video_ids
-    scored_video_ids = []
-
 def vet_channel(channel_data, channel_analytics):
     bt.logging.info(f"Checking channel")
 
@@ -74,13 +66,10 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     for video_id in video_ids:
         try:
             # Check if video has already been scored
-            if is_video_already_scored(video_id):
+            if youtube_utils.is_video_already_scored(video_id):
                 results[video_id] = [False] * len(briefs)
                 continue
                 
-            # Mark video as scored
-            mark_video_as_scored(video_id)
-            
             # Process the video
             process_video_vetting(
                 video_id, 
@@ -92,24 +81,17 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 video_analytics_dict, 
                 video_decision_details
             )
+            
+            # Only mark the video as scored if processing was successful
+            youtube_utils.mark_video_as_scored(video_id)
+            
         except Exception as e:
             bt.logging.error(f"Error evaluating video {video_id}: {e}")
             # Mark this video as not matching any briefs
             results[video_id] = [False] * len(briefs)
+            # Don't mark the video as scored if there was an error
 
     return results, video_data_dict, video_analytics_dict, video_decision_details
-
-def is_video_already_scored(video_id):
-    """Check if a video has already been scored by another hotkey."""
-    if video_id in scored_video_ids:
-        bt.logging.info(f"Video {video_id} already scored by another hotkey")
-        return True
-    return False
-
-def mark_video_as_scored(video_id):
-    """Mark a video as scored to prevent duplicate processing."""
-    global scored_video_ids
-    scored_video_ids.append(video_id)
 
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
                          results, video_data_dict, video_analytics_dict, video_decision_details):

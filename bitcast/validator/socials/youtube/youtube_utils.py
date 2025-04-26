@@ -9,6 +9,31 @@ import hashlib
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
 
+# Global list to track which videos have already been scored
+# This list is shared between youtube_scoring.py and youtube_evaluation.py
+scored_video_ids = []
+
+def reset_scored_videos():
+    """Reset the global scored_video_ids list.
+    
+    This function is used by other modules to clear the list of scored videos.
+    """
+    global scored_video_ids
+    scored_video_ids = []
+    bt.logging.info(f"Reset scored_video_ids list. Current length: {len(scored_video_ids)}")
+
+def is_video_already_scored(video_id):
+    """Check if a video has already been scored by another hotkey."""
+    if video_id in scored_video_ids:
+        bt.logging.info(f"Video {video_id} already scored by another hotkey")
+        return True
+    return False
+
+def mark_video_as_scored(video_id):
+    """Mark a video as scored to prevent duplicate processing."""
+    scored_video_ids.append(video_id)
+    bt.logging.info(f"Added video {video_id} to scored_video_ids. Current length: {len(scored_video_ids)}")
+
 # ============================================================================
 # Channel Analytics Functions
 # ============================================================================
@@ -40,21 +65,25 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     if end_date is None:
         end_date = datetime.today().strftime('%Y-%m-%d')
         
+    # Define metrics in a consistent order
+    metrics_list = "views,comments,likes,dislikes,shares,averageViewDuration,averageViewPercentage,subscribersGained,subscribersLost,estimatedMinutesWatched"
+    
     analytics_response = youtube_analytics_client.reports().query(
         ids="channel==MINE",
         startDate=start_date,
         endDate=end_date,
         dimensions=dimensions,
-        metrics="views,comments,likes,dislikes,shares,averageViewDuration,averageViewPercentage,subscribersGained,subscribersLost,estimatedMinutesWatched"
+        metrics=metrics_list
         ).execute()
 
     if not analytics_response.get("rows"):
         raise Exception("No channel analytics data found.")
 
+    # Define metric names in the same order as the metrics_list
     metric_names = [
-        "views", "comments", "likes",
-        "shares", "averageViewDuration", "averageViewPercentage",
-        "estimatedMinutesWatched"
+        "views", "comments", "likes", "dislikes", "shares", 
+        "averageViewDuration", "averageViewPercentage", 
+        "subscribersGained", "subscribersLost", "estimatedMinutesWatched"
     ]
 
     if dimensions:
@@ -288,12 +317,15 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     if start_date is None:
         start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
 
+    # Define metrics in a consistent order
+    metrics_list = "views,comments,likes,dislikes,shares,averageViewDuration,averageViewPercentage,estimatedMinutesWatched"
+
     analytics_response = youtube_analytics_client.reports().query(
         ids="channel==MINE",
         startDate=start_date,
         endDate=end_date,
         dimensions=dimensions,
-        metrics="views,comments,likes,shares,averageViewDuration,averageViewPercentage,estimatedMinutesWatched",
+        metrics=metrics_list,
         filters=f"video=={video_id}"
     ).execute()
 
@@ -301,9 +333,10 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
         bt.logging.warning(f"No analytics data found for video ID: {video_id}")
         return []
 
+    # Define metric names in the same order as the metrics_list
     metric_names = [
-        "views", "comments", "likes",
-        "shares", "averageViewDuration", "averageViewPercentage",
+        "views", "comments", "likes", "dislikes", "shares", 
+        "averageViewDuration", "averageViewPercentage", 
         "estimatedMinutesWatched"
     ]
 
@@ -311,9 +344,10 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
         # Handle the case where dimensions are present
         analytics_info = []
         for row in analytics_response.get("rows", []):
-            date = row[0]  # Assuming the first element is the date
-            metrics = dict(zip(metric_names, row[1:]))
-            metrics["date"] = date
+            dimension_values = row[:len(dimensions.split(','))]
+            metrics = dict(zip(metric_names, row[len(dimension_values):]))
+            for i, dimension in enumerate(dimensions.split(',')):
+                metrics[dimension] = dimension_values[i]
             analytics_info.append(metrics)
     else:
         # Handle the case where no dimensions are present

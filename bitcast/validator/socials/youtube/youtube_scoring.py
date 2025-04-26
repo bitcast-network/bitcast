@@ -6,12 +6,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.socials.youtube.youtube_evaluation import (
-    reset_scored_videos,
     vet_channel,
     vet_videos,
     calculate_video_score,
-    is_video_already_scored,
-    mark_video_as_scored,
     process_video_vetting,
     vet_video,
     initialize_decision_details,
@@ -36,14 +33,6 @@ from bitcast.validator.config import (
     RAPID_API_KEY
 )
 
-# Global list to track which videos have already been scored
-scored_video_ids = []
-
-def reset_scored_videos():
-    """Reset the global scored_video_ids list."""
-    global scored_video_ids
-    scored_video_ids = []
-
 def eval_youtube(creds, briefs):
     bt.logging.info(f"Scoring Youtube Content")
     
@@ -62,7 +51,6 @@ def eval_youtube(creds, briefs):
     # Vet the channel and store the result
     channel_vet_result = vet_channel(channel_data, channel_analytics)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
-    result["yt_account"]["vet_outcome"] = channel_vet_result
     
     if not channel_vet_result:
         return result
@@ -81,8 +69,7 @@ def initialize_youtube_evaluation(creds, briefs):
         "yt_account": {
             "details": None,
             "analytics": None,
-            "channel_vet_result": None,
-            "vet_outcome": None
+            "channel_vet_result": None
         },
         "videos": {},
         "scores": scores
