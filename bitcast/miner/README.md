@@ -1,89 +1,163 @@
-# Miner
+# Bitcast Miner
 
-## Content Requirements
-
-In order to mine on the subnet you must have a youtube account and videos which meet the requirements. Do not register until you have met the requirements.
-
-Youtube account:
-- 50+ subscribers
-- 10%+ average retention
-
-videos:
-- Public
-- 10%+ retention
-- Auto-generated captions (must not have manually entered ones)
-- Must match at least one of the briefs from the [content briefs list](http://dashboard.bitcast.network/briefs)
-- Must not be released more than 3 days before the content window opens ([content windows per brief](http://dashboard.bitcast.network/briefs))
-
-Test your video script against any briefs using our [dashboard tool](http://dashboard.bitcast.network/).
-
-Your goal is to maximise minutes watched across all videos that hit a brief.
-Videos may be long form or shorts.
-
-## System Requirements
-
-- **CPU**: 2 cores
-- **RAM**: 4 GB
-
-Ensure that your machine meets these requirements before proceeding with the setup.
-
-# Setup and google console project and app
-
-Obtain client secrets by following [these instructions](https://chatgpt.com/share/67fd9a3c-861c-800a-98ff-05b0eda4fcce) 
-
-When you have downloaded your client secrets json rename it to 'client_secret.json' and paste it into bitcast/miner/secrets/ .
+A lightweight YouTube‐based miner for the Bittensor subnet. Automatically finds and scores your videos against active briefs to maximize minutes watched.
 
 ---
 
-Create a bittensor wallet and register it to the subnet (~/.bittensor/wallets)
+## 🎥 Content Requirements
 
-For installation of btcli, check [this guide](https://github.com/opentensor/bittensor/blob/master/README.md#install-bittensor-sdk)
+> **Don’t register until you hit these!**
 
-Create coldkey
-```
-btcli wallet new_coldkey --wallet.name <wallet name>
-```
+1. **YouTube account**  
+   - ≥ 50 subscribers  
+   - ≥ 10% average retention  
 
-Create hotkey
-```
-btcli wallet new_hotkey --wallet.name <wallet name> --wallet.hotkey <hotkey name>
-```
+2. **Videos**  
+   - Public  
+   - ≥ 10% retention  
+   - Auto-generated captions only  
+   - Matches at least one [content brief](http://dashboard.bitcast.network/briefs)  
+   - Published no more than **3 days** before your brief’s content window  
 
-Register on the subnet
-```
-btcli subnet register --netuid 93 --wallet.name  <wallet name> --hotkey <hotkey name>
-```
+**Tip:** Test your script against any brief in our [dashboard tool](http://dashboard.bitcast.network/).
 
-## Installation
+---
 
-#### Step 1: Clone Git repo
+## 💻 System Requirements
 
-```
-git clone X
-```
+- **CPU:** 2 cores  
+- **RAM:** 4 GB  
 
-#### Step 3: Setup Environment
+Make sure your server meets these before you start.
 
-```
-cd bitcast
-chmod +x scripts/setup_env.sh && ./scripts/setup_env.sh
-```
+---
 
-#### Step 4: Update Wallet Details
+## 🔑 Google Console Setup
 
-Update WALLET_NAME and HOTKEY_NAME within /scrips/run_miner.sh.
+1. **Create a project**  
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)  
+   - Click **Select a project → New Project**  
+   - Name it **bitcast_miner**, then **Create**.  
+   - After creation, open the **project selector** dropdown in the top bar and select **bitcast_miner**.
 
-(optionally change the port or turn off auto-updates).
+2. **Enable APIs**  
+   - Open **APIs & Services → Library**  
+   - Search for **YouTube Data API v3** and **YouTube Analytics API**  
+   - Click **Enable** on each.
 
-#### Step 5: Run Miner on pm2
-```
-chmod +x scripts/run_miner.sh && ./scripts/run_miner.sh
-```
+3. **Configure OAuth consent screen**  
+   - Click **Get Started**.  
+   - Go to **APIs & Services → OAuth consent screen**  
+   - App name: **bitcast-miner**  
+   - Support email: *your email*  
+   - Audience: **External**  
+   - Contact email: *your email*  
+   - Agree to Google’s data policy and terms  
+   - Click **Create**.
 
-#### Step 6: Authenticate
+4. **Create OAuth credentials**  
+   - Go to **Overview → Metrics → Create OAuth client**  
+   - Application type: **Desktop app**  
+   - Name it **bitcast-miner**  
+   - Click **Create**.  
+   - Download the JSON and save as  
+     ```
+     bitcast/miner/secrets/client_secret.json
+     ```
 
-You should recieve a prompt to open an OAuth screen in your browser. Open the screen and connect your youtube account.
+---
 
-#### Step 7: Continue to Create
+## 🚀 Installation & Miner Registration
 
-If your miner is healthy the validators will be able to find any new content that you publish automatically. Briefs will change over time so ensure you check for new ones regularly.
+1. **Clone repo**  
+   ```bash
+   git clone <REPO_URL>
+   cd bitcast
+   ```
+
+2. **Setup environment & venv**  
+   ```bash
+   chmod +x scripts/setup_env.sh
+   ./scripts/setup_env.sh
+   ```  
+   This creates a Python virtual environment at `bitcast/venv_bitcast/` and installs dependencies, including `btcli`.
+
+3. **Activate the virtual environment**  
+   ```bash
+   source venv_bitcast/bin/activate
+   ```
+
+4. **Register Bittensor Wallet & Subnet**  
+   > **Run these from within the activated venv.**  
+   1. **Create wallets**  
+      ```bash
+      btcli wallet new_coldkey --wallet.name <WALLET_NAME>
+      btcli wallet new_hotkey  --wallet.name <WALLET_NAME> --wallet.hotkey <HOTKEY_NAME>
+      ```  
+   2. **Register on subnet**  
+      ```bash
+      btcli subnet register \
+        --netuid 93 \
+        --wallet.name <WALLET_NAME> \
+        --hotkey <HOTKEY_NAME>
+      ```
+
+---
+
+## 🚀 Run Miner
+
+1. **Configure miner script**  
+   - Edit `scripts/run_miner.sh`  
+     - Set `WALLET_NAME=<your wallet name>`  
+     - Set `HOTKEY_NAME=<your hotkey name>`  
+     - (Optional) change port or disable auto-updates  
+
+2. **Open port 8091**  
+   Make sure your server’s firewall or cloud security group allows inbound on **8091**.
+
+3. **Start miner**  
+   ```bash
+   chmod +x scripts/run_miner.sh
+   ./scripts/run_miner.sh
+   ```
+   - The first run will open an OAuth screen in your browser.  
+   - Authorize **all** requested YouTube access scopes for the account you wish to connect.  
+   - If it hangs or doesn’t appear, rerun `./scripts/run_miner.sh`.  
+
+4. **pm2 Launch & Health Check**  
+   The `run_miner.sh` script uses **pm2** to manage the miner process.  
+   - List running processes:  
+     ```bash
+     pm2 list
+     ```  
+   - View logs in real-time:  
+     ```bash
+     pm2 logs bitcast_miner
+     ```  
+   - Check detailed status:  
+     ```bash
+     pm2 show bitcast_miner
+     ```  
+   - If the miner isn’t running, you can restart it:  
+     ```bash
+     pm2 restart bitcast_miner
+     ```
+
+---
+
+## ℹ️ General Notes
+
+- **2‑day emissions delay:** You’ll begin receiving miner emissions **2 days** after the miner starts.  
+- **Validator polling:** Each validator sends a request roughly every **4 hours**.  
+- **Process visibility:** Validator logs are pushed to Weights & Biases—check your W&B dashboard for full process logs: `<YOUR_WANDB_RUN_URL>`  
+- **Single YouTube account:** Each miner instance supports only **one** YouTube account. To connect multiple accounts, run multiple miners.
+- **Auto‑updates:** The codebase has auto-update enabled by default.
+
+---
+
+## 🔄 Staying Healthy
+
+- Once healthy, your miner auto-detects and scores new uploads.  
+- **Briefs change**—check [content briefs](http://dashboard.bitcast.network/briefs) regularly.  
+
+Happy mining! 🚀  

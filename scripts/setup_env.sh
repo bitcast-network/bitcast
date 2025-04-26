@@ -49,7 +49,7 @@ cd "$PROJECT_ROOT"
 
 # Install project dependencies
 pip install --upgrade pip
-pip install -e .
 pip install -r requirements.txt
+pip install -e .
 
 echo "Environment setup completed successfully."
