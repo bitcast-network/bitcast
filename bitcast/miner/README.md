@@ -1,12 +1,13 @@
 # Bitcast Miner
 
-A lightweight YouTube‐based miner for the Bittensor subnet. Automatically finds and scores your videos against active briefs to maximize minutes watched.
+A YouTube token server which enables mining on the Bitcast subnet. Responds to validator requests with a temporary read access token for the YouTube APIs.
 
 ---
 
 ## 🎥 Content Requirements
 
 > **Don’t register until you hit these!**
+> **Note: Content requirements are likely to increase over time**
 
 1. **YouTube account**  
    - ≥ 50 subscribers  
@@ -17,7 +18,7 @@ A lightweight YouTube‐based miner for the Bittensor subnet. Automatically find
    - ≥ 10% retention  
    - Auto-generated captions only  
    - Matches at least one [content brief](http://dashboard.bitcast.network/briefs)  
-   - Published no more than **3 days** before your brief’s content window  
+   - Published no more than **3 days** before the brief content window starts
 
 **Tip:** Test your script against any brief in our [dashboard tool](http://dashboard.bitcast.network/).
 
@@ -80,7 +81,7 @@ Make sure your server meets these before you start.
    chmod +x scripts/setup_env.sh
    ./scripts/setup_env.sh
    ```  
-   This creates a Python virtual environment at `bitcast/venv_bitcast/` and installs dependencies, including `btcli`.
+   This creates a Python virtual environment at `bitcast/venv_bitcast/` and installs dependencies.
 
 3. **Activate the virtual environment**  
    ```bash

@@ -41,6 +41,21 @@ if [ -z "$WANDB_API_KEY" ]; then
   echo "Error: WANDB_API_KEY is not set in the .env file."
   exit 1
 fi
+if [ -z "$WALLET_NAME" ]; then
+  echo "Error: WALLET_NAME is not set in the .env file."
+  exit 1
+fi
+if [ -z "$HOTKEY_NAME" ]; then
+  echo "Error: HOTKEY_NAME is not set in the .env file."
+  exit 1
+fi
+
+# Set default values for validator parameters if not set in .env
+NETUID=${NETUID:-93}
+SUBTENSOR_NETWORK=${SUBTENSOR_NETWORK:-"finney"}
+SUBTENSOR_CHAIN_ENDPOINT=${SUBTENSOR_CHAIN_ENDPOINT:-"wss://entrypoint-finney.opentensor.ai:443"}
+PORT=${PORT:-8092}
+LOGGING=${LOGGING:-"--logging.debug"}
 
 # Clear cache if specified 
 while [[ $# -gt 0 ]]; do
@@ -70,15 +85,5 @@ fi
 echo "Starting validator process with pm2"
 cd "$PROJECT_ROOT"
 
-# Hardcoded parameters
-NETUID=1
-SUBTENSOR_CHAIN_ENDPOINT="ws://35.86.5.19:9944"
-SUBTENSOR_NETWORK="ws://35.86.5.19:9944"
-WALLET_NAME="vali_wallet"
-HOTKEY_NAME="hotkey_1"
-PORT=8092
-LOGGING="--logging.debug"
-DISABLE_AUTO_UPDATE= #"--disable_auto_update"
-
-# Start the validator with pm2 using hardcoded parameters
+# Start the validator with pm2 using environment variables
 pm2 start python --name "$VALIDATOR_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE
