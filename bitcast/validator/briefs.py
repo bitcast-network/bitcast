@@ -1,14 +1,15 @@
 import requests
 import bittensor as bt
-from datetime import datetime, timezone
-from bitcast.validator.config import BITCAST_BRIEFS_ENDPOINT
+from datetime import datetime, timezone, timedelta
+from bitcast.validator.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY
 
 def get_briefs(all: bool = False):
     """
     Fetches the briefs from the server.
 
     :param all: If True, returns all briefs without filtering;
-                if False, only returns briefs where the current UTC date is between start and end dates (inclusive).
+                if False, only returns briefs where the current UTC date is between start and end dates (inclusive),
+                or where the end date is within YT_REWARD_DELAY days of the current date.
     :return: List of brief objects
     """
     try:
@@ -23,17 +24,20 @@ def get_briefs(all: bool = False):
         filtered_briefs = []
         if not all:
             current_date = datetime.now(timezone.utc).date()
+            
             for brief in briefs_list:
                 try:
                     start_date = datetime.strptime(brief["start_date"], "%Y-%m-%d").date()
                     end_date = datetime.strptime(brief["end_date"], "%Y-%m-%d").date()
-                    if start_date <= current_date <= end_date:
+                    end_date_with_delay = end_date + timedelta(days=YT_REWARD_DELAY)
+                    
+                    if start_date <= current_date <= end_date_with_delay:
                         filtered_briefs.append(brief)
                 except Exception as e:
                     bt.logging.error(f"Error parsing dates for brief {brief.get('id', 'unknown')}: {e}")
             
             if not filtered_briefs:
-                bt.logging.info("No briefs have an active date range.")
+                bt.logging.info("No briefs have an active date range or are within the reward delay period.")
         else:
             filtered_briefs = briefs_list
 

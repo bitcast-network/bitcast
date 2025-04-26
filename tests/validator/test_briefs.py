@@ -1,8 +1,9 @@
 from pathlib import Path
 
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from bitcast.validator.briefs import get_briefs
+from bitcast.validator.config import YT_REWARD_DELAY
 
 class MockResponse:
     def __init__(self, json_data, status_code=200):
@@ -88,3 +89,56 @@ def test_get_briefs_date_parsing_error(monkeypatch):
     monkeypatch.setattr(requests, "get", mock_get)
     briefs = get_briefs()  # Filtering active briefs; invalid date will be skipped.
     assert briefs == []
+
+def test_get_briefs_with_reward_delay(monkeypatch):
+    """
+    Test that get_briefs correctly includes briefs that ended within YT_REWARD_DELAY days.
+    """
+    # Calculate dates for testing
+    current_date = datetime.now(timezone.utc).date()
+    end_date = current_date - timedelta(days=1)  # Yesterday
+    start_date = end_date - timedelta(days=5)    # 5 days before end date
+    
+    # Create a brief that ended yesterday (should be included due to reward delay)
+    mock_data = {
+        "briefs": [
+            {
+                "id": "recently_ended", 
+                "start_date": start_date.strftime("%Y-%m-%d"), 
+                "end_date": end_date.strftime("%Y-%m-%d")
+            },
+            {
+                "id": "old_ended", 
+                "start_date": "2000-01-01", 
+                "end_date": "2000-01-02"
+            }
+        ]
+    }
+
+    def mock_get(*args, **kwargs):
+        return MockResponse(mock_data)
+
+    monkeypatch.setattr(requests, "get", mock_get)
+    briefs = get_briefs()  # Default is all=False, so it filters active briefs.
+    
+    # The 'recently_ended' brief should be included because it ended within YT_REWARD_DELAY days
+    assert isinstance(briefs, list)
+    assert len(briefs) == 1
+    assert briefs[0]["id"] == "recently_ended"
+    
+    # Test with a brief that ended beyond the reward delay period
+    old_end_date = current_date - timedelta(days=YT_REWARD_DELAY + 1)
+    old_start_date = old_end_date - timedelta(days=5)
+    
+    mock_data = {
+        "briefs": [
+            {
+                "id": "beyond_delay", 
+                "start_date": old_start_date.strftime("%Y-%m-%d"), 
+                "end_date": old_end_date.strftime("%Y-%m-%d")
+            }
+        ]
+    }
+    
+    briefs = get_briefs()
+    assert len(briefs) == 0  # Should not be included as it's beyond the reward delay period
