@@ -53,7 +53,7 @@ async def forward(self):
     bt.logging.info(f"Number of responses received: {len(responses)}")
 
     # Get rewards for the responses
-    rewards, yt_stats_list = get_rewards(self, responses=responses)
+    rewards, yt_stats_list = get_rewards(self, miner_uids, responses=responses)
 
     # Log the rewards for monitoring purposes
     bt.logging.info(f"Scored responses: {rewards}")

@@ -81,5 +81,5 @@ if __name__ == "__main__":
         update_thread.start()
 
         while True:
-            bt.logging.info(f"Validator running... {time.time()}")
-            time.sleep(5)
+            bt.logging.info(f"Validator running | uid {validator.uid} | {time.time()}")
+            time.sleep(30)

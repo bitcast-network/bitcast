@@ -11,6 +11,9 @@ def test_get_rewards():
         MagicMock(YT_access_token="token2")
     ]
 
+    # Create mock UIDs
+    uids = [1, 2]
+
     # Mock scores to be returned by reward function
     mock_scores = [
         [10, 10, 10],  # Scores for response 1
@@ -25,10 +28,10 @@ def test_get_rewards():
 
     # Patch get_briefs and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda briefs, response: mock_scores.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: {"scores": mock_scores.pop(0)}) as mock_reward:
         
         # Call get_rewards
-        result = get_rewards(mock_self, responses)
+        result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
         # Verify the result is a list of numpy float64 values
         assert isinstance(result, list)
@@ -47,6 +50,10 @@ def test_get_rewards():
         
         # Verify that reward was called for each response
         assert mock_reward.call_count == 2
+        
+        # Verify that yt_stats_list is returned
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 2
 
 def test_get_rewards_identical_responses():
     # Create 3 identical mock responses
@@ -55,6 +62,9 @@ def test_get_rewards_identical_responses():
         MagicMock(YT_access_token="token2"),
         MagicMock(YT_access_token="token3")
     ]
+
+    # Create mock UIDs
+    uids = [1, 2, 3]
 
     # Mock scores to be returned by reward function - all identical [5, 10, 15]
     mock_scores = [
@@ -71,10 +81,10 @@ def test_get_rewards_identical_responses():
 
     # Patch get_briefs and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda briefs, response: mock_scores.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: {"scores": mock_scores.pop(0)}) as mock_reward:
         
         # Call get_rewards
-        result = get_rewards(mock_self, responses)
+        result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
         # Verify the result is a list of numpy float64 values
         assert isinstance(result, list)
@@ -90,6 +100,10 @@ def test_get_rewards_identical_responses():
         
         # Verify that reward was called for each response
         assert mock_reward.call_count == 3
+        
+        # Verify that yt_stats_list is returned
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 3
 
 def test_get_rewards_with_zeros():
     # Create mock responses
@@ -98,6 +112,9 @@ def test_get_rewards_with_zeros():
         MagicMock(YT_access_token="token2"),
         MagicMock(YT_access_token="token3")
     ]
+
+    # Create mock UIDs
+    uids = [1, 2, 3]
 
     # Mock scores to be returned by reward function - each has a zero in one position
     mock_scores = [
@@ -114,10 +131,10 @@ def test_get_rewards_with_zeros():
 
     # Patch get_briefs and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda briefs, response: mock_scores.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: {"scores": mock_scores.pop(0)}) as mock_reward:
         
         # Call get_rewards
-        result = get_rewards(mock_self, responses)
+        result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
         # Verify the result is a list of numpy float64 values
         assert isinstance(result, list)
@@ -138,6 +155,10 @@ def test_get_rewards_with_zeros():
         
         # Verify that reward was called for each response
         assert mock_reward.call_count == 3
+        
+        # Verify that yt_stats_list is returned
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 3
 
 def test_get_rewards_all_zeros_in_first_position():
     # Create mock responses
@@ -146,6 +167,9 @@ def test_get_rewards_all_zeros_in_first_position():
         MagicMock(YT_access_token="token2"),
         MagicMock(YT_access_token="token3")
     ]
+
+    # Create mock UIDs
+    uids = [1, 2, 3]
 
     # Mock scores to be returned by reward function - all have zero in first position
     mock_scores = [
@@ -162,10 +186,10 @@ def test_get_rewards_all_zeros_in_first_position():
 
     # Patch get_briefs and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda briefs, response: mock_scores.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: {"scores": mock_scores.pop(0)}) as mock_reward:
         
         # Call get_rewards
-        result = get_rewards(mock_self, responses)
+        result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
         # Verify the result is a list of numpy float64 values
         assert isinstance(result, list)
@@ -185,7 +209,11 @@ def test_get_rewards_all_zeros_in_first_position():
         mock_get_briefs.assert_called_once()
         
         # Verify that reward was called for each response
-        assert mock_reward.call_count == 3 
+        assert mock_reward.call_count == 3
+        
+        # Verify that yt_stats_list is returned
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 3
 
 
 def test_normalize_across_miners():
