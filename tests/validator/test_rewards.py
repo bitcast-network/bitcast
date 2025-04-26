@@ -215,6 +215,58 @@ def test_get_rewards_all_zeros_in_first_position():
         assert isinstance(yt_stats_list, list)
         assert len(yt_stats_list) == 3
 
+def test_get_rewards_uid_0():
+    # Create mock responses
+    responses = [
+        MagicMock(YT_access_token="token1"),
+        MagicMock(YT_access_token="token2"),
+        MagicMock(YT_access_token="token3")
+    ]
+
+    # Create mock UIDs - include UID 0
+    uids = [0, 1, 2]
+
+    # Mock briefs to be returned by get_briefs
+    mock_briefs = ['brief1', 'brief2', 'brief3']
+
+    # Create a mock class instance for self parameter
+    mock_self = MagicMock()
+
+    # Patch get_briefs and reward functions
+    with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: {"scores": [1.0] * len(briefs) if uid == 0 else [0.5] * len(briefs)}) as mock_reward:
+        
+        # Call get_rewards
+        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        
+        # Verify the result is a list of numpy float64 values
+        assert isinstance(result, list)
+        assert all(isinstance(score, np.float64) for score in result)
+        
+        # The expected result after normalization and summing
+        # For UID 0: [1.0, 1.0, 1.0] -> normalized across miners -> [0.5, 0.5, 0.5] -> normalized across briefs -> [0.167, 0.167, 0.167] -> sum = 0.5
+        # For other UIDs: [0.5, 0.5, 0.5] -> normalized across miners -> [0.25, 0.25, 0.25] -> normalized across briefs -> [0.083, 0.083, 0.083] -> sum = 0.25
+        expected_result = [0.5, 0.25, 0.25]
+        
+        # Check that the result matches the expected values (with some tolerance for floating point)
+        np.testing.assert_allclose(result, expected_result, rtol=1e-5)
+        
+        # Verify that get_briefs was called
+        mock_get_briefs.assert_called_once()
+        
+        # Verify that reward was called for each response
+        assert mock_reward.call_count == 3
+        
+        # Verify that yt_stats_list is returned
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 3
+        
+        # Verify that UID 0 has all scores set to 1.0
+        assert all(score == 1.0 for score in yt_stats_list[0]["scores"])
+        
+        # Verify that other UIDs have scores set to 0.5
+        assert all(score == 0.5 for score in yt_stats_list[1]["scores"])
+        assert all(score == 0.5 for score in yt_stats_list[2]["scores"])
 
 def test_normalize_across_miners():
     # Test with regular matrix
@@ -270,3 +322,44 @@ def test_normalise_scores():
     scores_matrix = np.array([[0, 0], [0, 0]])
     final_scores = normalise_scores(scores_matrix)
     assert np.allclose(final_scores, [0.0, 0.0])
+
+def test_get_rewards_empty_briefs():
+    # Create mock responses
+    responses = [
+        MagicMock(YT_access_token="token1"),
+        MagicMock(YT_access_token="token2"),
+        MagicMock(YT_access_token="token3")
+    ]
+
+    # Create mock UIDs - include UID 0
+    uids = [0, 1, 2]
+
+    # Create a mock class instance for self parameter
+    mock_self = MagicMock()
+
+    # Patch get_briefs to return an empty list
+    with patch('bitcast.validator.reward.get_briefs', return_value=[]) as mock_get_briefs:
+        
+        # Call get_rewards
+        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        
+        # Verify the result is a numpy array
+        assert isinstance(result, np.ndarray)
+        
+        # Verify the expected result: UID 0 gets 1.0, others get 0.0
+        expected_result = np.array([1.0, 0.0, 0.0])
+        np.testing.assert_allclose(result, expected_result, rtol=1e-5)
+        
+        # Verify that get_briefs was called
+        mock_get_briefs.assert_called_once()
+        
+        # Verify that yt_stats_list is returned with the correct structure
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 3
+        
+        # Verify that UID 0 has a score of 1.0
+        assert yt_stats_list[0]["scores"] == [1.0]
+        
+        # Verify that other UIDs have a score of 0.0
+        assert yt_stats_list[1]["scores"] == [0.0]
+        assert yt_stats_list[2]["scores"] == [0.0]

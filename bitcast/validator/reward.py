@@ -32,6 +32,12 @@ def reward(uid, briefs, response) -> dict:
     """
     bt.logging.info(f"===== Reward function called for UID: {uid} =====")
 
+    # Give the burn UID low score.
+    # If a brief has no valid videos its portion of emissions is burned.
+    if uid == 0:
+        bt.logging.info(f"Special case: Setting all scores to 1.0 for UID: {uid}")
+        return {"scores": [1.0] * len(briefs)}
+
     if not response:
         bt.logging.info("No response provided, returning default scores.")
         return {"scores": [0.0] * len(briefs)}
@@ -67,6 +73,11 @@ def get_rewards(
     - List[dict]: A list of YouTube statistics dictionaries for each response.
     """
     briefs = get_briefs()
+    
+    # Special case: If briefs is empty, return a list of scores where UID 0 gets 1.0 and others get 0.0
+    if not briefs:
+        bt.logging.info("No briefs available, returning special case scores.")
+        return np.array([1.0 if uid == 0 else 0.0 for uid in uids]), [{"scores": [1.0] if uid == 0 else [0.0]} for uid in uids]
 
     yt_stats_list = [reward(uid, briefs, response) for uid, response in zip(uids, responses)]
     scores_matrix = np.array([yt_stats["scores"] for yt_stats in yt_stats_list])
