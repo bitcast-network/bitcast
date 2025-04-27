@@ -18,7 +18,7 @@ Validators are crucial network participants that:
 ## 💻 System Requirements
 
 - **CPU**: 2 cores
-- **RAM**: 4 GB
+- **RAM**: 8 GB
 
 Ensure your machine meets these requirements before proceeding with setup.
 
@@ -28,7 +28,7 @@ Ensure your machine meets these requirements before proceeding with setup.
 
 1. **RapidAPI Key**
    - Sign up at [RapidAPI](https://rapidapi.com/)
-   - Subscribe to required APIs
+   - Subscribe to the [youtube-transcriptor API](https://rapidapi.com/benrhzala90/api/youtube-transcriptor) - Choose **Pro** subscription ($10pm)
    - Copy your API key
 
 2. **OpenAI API Key**
@@ -51,13 +51,13 @@ Ensure your machine meets these requirements before proceeding with setup.
 
 2. **Setup Environment**
    ```bash
-   chmod +x *validator.sh
-   ./setup_env_validator.sh
+   chmod +x scripts/setup_env.sh
+   ./scripts/setup_env.sh
    ```
 
 3. **Configure Environment**
    ```bash
-   cp validator/.env.example validator/.env
+   cp bitcast/validator/.env.example bitcast/validator/.env
    ```
    Edit `.env` with your information:
    - `WALLET_NAME`: Your Bittensor wallet name
@@ -80,7 +80,7 @@ Ensure your machine meets these requirements before proceeding with setup.
 
 1. **Start Validator Service**
    ```bash
-   ./run_validator.sh
+   ./scripts/run_validator.sh
    ```
 
 2. **Process Management with PM2**
