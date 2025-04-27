@@ -189,7 +189,7 @@ def check_video_publish_date(video_data, briefs, decision_details):
             earliest_allowed_date = brief_start_date - timedelta(days=YT_VIDEO_RELEASE_BUFFER)
             
             if video_publish_date < earliest_allowed_date:
-                bt.logging.warning(f"Video was published before the allowed buffer period: {video_publish_date} < {earliest_allowed_date} (brief start: {brief_start_date}, buffer: {YT_VIDEO_RELEASE_BUFFER} days)")
+                bt.logging.warning(f"Video was published before the allowed period")
                 decision_details["publishDateCheck"] = False
                 decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
                 return False

@@ -6,7 +6,7 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
 
 ## 🎥 Content Requirements
 
-> **Don’t register until you hit these!**
+> **Don’t register until you hit these!**  
 > **Note: Content requirements are likely to increase over time**
 
 1. **YouTube account**  
@@ -108,6 +108,8 @@ Make sure your server meets these before you start.
 
 ## 🚀 Run Miner
 
+**Important:** The OAuth consent screen requires a browser environment. Run the miner from a terminal capable of launching your default web browser (e.g., VS Code). Headless or minimal terminals (e.g., PuTTY, Terminus, mobaXterm) will not be suitable.
+
 1. **Configure miner script**  
    - Edit `scripts/run_miner.sh`  
      - Set `WALLET_NAME=<your wallet name>`  
@@ -149,11 +151,11 @@ Make sure your server meets these before you start.
 
 ## ℹ️ General Notes
 
-- **2‑day emissions delay:** You’ll begin receiving miner emissions **2 days** after the miner starts.  
+- **2-day emissions delay:** You’ll begin receiving miner emissions **2 days** after the miner starts.  
 - **Validator polling:** Each validator sends a request roughly every **4 hours**.  
-- **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)
-- **Single YouTube account:** Each miner instance supports only **one** YouTube account. To connect multiple accounts, run multiple miners.
-- **Auto‑updates:** The codebase has auto-update enabled by default.
+- **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)  
+- **Single YouTube account:** Each miner instance supports only **one** YouTube account. To connect multiple accounts, run multiple miners.  
+- **Auto-updates:** The codebase has auto-update enabled by default.
 
 ---
 
