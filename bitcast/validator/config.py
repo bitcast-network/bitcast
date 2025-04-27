@@ -18,18 +18,6 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
 WANDB_PROJECT = os.getenv('WANDB_PROJECT', 'bitcast_vali_logs')
 
-# Check if any required variables are missing
-required_vars = {
-    'RAPID_API_KEY': RAPID_API_KEY,
-    'OPENAI_API_KEY': OPENAI_API_KEY,
-    'WANDB_API_KEY': WANDB_API_KEY
-}
-
-missing_vars = [var for var, value in required_vars.items() if value is None or value == '']
-if missing_vars:
-    sys.stderr.write(f"Error: Missing required environment variables: {', '.join(missing_vars)}\n")
-    sys.exit(1)
-
 # optional
 DISABLE_LLM_CACHING = os.getenv('DISABLE_LLM_CACHING', 'False').lower() == 'true'
 LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY')

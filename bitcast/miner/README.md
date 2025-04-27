@@ -34,41 +34,6 @@ Make sure your server meets these before you start.
 
 ---
 
-## 🔑 Google Console Setup
-
-1. **Create a project**  
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)  
-   - Click **Select a project → New Project**  
-   - Name it **bitcast_miner**, then **Create**.  
-   - After creation, open the **project selector** dropdown in the top bar and select **bitcast_miner**.
-
-2. **Enable APIs**  
-   - Open **APIs & Services → Library**  
-   - Search for **YouTube Data API v3** and **YouTube Analytics API**  
-   - Click **Enable** on each.
-
-3. **Configure OAuth consent screen**  
-   - Click **Get Started**.  
-   - Go to **APIs & Services → OAuth consent screen**  
-   - App name: **bitcast-miner**  
-   - Support email: *your email*  
-   - Audience: **External**  
-   - Contact email: *your email*  
-   - Agree to Google’s data policy and terms  
-   - Click **Create**.
-
-4. **Create OAuth credentials**  
-   - Go to **Overview → Metrics → Create OAuth client**  
-   - Application type: **Desktop app**  
-   - Name it **bitcast-miner**  
-   - Click **Create**.  
-   - Download the JSON and save as  
-     ```
-     bitcast/miner/secrets/client_secret.json
-     ```
-
----
-
 ## 🚀 Installation & Miner Registration
 
 1. **Clone repo**  
@@ -103,6 +68,41 @@ Make sure your server meets these before you start.
         --wallet.name <WALLET_NAME> \
         --hotkey <HOTKEY_NAME>
       ```
+
+---
+
+## 🔑 Google Console Setup
+
+1. **Create a project**  
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)  
+   - Click **Select a project → New Project**  
+   - Name it **bitcast_miner**, then **Create**.  
+   - After creation, open the **project selector** dropdown in the top bar and select **bitcast_miner**.
+
+2. **Enable APIs**  
+   - Open **APIs & Services → Library**  
+   - Search for **YouTube Data API v3** and **YouTube Analytics API**  
+   - Click **Enable** on each.
+
+3. **Configure OAuth consent screen**  
+   - Click **Get Started**.  
+   - Go to **APIs & Services → OAuth consent screen**  
+   - App name: **bitcast-miner**  
+   - Support email: *your email*  
+   - Audience: **External**  
+   - Contact email: *your email*  
+   - Agree to Google’s data policy and terms  
+   - Click **Create**.
+
+4. **Create OAuth credentials**  
+   - Go to **Overview → Metrics → Create OAuth client**  
+   - Application type: **Desktop app**  
+   - Name it **bitcast-miner**  
+   - Click **Create**.  
+   - Download the JSON and save as  
+     ```
+     bitcast/miner/secrets/client_secret.json
+     ```
 
 ---
 
