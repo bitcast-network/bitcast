@@ -176,5 +176,5 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
     # Update the score for the matching brief
     for i, match in enumerate(video_matches.get(video_id, [])):
         if match:
-            result["scores"][i] = video_score
+            result["scores"][i] += video_score
             bt.logging.info(f"Brief: {briefs[i]['id']}, Video: {video_id}, Score: {video_score}")
