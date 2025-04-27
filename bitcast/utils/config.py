@@ -117,24 +117,10 @@ def add_args(cls, parser):
     )
 
     parser.add_argument(
-        "--wandb.off",
-        action="store_true",
-        help="Turn off wandb.",
-        default=False,
-    )
-
-    parser.add_argument(
-        "--wandb.offline",
-        action="store_true",
-        help="Runs wandb in offline mode.",
-        default=False,
-    )
-
-    parser.add_argument(
-        "--wandb.notes",
+        "--wandb.project",
         type=str,
-        help="Notes to add to the wandb run.",
-        default="",
+        default="bitcast_vali_logs",
+        help="Wandb project to log to.",
     )
 
 
@@ -167,20 +153,6 @@ def add_miner_args(cls, parser):
         type=int,
         help="Minimum stake required for a validator to query this miner.",
         default=30000,
-    )
-
-    parser.add_argument(
-        "--wandb.project_name",
-        type=str,
-        default="template-miners",
-        help="Wandb project to log to.",
-    )
-
-    parser.add_argument(
-        "--wandb.entity",
-        type=str,
-        default="opentensor-dev",
-        help="Wandb entity to log to.",
     )
 
     parser.add_argument(
