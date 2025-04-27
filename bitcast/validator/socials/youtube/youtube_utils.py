@@ -20,7 +20,7 @@ def reset_scored_videos():
     """
     global scored_video_ids
     scored_video_ids = []
-    bt.logging.info(f"Reset scored_video_ids list. Current length: {len(scored_video_ids)}")
+    bt.logging.info(f"Reset scored_video_ids list")
 
 def is_video_already_scored(video_id):
     """Check if a video has already been scored by another hotkey."""
@@ -32,7 +32,6 @@ def is_video_already_scored(video_id):
 def mark_video_as_scored(video_id):
     """Mark a video as scored to prevent duplicate processing."""
     scored_video_ids.append(video_id)
-    bt.logging.info(f"Added video {video_id} to scored_video_ids. Current length: {len(scored_video_ids)}")
 
 # ============================================================================
 # Channel Analytics Functions

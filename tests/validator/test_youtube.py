@@ -29,7 +29,7 @@ async def test_update_video_score():
     # Setup
     youtube_analytics_client = MagicMock()
     briefs = [{"id": "test_brief"}]
-    result = {"videos": {}, "scores": [0]}
+    result = {"videos": {}, "scores": {"test_brief": 0}}
     
     # Create a single video_matches dictionary that will be updated
     video_matches = {}
@@ -42,7 +42,7 @@ async def test_update_video_score():
         result["videos"][video_id_1] = {"details": {}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 2, "daily_analytics": {}}
         update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result)
-        assert result["scores"][0] == 2, "First score should be 2"
+        assert result["scores"]["test_brief"] == 2, "First score should be 2"
         
         # Test case 2: Second video with score 4
         video_id_2 = "test_video_id_2"
@@ -50,7 +50,7 @@ async def test_update_video_score():
         result["videos"][video_id_2] = {"details": {}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 4, "daily_analytics": {}}
         update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result)
-        assert result["scores"][0] == 6, "Score should be sum of 2 and 4"
+        assert result["scores"]["test_brief"] == 6, "Score should be sum of 2 and 4"
         
         # Test case 3: Third video with score 2
         video_id_3 = "test_video_id_3"
@@ -58,7 +58,7 @@ async def test_update_video_score():
         result["videos"][video_id_3] = {"details": {}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 2, "daily_analytics": {}}
         update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result)
-        assert result["scores"][0] == 8, "Score should be sum of 2, 4, and 2"
+        assert result["scores"]["test_brief"] == 8, "Score should be sum of 2, 4, and 2"
         
         # Test case 4: Fourth video with score 0
         video_id_4 = "test_video_id_4"
@@ -66,4 +66,4 @@ async def test_update_video_score():
         result["videos"][video_id_4] = {"details": {}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 0, "daily_analytics": {}}
         update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result)
-        assert result["scores"][0] == 8, "Score should remain 8 (sum of 2, 4, 2, and 0)"
+        assert result["scores"]["test_brief"] == 8, "Score should remain 8 (sum of 2, 4, 2, and 0)"

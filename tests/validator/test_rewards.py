@@ -16,12 +16,12 @@ def test_get_rewards():
 
     # Mock scores to be returned by reward function
     mock_scores = [
-        [10, 10, 10],  # Scores for response 1
-        [15, 15, 15]   # Scores for response 2
+        {"brief1": 10, "brief2": 10, "brief3": 10},  # Scores for response 1
+        {"brief1": 15, "brief2": 15, "brief3": 15}   # Scores for response 2
     ]
 
     # Mock briefs to be returned by get_briefs
-    mock_briefs = ['brief1', 'brief2', 'brief3']
+    mock_briefs = [{"id": "brief1"}, {"id": "brief2"}, {"id": "brief3"}]
 
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
@@ -66,15 +66,15 @@ def test_get_rewards_identical_responses():
     # Create mock UIDs
     uids = [1, 2, 3]
 
-    # Mock scores to be returned by reward function - all identical [5, 10, 15]
+    # Mock scores to be returned by reward function - all identical
     mock_scores = [
-        [5, 10, 15],  # Scores for response 1
-        [5, 10, 15],  # Scores for response 2
-        [5, 10, 15]   # Scores for response 3
+        {"brief1": 5, "brief2": 10, "brief3": 15},  # Scores for response 1
+        {"brief1": 5, "brief2": 10, "brief3": 15},  # Scores for response 2
+        {"brief1": 5, "brief2": 10, "brief3": 15}   # Scores for response 3
     ]
 
     # Mock briefs to be returned by get_briefs
-    mock_briefs = ['brief1', 'brief2', 'brief3']
+    mock_briefs = [{"id": "brief1"}, {"id": "brief2"}, {"id": "brief3"}]
 
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
@@ -118,13 +118,13 @@ def test_get_rewards_with_zeros():
 
     # Mock scores to be returned by reward function - each has a zero in one position
     mock_scores = [
-        [0, 10, 10],  # Scores for response 1
-        [10, 0, 10],  # Scores for response 2
-        [10, 10, 0]   # Scores for response 3
+        {"brief1": 0, "brief2": 10, "brief3": 10},  # Scores for response 1
+        {"brief1": 10, "brief2": 0, "brief3": 10},  # Scores for response 2
+        {"brief1": 10, "brief2": 10, "brief3": 0}   # Scores for response 3
     ]
 
     # Mock briefs to be returned by get_briefs
-    mock_briefs = ['brief1', 'brief2', 'brief3']
+    mock_briefs = [{"id": "brief1"}, {"id": "brief2"}, {"id": "brief3"}]
 
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
@@ -173,13 +173,13 @@ def test_get_rewards_all_zeros_in_first_position():
 
     # Mock scores to be returned by reward function - all have zero in first position
     mock_scores = [
-        [0, 10, 10],  # Scores for response 1
-        [0, 10, 10],  # Scores for response 2
-        [0, 10, 10]   # Scores for response 3
+        {"brief1": 0, "brief2": 10, "brief3": 10},  # Scores for response 1
+        {"brief1": 0, "brief2": 10, "brief3": 10},  # Scores for response 2
+        {"brief1": 0, "brief2": 10, "brief3": 10}   # Scores for response 3
     ]
 
     # Mock briefs to be returned by get_briefs
-    mock_briefs = ['brief1', 'brief2', 'brief3']
+    mock_briefs = [{"id": "brief1"}, {"id": "brief2"}, {"id": "brief3"}]
 
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
@@ -227,14 +227,14 @@ def test_get_rewards_uid_0():
     uids = [0, 1, 2]
 
     # Mock briefs to be returned by get_briefs
-    mock_briefs = ['brief1', 'brief2', 'brief3']
+    mock_briefs = [{"id": "brief1"}, {"id": "brief2"}, {"id": "brief3"}]
 
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
 
     # Patch get_briefs and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: {"scores": [1.0] * len(briefs) if uid == 0 else [0.5] * len(briefs)}) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: {"scores": {brief["id"]: 1.0 if uid == 0 else 0.5 for brief in briefs}}) as mock_reward:
         
         # Call get_rewards
         result, yt_stats_list = get_rewards(mock_self, uids, responses)
@@ -260,13 +260,47 @@ def test_get_rewards_uid_0():
         # Verify that yt_stats_list is returned
         assert isinstance(yt_stats_list, list)
         assert len(yt_stats_list) == 3
+
+def test_get_rewards_empty_briefs():
+    # Create mock responses
+    responses = [
+        MagicMock(YT_access_token="token1"),
+        MagicMock(YT_access_token="token2"),
+        MagicMock(YT_access_token="token3")
+    ]
+
+    # Create mock UIDs - include UID 0
+    uids = [0, 1, 2]
+
+    # Create a mock class instance for self parameter
+    mock_self = MagicMock()
+
+    # Patch get_briefs to return an empty list
+    with patch('bitcast.validator.reward.get_briefs', return_value=[]) as mock_get_briefs:
         
-        # Verify that UID 0 has all scores set to 1.0
-        assert all(score == 1.0 for score in yt_stats_list[0]["scores"])
+        # Call get_rewards
+        result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
-        # Verify that other UIDs have scores set to 0.5
-        assert all(score == 0.5 for score in yt_stats_list[1]["scores"])
-        assert all(score == 0.5 for score in yt_stats_list[2]["scores"])
+        # Verify the result is a numpy array
+        assert isinstance(result, np.ndarray)
+        
+        # Verify the expected result: UID 0 gets 1.0, others get 0.0
+        expected_result = np.array([1.0, 0.0, 0.0])
+        np.testing.assert_allclose(result, expected_result, rtol=1e-5)
+        
+        # Verify that get_briefs was called
+        mock_get_briefs.assert_called_once()
+        
+        # Verify that yt_stats_list is returned with the correct structure
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 3
+        
+        # Verify that UID 0 has a score of 1.0
+        assert yt_stats_list[0]["scores"] == {}
+        
+        # Verify that other UIDs have a score of 0.0
+        assert yt_stats_list[1]["scores"] == {}
+        assert yt_stats_list[2]["scores"] == {}
 
 def test_normalize_across_miners():
     # Test with regular matrix
@@ -322,44 +356,3 @@ def test_normalise_scores():
     scores_matrix = np.array([[0, 0], [0, 0]])
     final_scores = normalise_scores(scores_matrix)
     assert np.allclose(final_scores, [0.0, 0.0])
-
-def test_get_rewards_empty_briefs():
-    # Create mock responses
-    responses = [
-        MagicMock(YT_access_token="token1"),
-        MagicMock(YT_access_token="token2"),
-        MagicMock(YT_access_token="token3")
-    ]
-
-    # Create mock UIDs - include UID 0
-    uids = [0, 1, 2]
-
-    # Create a mock class instance for self parameter
-    mock_self = MagicMock()
-
-    # Patch get_briefs to return an empty list
-    with patch('bitcast.validator.reward.get_briefs', return_value=[]) as mock_get_briefs:
-        
-        # Call get_rewards
-        result, yt_stats_list = get_rewards(mock_self, uids, responses)
-        
-        # Verify the result is a numpy array
-        assert isinstance(result, np.ndarray)
-        
-        # Verify the expected result: UID 0 gets 1.0, others get 0.0
-        expected_result = np.array([1.0, 0.0, 0.0])
-        np.testing.assert_allclose(result, expected_result, rtol=1e-5)
-        
-        # Verify that get_briefs was called
-        mock_get_briefs.assert_called_once()
-        
-        # Verify that yt_stats_list is returned with the correct structure
-        assert isinstance(yt_stats_list, list)
-        assert len(yt_stats_list) == 3
-        
-        # Verify that UID 0 has a score of 1.0
-        assert yt_stats_list[0]["scores"] == [1.0]
-        
-        # Verify that other UIDs have a score of 0.0
-        assert yt_stats_list[1]["scores"] == [0.0]
-        assert yt_stats_list[2]["scores"] == [0.0]

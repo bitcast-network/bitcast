@@ -36,13 +36,13 @@ def reward(uid, briefs, response) -> dict:
     # If a brief has no valid videos its portion of emissions is burned.
     if uid == 0:
         bt.logging.info(f"Special case: Setting all scores to 1.0 for UID: {uid}")
-        return {"scores": [1.0] * len(briefs)}
+        return {"scores": {brief["id"]: 1.0 for brief in briefs}}
 
     if not response:
         bt.logging.info("No response provided, returning default scores.")
-        return {"scores": [0.0] * len(briefs)}
+        return {"scores": {brief["id"]: 0.0 for brief in briefs}}
     
-    yt_stats = {"scores": [0.0] * len(briefs)}  # Initialize yt_stats outside the try block
+    yt_stats = {"scores": {brief["id"]: 0.0 for brief in briefs}}  # Initialize yt_stats outside the try block
 
     try:
         # YouTube Scoring
@@ -77,13 +77,21 @@ def get_rewards(
     # Special case: If briefs is empty, return a list of scores where UID 0 gets 1.0 and others get 0.0
     if not briefs:
         bt.logging.info("No briefs available, returning special case scores.")
-        return np.array([1.0 if uid == 0 else 0.0 for uid in uids]), [{"scores": [1.0] if uid == 0 else [0.0]} for uid in uids]
+        return np.array([1.0 if uid == 0 else 0.0 for uid in uids]), [{"scores": {}} for uid in uids]
+
+    bt.logging.info(f"List of UIDs: {uids}")
+
 
     yt_stats_list = [reward(uid, briefs, response) for uid, response in zip(uids, responses)]
-    scores_matrix = np.array([yt_stats["scores"] for yt_stats in yt_stats_list])
-
+    
+    # Convert dictionary scores to matrix format for normalization
+    scores_matrix = []
+    for yt_stats in yt_stats_list:
+        scores = [yt_stats["scores"].get(brief["id"], 0.0) for brief in briefs]
+        scores_matrix.append(scores)
+    
+    scores_matrix = np.array(scores_matrix)
     youtube_utils.reset_scored_videos()
-
     rewards = normalise_scores(scores_matrix)
 
     return rewards, yt_stats_list

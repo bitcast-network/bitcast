@@ -62,7 +62,8 @@ def eval_youtube(creds, briefs):
 
 def initialize_youtube_evaluation(creds, briefs):
     """Initialize the result structure and YouTube API clients."""
-    scores = [0] * len(briefs)
+    # Initialize scores with brief IDs as keys
+    scores = {brief["id"]: 0 for brief in briefs}
     
     # Initialize the comprehensive result structure
     result = {
@@ -176,5 +177,6 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
     # Update the score for the matching brief
     for i, match in enumerate(video_matches.get(video_id, [])):
         if match:
-            result["scores"][i] += video_score
-            bt.logging.info(f"Brief: {briefs[i]['id']}, Video: {video_id}, Score: {video_score}")
+            brief_id = briefs[i]["id"]
+            result["scores"][brief_id] += video_score
+            bt.logging.info(f"Brief: {brief_id}, Video: {video_id}, Score: {video_score}")
