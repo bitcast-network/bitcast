@@ -44,5 +44,9 @@ def get_all_uids(self, exclude: List[int] = None) -> np.ndarray:
         if uid_is_available and uid_is_not_excluded:
             avail_uids.append(uid)
 
+    # Ensure uid 0 is always included at the start of the list
+    if 0 not in avail_uids:
+        avail_uids.insert(0, 0)
+
     uids = np.array(avail_uids)
     return uids
