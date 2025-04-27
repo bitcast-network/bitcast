@@ -33,10 +33,6 @@ if [ -z "$OPENAI_API_KEY" ]; then
   echo "Error: OPENAI_API_KEY is not set in the .env file."
   exit 1
 fi
-if [ -z "$BITCAST_BRIEFS_ENDPOINT" ]; then
-  echo "Error: BITCAST_BRIEFS_ENDPOINT is not set in the .env file."
-  exit 1
-fi
 if [ -z "$WANDB_API_KEY" ]; then
   echo "Error: WANDB_API_KEY is not set in the .env file."
   exit 1
