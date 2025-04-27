@@ -28,6 +28,7 @@ import bittensor as bt
 from bitcast.base.validator import BaseValidatorNeuron
 from bitcast.validator import forward
 from bitcast.validator import config
+from bitcast.validator.config import __version__
 from core.auto_update import run_auto_update
 
 class Validator(BaseValidatorNeuron):
@@ -45,9 +46,11 @@ class Validator(BaseValidatorNeuron):
         # Initialize wandb
         try:
             wandb.init(
-                entity="bitcast-network",
-                project="bitcast",
-                name=f"run_{self.wallet.hotkey.ss58_address[:6]}",
+                entity="bitcast_network",
+                project="bitcast_vali_logs",
+                name=f"validator-{self.uid}-{__version__}",
+                config=self.config,
+                reinit=True
             )
         except Exception as e:
             bt.logging.error(f"Failed to initialize wandb run: {e}")

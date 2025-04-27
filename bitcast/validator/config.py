@@ -7,6 +7,8 @@ import bittensor as bt
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
+__version__ = "0.1.0"
+
 # required
 BITCAST_BRIEFS_ENDPOINT = os.getenv('BITCAST_BRIEFS_ENDPOINT')
 BITCAST_STATS_ENDPOINT = os.getenv('BITCAST_STATS_ENDPOINT')
