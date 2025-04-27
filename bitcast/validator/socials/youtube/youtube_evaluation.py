@@ -10,7 +10,10 @@ from bitcast.validator.config import (
     YT_REWARD_DELAY,
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
-    RAPID_API_KEY
+    RAPID_API_KEY,
+    YT_MIN_MINS_WATCHED,
+    YT_LOOKBACK,
+    YT_VIDEO_RELEASE_BUFFER
 )
 
 def vet_channel(channel_data, channel_analytics):
@@ -52,7 +55,11 @@ def check_channel_criteria(channel_data, channel_analytics, channel_age_days):
         criteria_met = False
 
     if float(channel_analytics["averageViewPercentage"]) < YT_MIN_CHANNEL_RETENTION:
-        bt.logging.warning(f"Avg retention check failed: {channel_data['id']}. {channel_analytics['averageViewPercentage']} < {YT_MIN_CHANNEL_RETENTION}%.")
+        bt.logging.warning(f"Avg retention check failed (last {YT_LOOKBACK} days): {channel_data['id']}. {channel_analytics['averageViewPercentage']} < {YT_MIN_CHANNEL_RETENTION}%.")
+        criteria_met = False
+        
+    if float(channel_analytics["estimatedMinutesWatched"]) < YT_MIN_MINS_WATCHED:
+        bt.logging.warning(f"Minutes watched check failed (last {YT_LOOKBACK} days): {channel_data['id']}. {channel_analytics['estimatedMinutesWatched']} < {YT_MIN_MINS_WATCHED}.")
         criteria_met = False
 
     return criteria_met
@@ -122,6 +129,10 @@ def vet_video(video_id, briefs, video_data, video_analytics):
     if not check_video_privacy(video_data, decision_details, briefs):
         return {"met_brief_ids": [], "decision_details": decision_details}
     
+    # Check if video was published after brief start date
+    if not check_video_publish_date(video_data, briefs, decision_details):
+        return {"met_brief_ids": [], "decision_details": decision_details}
+    
     # Check video retention
     if not check_video_retention(video_id, video_analytics, decision_details, briefs):
         return {"met_brief_ids": [], "decision_details": decision_details}
@@ -152,7 +163,8 @@ def initialize_decision_details():
         "manualCaptionsCheck": None,
         "promptInjectionCheck": None,
         "contentAgainstBriefCheck": [],
-        "publicVideo": None
+        "publicVideo": None,
+        "publishDateCheck": None
     }
 
 def check_video_privacy(video_data, decision_details, briefs):
@@ -165,6 +177,30 @@ def check_video_privacy(video_data, decision_details, briefs):
     else:
         decision_details["publicVideo"] = True
         return True
+
+def check_video_publish_date(video_data, briefs, decision_details):
+    """Check if the video was published after the brief's start date (minus buffer days)."""
+    try:
+        video_publish_date = datetime.strptime(video_data["publishedAt"], '%Y-%m-%dT%H:%M:%SZ').date()
+        
+        for brief in briefs:
+            brief_start_date = datetime.strptime(brief["start_date"], "%Y-%m-%d").date()
+            # Calculate the earliest allowed publish date by subtracting the buffer days
+            earliest_allowed_date = brief_start_date - timedelta(days=YT_VIDEO_RELEASE_BUFFER)
+            
+            if video_publish_date < earliest_allowed_date:
+                bt.logging.warning(f"Video was published before the allowed buffer period: {video_publish_date} < {earliest_allowed_date} (brief start: {brief_start_date}, buffer: {YT_VIDEO_RELEASE_BUFFER} days)")
+                decision_details["publishDateCheck"] = False
+                decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
+                return False
+        
+        decision_details["publishDateCheck"] = True
+        return True
+    except Exception as e:
+        bt.logging.error(f"Error checking video publish date: {e}")
+        decision_details["publishDateCheck"] = False
+        decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
+        return False
 
 def check_video_retention(video_id, video_analytics, decision_details, briefs):
     """Check if the video meets the minimum retention criteria."""

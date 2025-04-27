@@ -7,10 +7,11 @@ A validator service that maintains network integrity by verifying YouTube conten
 ## 🔍 Validator Responsibilities
 
 Validators are crucial network participants that:
-- Retrieve YouTube Analytics data via OAuth
-- Verify content engagement metrics
-- Validate miner submissions
-- Disburse on-chain rewards to miners
+- Obtain temporary YouTube API tokens the miners
+- Retrieve channel and video analytics via OAuth
+- Verify content submissions and channel eligibility
+- Evaluate performance based on engagement metrics
+- Distribute on-chain rewards to miners
 
 ---
 

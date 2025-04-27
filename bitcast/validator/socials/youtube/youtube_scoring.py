@@ -27,7 +27,7 @@ from bitcast.validator.config import (
     YT_REWARD_DELAY, 
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
-    YT_VIDEO_LOOKBACK
+    YT_LOOKBACK
 )
 from bitcast.validator.config import (
     RAPID_API_KEY
@@ -87,7 +87,12 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
     """Retrieve channel data and analytics."""
     try:
         channel_data = youtube_utils.get_channel_data(youtube_data_client, DISCRETE_MODE)
-        channel_analytics = youtube_utils.get_channel_analytics(youtube_analytics_client, start_date="1995-01-01", end_date="2025-03-31")
+        
+        # Calculate date range for the last YT_LOOKBACK days
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=YT_LOOKBACK)).strftime('%Y-%m-%d')
+        
+        channel_analytics = youtube_utils.get_channel_analytics(youtube_analytics_client, start_date=start_date, end_date=end_date)
         return channel_data, channel_analytics
     except Exception as e:
         bt.logging.warning(f"An error occurred while retrieving YouTube data: {e}")
@@ -96,7 +101,7 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
 def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
     """Process videos, calculate scores, and update the result structure."""
     try:
-        video_ids = youtube_utils.get_all_uploads(youtube_data_client, YT_VIDEO_LOOKBACK)
+        video_ids = youtube_utils.get_all_uploads(youtube_data_client, YT_LOOKBACK)
         
         # Vet videos and store the results
         video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
@@ -146,7 +151,6 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result)
     else:
         result["videos"][video_id]["score"] = 0
-        bt.logging.info(f"Video: {video_id} doesn't match any briefs, Score: 0")
 
 def check_video_brief_matches(video_id, video_matches, briefs):
     """Check if a video matches any briefs and return the matching brief ID."""
