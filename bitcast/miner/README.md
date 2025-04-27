@@ -34,7 +34,7 @@ Make sure your server meets these before you start.
 
 ---
 
-## 🚀 Installation & Miner Registration
+## 🚀 Installation
 
 1. **Clone repo**  
    ```bash
@@ -48,26 +48,6 @@ Make sure your server meets these before you start.
    ./scripts/setup_env.sh
    ```  
    This creates a Python virtual environment at `bitcast/venv_bitcast/` and installs dependencies.
-
-3. **Activate the virtual environment**  
-   ```bash
-   source venv_bitcast/bin/activate
-   ```
-
-4. **Register Bittensor Wallet & Subnet**  
-   > **Run these from within the activated venv.**  
-   1. **Create wallets**  
-      ```bash
-      btcli wallet new_coldkey --wallet.name <WALLET_NAME>
-      btcli wallet new_hotkey  --wallet.name <WALLET_NAME> --wallet.hotkey <HOTKEY_NAME>
-      ```  
-   2. **Register on subnet**  
-      ```bash
-      btcli subnet register \
-        --netuid 93 \
-        --wallet.name <WALLET_NAME> \
-        --hotkey <HOTKEY_NAME>
-      ```
 
 ---
 
@@ -108,7 +88,7 @@ Make sure your server meets these before you start.
 
 ## 🚀 Run Miner
 
-**Important:** The OAuth consent screen requires a browser environment. Run the miner from a terminal capable of launching your default web browser (e.g., VS Code). Headless or minimal terminals (e.g., PuTTY, Terminus, mobaXterm) will not be suitable.
+**Important:** The OAuth consent screen requires a browser environment. Run the miner from a terminal capable of launching your default web browser (e.g., VS Code). Headless or minimal terminals (PuTTY, Terminus, mobaXterm) will not work.
 
 1. **Configure miner script**  
    - Edit `scripts/run_miner.sh`  
@@ -117,7 +97,7 @@ Make sure your server meets these before you start.
      - (Optional) change port or disable auto-updates  
 
 2. **Open port 8091**  
-   Make sure your server’s firewall or cloud security group allows inbound on **8091**.
+   Ensure your firewall or cloud security group allows inbound on **8091**.
 
 3. **Start miner**  
    ```bash
@@ -146,6 +126,30 @@ Make sure your server meets these before you start.
      ```bash
      pm2 restart bitcast_miner
      ```
+
+---
+
+## 🚀 Miner Registration
+
+1. **Activate the virtual environment**  
+   ```bash
+   source venv_bitcast/bin/activate
+   ```
+
+2. **Register Bittensor Wallet & Subnet**  
+   > **Run these from within the activated venv.**  
+   1. **Create wallets**  
+      ```bash
+      btcli wallet new_coldkey --wallet.name <WALLET_NAME>
+      btcli wallet new_hotkey  --wallet.name <WALLET_NAME> --wallet.hotkey <HOTKEY_NAME>
+      ```  
+   2. **Register on subnet**  
+      ```bash
+      btcli subnet register \
+        --netuid 93 \
+        --wallet.name <WALLET_NAME> \
+        --hotkey <HOTKEY_NAME>
+      ```
 
 ---
 
