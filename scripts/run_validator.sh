@@ -56,7 +56,6 @@ SUBTENSOR_NETWORK=${SUBTENSOR_NETWORK:-"finney"}
 SUBTENSOR_CHAIN_ENDPOINT=${SUBTENSOR_CHAIN_ENDPOINT:-"wss://entrypoint-finney.opentensor.ai:443"}
 PORT=${PORT:-8092}
 LOGGING=${LOGGING:-"--logging.debug"}
-WANDB_PROJECT=${WANDB_PROJECT:-"bitcast_vali_logs"}
 
 # Clear cache if specified 
 while [[ $# -gt 0 ]]; do
@@ -87,4 +86,4 @@ echo "Starting validator process with pm2"
 cd "$PROJECT_ROOT"
 
 # Start the validator with pm2 using environment variables
-pm2 start python --name "$VALIDATOR_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT  --wandb.project $WANDB_PROJECT $LOGGING $DISABLE_AUTO_UPDATE
+pm2 start python --name "$VALIDATOR_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE

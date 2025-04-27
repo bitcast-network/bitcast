@@ -10,11 +10,13 @@ load_dotenv(dotenv_path=env_path)
 __version__ = "0.1.0"
 
 # required
-BITCAST_BRIEFS_ENDPOINT = os.getenv('BITCAST_BRIEFS_ENDPOINT')
-BITCAST_STATS_ENDPOINT = os.getenv('BITCAST_STATS_ENDPOINT')
+BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
+BITCAST_BRIEFS_ENDPOINT = f"{BITCAST_SERVER_URL}:8013/briefs"
+BITCAST_STATS_ENDPOINT = f"{BITCAST_SERVER_URL}:8003/submit"
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
+WANDB_PROJECT = os.getenv('WANDB_PROJECT', 'bitcast_vali_logs')
 
 # Check if any required variables are missing
 required_vars = {

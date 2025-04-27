@@ -27,7 +27,7 @@ import bittensor as bt
 
 from bitcast.base.validator import BaseValidatorNeuron
 from bitcast.validator import forward
-from bitcast.validator.config import __version__
+from bitcast.validator.config import __version__, WANDB_PROJECT
 from core.auto_update import run_auto_update
 
 class Validator(BaseValidatorNeuron):
@@ -44,11 +44,9 @@ class Validator(BaseValidatorNeuron):
 
         # Initialize wandb
         try:
-            project_name = self.config.wandb.project
-            bt.logging.info(f"Initializing wandb with project: {project_name}")
             wandb.init(
                 entity="bitcast_network",
-                project=project_name,
+                project=WANDB_PROJECT,
                 name=f"validator-{self.uid}-{__version__}",
                 config=self.config,
                 reinit=True
