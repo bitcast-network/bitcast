@@ -73,7 +73,7 @@ Make sure your server meets these before you start.
 
 1. **Clone repo**  
    ```bash
-   git clone <REPO_URL>
+   git clone git@github.com:bitcast-network/bitcast.git
    cd bitcast
    ```
 
