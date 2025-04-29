@@ -19,6 +19,15 @@ fi
 echo "Activating virtual environment..."
 source "$VENV_PATH/bin/activate"
 
+# Source environment variables from .env file
+if [ -f "$PROJECT_ROOT/bitcast/miner/.env" ]; then
+    echo "Loading environment variables from .env file..."
+    source "$PROJECT_ROOT/bitcast/miner/.env"
+else
+    echo "Error: .env file not found at $PROJECT_ROOT/bitcast/miner/.env"
+    exit 1
+fi
+
 # Stop miner process if it's already running on pm2
 if pm2 list | grep -q "$MINER_PROCESS_NAME"; then
   echo "Process '$MINER_PROCESS_NAME' is already running. Deleting it..."
@@ -28,17 +37,35 @@ fi
 echo "Starting miner process with pm2"
 cd "$PROJECT_ROOT"
 
-# Hardcoded parameters
-NETUID=1
-SUBTENSOR_CHAIN_ENDPOINT="ws://35.86.5.19:9944"
-SUBTENSOR_NETWORK="ws://35.86.5.19:9944"
-WALLET_NAME="test_1"
-HOTKEY_NAME="hotkey_1"
-PORT=8091
-LOGGING="--logging.debug"
-DEV_MODE="--dev_mode"
-DISABLE_AUTO_UPDATE= #"--disable_auto_update"
+# Default values for optional parameters
+SUBTENSOR_CHAIN_ENDPOINT=${SUBTENSOR_CHAIN_ENDPOINT:-"wss://entrypoint-finney.opentensor.ai:443"}
+SUBTENSOR_NETWORK=${SUBTENSOR_NETWORK:-"finney"}
+PORT=${PORT:-8091}
+LOGGING=${LOGGING:-"--logging.debug"}
 
-#TODO remove dev_mode
-# Run the miner with hardcoded parameters using pm2
-pm2 start python --name "$MINER_PROCESS_NAME" -- neurons/miner.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DEV_MODE $DISABLE_AUTO_UPDATE
+# Handle boolean flags
+DEV_MODE_FLAG=""
+if [ "${DEV_MODE,,}" = "true" ]; then
+    DEV_MODE_FLAG="--dev_mode"
+fi
+
+DISABLE_AUTO_UPDATE_FLAG=""
+if [ "${DISABLE_AUTO_UPDATE,,}" = "true" ]; then
+    DISABLE_AUTO_UPDATE_FLAG="--disable_auto_update"
+fi
+
+# Check if required environment variables are set
+if [ -z "$NETUID" ] || [ -z "$WALLET_NAME" ] || [ -z "$HOTKEY_NAME" ]; then
+    echo "Error: Required environment variables NETUID, WALLET_NAME, and HOTKEY_NAME must be set in .env file"
+    exit 1
+fi
+
+# Run the miner with environment variables using pm2
+pm2 start python --name "$MINER_PROCESS_NAME" -- neurons/miner.py \
+    --netuid "$NETUID" \
+    --subtensor.chain_endpoint "$SUBTENSOR_CHAIN_ENDPOINT" \
+    --subtensor.network "$SUBTENSOR_NETWORK" \
+    --wallet.name "$WALLET_NAME" \
+    --wallet.hotkey "$HOTKEY_NAME" \
+    --axon.port "$PORT" \
+    $LOGGING $DEV_MODE_FLAG $DISABLE_AUTO_UPDATE_FLAG
