@@ -93,7 +93,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
             youtube_utils.mark_video_as_scored(video_id)
             
         except Exception as e:
-            bt.logging.error(f"Error evaluating video {video_id}: {e}")
+            bt.logging.error(f"Error evaluating video {e}")
             # Mark this video as not matching any briefs
             results[video_id] = [False] * len(briefs)
             # Don't mark the video as scored if there was an error
@@ -120,7 +120,7 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     bt.logging.info(f"Video meets {sum(decision_details['contentAgainstBriefCheck'])} briefs.")
 
 def vet_video(video_id, briefs, video_data, video_analytics):
-    bt.logging.info(f"=== Evaluating video: {video_data['videoId']} ===")
+    bt.logging.info(f"=== Evaluating video: {video_data['bitcastVideoId']} ===")
 
     # Initialize decision details structure
     decision_details = initialize_decision_details()
