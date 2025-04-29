@@ -90,11 +90,13 @@ Make sure your server meets these before you start.
 
 **Important:** The OAuth consent screen requires a browser environment. Run the miner from a terminal capable of launching your default web browser (e.g., VS Code). Headless or minimal terminals (PuTTY, Terminus, mobaXterm) will not work.
 
-1. **Configure miner script**  
-   - Edit `scripts/run_miner.sh`  
-     - Set `WALLET_NAME=<your wallet name>`  
-     - Set `HOTKEY_NAME=<your hotkey name>`  
-     - (Optional) change port or disable auto-updates  
+3. **Configure Environment**
+   ```bash
+   cp bitcast/miner/.env.example bitcast/miner/.env
+   ```
+   Edit `.env` with your wallet information:
+   - `WALLET_NAME`: Your Bittensor wallet name
+   - `HOTKEY_NAME`: Your validator hotkey name
 
 2. **Open port 8091**  
    Ensure your firewall or cloud security group allows inbound on **8091**.
