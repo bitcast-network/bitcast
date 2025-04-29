@@ -36,7 +36,7 @@ def run_auto_update(neuron_type):
             print("Finished running the autoupdate steps")
             print("Restarting neuron")
             # Run start script with venv activation
-            start_cmd = f"source {venv_path}/bin/activate && {project_root}/scripts/start_{neuron_type}.sh"
+            start_cmd = f"source {venv_path}/bin/activate && {project_root}/scripts/run_{neuron_type}.sh"
             subprocess.run(start_cmd, shell=True, executable='/bin/bash')
     else:
         print("Repo is up-to-date.")
