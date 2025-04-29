@@ -46,11 +46,14 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
 
     channel_id = account_info['items'][0]['id']
     if discrete_mode:
-        channel_id = hashlib.sha256(channel_id.encode()).hexdigest()
+        bitcast_channel_id = "bitcast_" + hashlib.sha256(channel_id.encode()).hexdigest()[:8]
+    else:
+        bitcast_channel_id = channel_id
 
     channel_info = {
         "title": account_info['items'][0]['snippet']['title'],
         "id": channel_id,
+        "bitcastChannelId": bitcast_channel_id,
         "channel_start": account_info['items'][0]['snippet']['publishedAt'],
         "viewCount": account_info['items'][0]['statistics']['viewCount'],
         "subCount": account_info['items'][0]['statistics']['subscriberCount'],
@@ -290,11 +293,14 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
         raise Exception(f"No video found with ID: {video_id}")
 
     if discrete_mode:
-        video_id = hashlib.sha256(video_id.encode()).hexdigest()
+        bitcast_video_id = "bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]
+    else:
+        bitcast_video_id = video_id
 
     video_info = video_response["items"][0]
     stats = {
         "videoId": video_id,
+        "bitcastVideoId": bitcast_video_id,
         "title": video_info["snippet"]["title"],
         "description": video_info["snippet"]["description"],
         "publishedAt": video_info["snippet"]["publishedAt"],

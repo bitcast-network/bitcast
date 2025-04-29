@@ -47,19 +47,19 @@ def check_channel_criteria(channel_data, channel_analytics, channel_age_days):
     criteria_met = True
 
     if channel_age_days < YT_MIN_CHANNEL_AGE:
-        bt.logging.warning(f"Channel age check failed: {channel_data['id']}. {channel_age_days} < {YT_MIN_CHANNEL_AGE}")
+        bt.logging.warning(f"Channel age check failed: {channel_data['bitcastChannelId']}. {channel_age_days} < {YT_MIN_CHANNEL_AGE}")
         criteria_met = False
 
     if int(channel_data["subCount"]) < YT_MIN_SUBS:
-        bt.logging.warning(f"Subscriber count check failed: {channel_data['id']}. {channel_data['subCount']} < {YT_MIN_SUBS}.")
+        bt.logging.warning(f"Subscriber count check failed: {channel_data['bitcastChannelId']}. {channel_data['subCount']} < {YT_MIN_SUBS}.")
         criteria_met = False
 
     if float(channel_analytics["averageViewPercentage"]) < YT_MIN_CHANNEL_RETENTION:
-        bt.logging.warning(f"Avg retention check failed (last {YT_LOOKBACK} days): {channel_data['id']}. {channel_analytics['averageViewPercentage']} < {YT_MIN_CHANNEL_RETENTION}%.")
+        bt.logging.warning(f"Avg retention check failed (last {YT_LOOKBACK} days): {channel_data['bitcastChannelId']}. {channel_analytics['averageViewPercentage']} < {YT_MIN_CHANNEL_RETENTION}%.")
         criteria_met = False
         
     if float(channel_analytics["estimatedMinutesWatched"]) < YT_MIN_MINS_WATCHED:
-        bt.logging.warning(f"Minutes watched check failed (last {YT_LOOKBACK} days): {channel_data['id']}. {channel_analytics['estimatedMinutesWatched']} < {YT_MIN_MINS_WATCHED}.")
+        bt.logging.warning(f"Minutes watched check failed (last {YT_LOOKBACK} days): {channel_data['bitcastChannelId']}. {channel_analytics['estimatedMinutesWatched']} < {YT_MIN_MINS_WATCHED}.")
         criteria_met = False
 
     return criteria_met
