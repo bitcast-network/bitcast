@@ -2,7 +2,7 @@ import pytest
 from bitcast.validator.socials.youtube.youtube_utils import get_video_transcript
 from unittest.mock import MagicMock, patch
 from bitcast.validator.config import TRANSCRIPT_MAX_RETRY
-from bitcast.validator.socials.youtube.youtube_scoring import update_video_score
+from bitcast.validator.socials.youtube.youtube_scoring import update_video_score, check_video_brief_matches
 
 
 @pytest.mark.asyncio
@@ -67,3 +67,36 @@ async def test_update_video_score():
         mock_calculate.return_value = {"score": 0, "daily_analytics": {}}
         update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result)
         assert result["scores"]["test_brief"] == 8, "Score should remain 8 (sum of 2, 4, 2, and 0)"
+
+def test_check_video_brief_matches():
+    # Setup
+    video_id = "test_video"
+    briefs = [
+        {"id": "brief1"},
+        {"id": "brief2"},
+        {"id": "brief3"}
+    ]
+    
+    # Test case 1: Video matches multiple briefs
+    video_matches = {
+        video_id: [True, True, False]  # Matches brief1 and brief2
+    }
+    matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
+    assert matches_any_brief == True
+    assert matching_brief_ids == ["brief1", "brief2"]
+    
+    # Test case 2: Video matches no briefs
+    video_matches = {
+        video_id: [False, False, False]
+    }
+    matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
+    assert matches_any_brief == False
+    assert matching_brief_ids == []
+    
+    # Test case 3: Video matches all briefs
+    video_matches = {
+        video_id: [True, True, True]
+    }
+    matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
+    assert matches_any_brief == True
+    assert matching_brief_ids == ["brief1", "brief2", "brief3"]

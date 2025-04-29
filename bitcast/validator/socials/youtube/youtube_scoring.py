@@ -134,14 +134,14 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     video_analytics = video_analytics_dict[video_id]
     
     # Check if this video matches any briefs
-    matches_any_brief, brief_id = check_video_brief_matches(video_id, video_matches, briefs)
+    matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
     
     # Store video details in the result
     result["videos"][video_id] = {
         "details": video_data,
         "analytics": video_analytics,
         "matches_brief": matches_any_brief,
-        "brief_id": brief_id,
+        "matching_brief_ids": matching_brief_ids,
         "url": f"https://www.youtube.com/watch?v={video_id}",
         "vet_outcomes": video_matches.get(video_id, []),
         "decision_details": video_decision_details.get(video_id, {})
@@ -154,17 +154,16 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         result["videos"][video_id]["score"] = 0
 
 def check_video_brief_matches(video_id, video_matches, briefs):
-    """Check if a video matches any briefs and return the matching brief ID."""
+    """Check if a video matches any briefs and return all matching brief IDs."""
     matches_any_brief = False
-    brief_id = None
+    matching_brief_ids = []
     
     for i, match in enumerate(video_matches.get(video_id, [])):
         if match:
             matches_any_brief = True
-            brief_id = briefs[i]["id"]
-            break
+            matching_brief_ids.append(briefs[i]["id"])
     
-    return matches_any_brief, brief_id
+    return matches_any_brief, matching_brief_ids
 
 def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result):
     """Calculate and update the score for a video that matches a brief."""
