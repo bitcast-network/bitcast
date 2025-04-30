@@ -42,11 +42,10 @@ def test_get_rewards():
         # Call get_rewards
         result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
-        # Verify the result is a list of numpy float64 values
-        assert isinstance(result, list)
-        assert all(isinstance(score, np.float64) for score in result)
+        # Verify the result is a numpy array
+        assert isinstance(result, np.ndarray)
         
-        expected_result = [0, 0.4, 0.6]
+        expected_result = np.array([0, 0.4, 0.6])
         
         # Check that the result matches the expected values (with some tolerance for floating point)
         np.testing.assert_allclose(result, expected_result, rtol=1e-5)
@@ -98,7 +97,7 @@ def test_get_rewards_identical_responses():
         # Call get_rewards
         result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
-        expected_result = [0.0, 1/3, 1/3, 1/3]
+        expected_result = np.array([0.0, 1/3, 1/3, 1/3])
         
         # Check that the result matches the expected values (with some tolerance for floating point)
         np.testing.assert_allclose(result, expected_result, rtol=1e-5)
@@ -149,7 +148,7 @@ def test_get_rewards_with_zeros():
         # Call get_rewards
         result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
-        expected_result = [0.0, 1/3, 1/3, 1/3]
+        expected_result = np.array([0.0, 1/3, 1/3, 1/3])
         
         # Check that the result matches the expected values (with some tolerance for floating point)
         np.testing.assert_allclose(result, expected_result, rtol=1e-5)
@@ -207,16 +206,15 @@ def test_get_rewards_all_zeros_in_first_position():
         # Call get_rewards
         result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
-        # Verify the result is a list of numpy float64 values
-        assert isinstance(result, list)
-        assert all(isinstance(score, np.float64) for score in result)
+        # Verify the result is a numpy array
+        assert isinstance(result, np.ndarray)
         
         # The expected result after normalization and summing
         # Each response has a total of 20 (0+10+10)
         # After normalization across miners: [0, 1/3, 1/3, 1/3]
         # After normalization across briefs: [1/3, 1/9, 1/9, 1/9]
         # Final sum for each: [1/3, 2/9, 2/9, 2/9]
-        expected_result = [1/3, 2/9, 2/9, 2/9]
+        expected_result = np.array([1/3, 2/9, 2/9, 2/9])
         
         # Check that the result matches the expected values (with some tolerance for floating point)
         np.testing.assert_allclose(result, expected_result, rtol=1e-5)
@@ -280,7 +278,7 @@ def test_normalize_across_miners():
     assert np.allclose(normalized_scores, [[0.1, 0.3, 0.5], [0.9, 0.7, 0.5]])
     
     # Test with empty matrix
-    assert normalize_across_miners(np.array([])) == []
+    assert normalize_across_miners(np.array([])).size == 0
     
     # Test with single row
     scores_matrix = np.array([[10, 30, 2]])
@@ -299,7 +297,7 @@ def test_normalize_across_briefs():
     assert np.allclose(normalized_across_briefs, [[0.1, 0.05, 0.1, 0.05], [0.15, 0.2, 0.15, 0.2]])
     
     # Test with empty matrix
-    assert normalize_across_briefs([]) == []
+    assert normalize_across_briefs(np.array([])).size == 0
     
     # Test with single brief
     normalized_scores_matrix = [[0.4], [0.6]]
@@ -326,7 +324,7 @@ def test_normalise_scores():
     assert np.allclose(final_scores, [0, 0.3, 0.7])
     
     # Test with empty matrix
-    assert normalise_scores(np.array([]), [], MOCK_TEST_BRIEFS) == []
+    assert np.array(normalise_scores(np.array([]), [], MOCK_TEST_BRIEFS)).size == 0
     
     # # Test with single row
     scores_matrix = np.array([[10, 30, 2]])

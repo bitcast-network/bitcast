@@ -101,7 +101,7 @@ def normalise_scores(scores_matrix, yt_stats_list, briefs):
     """
     Normalizes the scores matrix in three steps:
     1. Normalize each brief's scores across all miners so each column sums to 1.
-    2. Normalize each miner's scores by the number of briefs.
+    2. Normalize each miner's scores by the number of briefs. Matrix should now sum to 1.
     3. Scale rewards to determine burn portions.
     4. Sum each miner's normalized and scaled scores to produce a final reward per miner.
     """
@@ -114,39 +114,31 @@ def normalize_across_miners(scores_matrix):
     """
     For each brief (column), normalize scores so the sum across all miners is 1.
     """
+    if isinstance(scores_matrix, list):
+        scores_matrix = np.array(scores_matrix, dtype=np.float64)
     if scores_matrix.size == 0:
-        return []
-
-    # Transpose the matrix to work column by column
-    transposed = list(zip(*scores_matrix))
-    normalized_transposed = []
-
-    for column in transposed:
-        column_sum = sum(column)
-        if column_sum > 0:
-            normalized_column = [value / column_sum for value in column]
-        else:
-            normalized_column = [0] * len(column)
-        normalized_transposed.append(normalized_column)
-
-    # Transpose back to the original shape
-    normalized_scores_matrix = list(map(list, zip(*normalized_transposed)))
-    return normalized_scores_matrix
+        return np.array([])
+    col_sums = scores_matrix.sum(axis=0, keepdims=True)
+    col_sums[col_sums == 0] = 1  # Avoid division by zero
+    return scores_matrix / col_sums
 
 def normalize_across_briefs(normalized_scores_matrix):
     """
     For each miner (row), divide each score by the number of briefs.
     """
-    if not normalized_scores_matrix:
-        return []
-    num_briefs = len(normalized_scores_matrix[0])
-    return [[score / num_briefs for score in row] for row in normalized_scores_matrix]
+    if isinstance(normalized_scores_matrix, list):
+        normalized_scores_matrix = np.array(normalized_scores_matrix, dtype=np.float64)
+    if normalized_scores_matrix.size == 0:
+        return np.array([])
+    num_briefs = normalized_scores_matrix.shape[1]
+    return normalized_scores_matrix / num_briefs
 
 def sum_scores(scores_matrix):
     """
     For each miner (row), sum all normalized scores to get a single reward value.
     """
-    final_scores = []
-    for row in scores_matrix:
-        final_scores.append(sum(row))
-    return final_scores
+    if isinstance(scores_matrix, list):
+        scores_matrix = np.array(scores_matrix, dtype=np.float64)
+    if scores_matrix.size == 0:
+        return np.array([])
+    return scores_matrix.sum(axis=1)

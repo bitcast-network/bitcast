@@ -63,60 +63,37 @@ def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dic
     bt.logging.info(f"Emission scalars per brief: {brief_scalars}")
     return brief_scalars
 
-def scale_rewards(matrix: List[List[np.float64]], yt_stats_list: List[dict], briefs: List[dict]) -> List[List[np.float64]]:
+def scale_rewards(matrix: np.ndarray, yt_stats_list: List[dict], briefs: List[dict]) -> np.ndarray:
     """
     Scale rewards matrix based on brief emission scalars.
-    
     Args:
-        matrix (List[List[np.float64]]): Input matrix where each column sums to 1. Each element should be np.float64.
+        matrix (np.ndarray): Input matrix where each column sums to 1. Each element should be np.float64.
         yt_stats_list (List[dict]): List of YouTube statistics from all miners
         briefs (List[dict]): List of briefs containing max_burn and burn_decay parameters
-        
     Returns:
-        List[List[np.float64]]: Scaled matrix where each column still sums to 1, with np.float64 values
+        np.ndarray: Scaled matrix where each column still sums to 1, with np.float64 values
     """
-    if not matrix:
-        return []
+    if matrix is None or (isinstance(matrix, np.ndarray) and matrix.size == 0):
+        return np.array([])
 
-    print(f"MATRIX {matrix}")
-
-    # Convert input matrix to numpy array for easier operations
     matrix_np = np.array(matrix, dtype=np.float64)
-    
-    # Validate matrix sums to approximately 1
     col_sums = np.sum(matrix_np, axis=0)
     if not np.allclose(col_sums, 1.0, rtol=1e-5):
         bt.logging.warning(f"Input matrix sum {np.sum(col_sums)} is not close to 1")
-        
-    # Validate first row contains only zeros
     if not np.allclose(matrix_np[0, :], 0.0, rtol=1e-5):
         bt.logging.warning("First row of matrix contains non-zero values")
-        
-    # Get emission scalars for each brief
+
     brief_scalars = calculate_brief_emissions_scalar(yt_stats_list, briefs)
-    
-    # Convert brief scalars to numpy array matching matrix columns
     scalars = np.array([brief_scalars[brief["id"]] for brief in briefs], dtype=np.float64)
-    
-    # Special case: if all scalars are zero (no views), distribute rewards equally in first row
+
     if np.allclose(scalars, 0.0, rtol=1e-5):
         result = np.zeros_like(matrix_np)
-        result[0, :] = 1.0 / matrix_np.shape[1]  # Equal split between columns
-        # Convert to list of lists while preserving np.float64 type
-        return [[np.float64(x) for x in row] for row in result]
-    
-    # Create output matrix
+        result[0, :] = 1.0 / matrix_np.shape[1]
+        return result
+
     scaled_matrix = matrix_np.copy()
-    
-    # Scale non-first rows by scalars
     scaled_matrix[1:, :] *= scalars[np.newaxis, :]
-    
-    # Set first row to make columns sum to 1/number of columns
     num_cols = scaled_matrix.shape[1]
     col_sums = np.sum(scaled_matrix[1:, :], axis=0)
     scaled_matrix[0, :] = (1.0 / num_cols) - col_sums
-    
-    print(f"RES: {[[np.float64(x) for x in row] for row in scaled_matrix]}")
-
-    # Convert back to list of lists while preserving np.float64 type
-    return [[np.float64(x) for x in row] for row in scaled_matrix]
+    return scaled_matrix
