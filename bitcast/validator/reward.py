@@ -24,6 +24,7 @@ from google.oauth2.credentials import Credentials
 from bitcast.validator.briefs import get_briefs
 from bitcast.validator.socials.youtube.youtube_scoring import eval_youtube
 from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.rewards_scaling import scale_rewards
 
 def reward(uid, briefs, response) -> dict:
     """
@@ -92,19 +93,21 @@ def get_rewards(
     
     scores_matrix = np.array(scores_matrix)
     youtube_utils.reset_scored_videos()
-    rewards = normalise_scores(scores_matrix)
+    rewards = normalise_scores(scores_matrix, yt_stats_list, briefs)
 
     return rewards, yt_stats_list
 
-def normalise_scores(scores_matrix):
+def normalise_scores(scores_matrix, yt_stats_list, briefs):
     """
-    Normalizes the scores matrix in two steps:
+    Normalizes the scores matrix in three steps:
     1. Normalize each brief's scores across all miners so each column sums to 1.
     2. Normalize each miner's scores by the number of briefs.
-    3. Sum each miner's normalized scores to produce a final reward per miner.
+    3. Scale rewards to determine burn portions.
+    4. Sum each miner's normalized and scaled scores to produce a final reward per miner.
     """
     res = normalize_across_miners(scores_matrix)
     res = normalize_across_briefs(res)
+    res = scale_rewards(res, yt_stats_list, briefs)  # Apply scaling after normalization but before summing
     return sum_scores(res)
 
 def normalize_across_miners(scores_matrix):

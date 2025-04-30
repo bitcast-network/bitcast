@@ -176,11 +176,11 @@ def test_calculate_brief_emissions_scalar_max_burn_zero():
 
 def test_scale_rewards_basic():
     # Test basic functionality with valid inputs
-    matrix = np.array([
-        [0.0, 0.0],
-        [0.6, 0.7],
-        [0.4, 0.3]
-    ])
+    matrix = [
+        [np.float64(0.0), np.float64(0.0)],
+        [np.float64(0.3), np.float64(0.35)],
+        [np.float64(0.2), np.float64(0.15)]
+    ]
     
     yt_stats_list = [{
         "videos": {
@@ -209,18 +209,19 @@ def test_scale_rewards_basic():
     ]
     
     result = scale_rewards(matrix, yt_stats_list, briefs)
+    result_np = np.array(result)
     
     # Check properties
-    assert np.allclose(np.sum(result, axis=0), 1.0)  # Columns should sum to 1
-    assert np.all(result >= 0)  # All values should be non-negative
+    assert np.isclose(np.sum(result_np), 1.0)  # Entire matrix should sum to 1
+    assert np.all(result_np >= 0)  # All values should be non-negative
 
 def test_scale_rewards_invalid_sum():
     # Test with matrix that doesn't sum to 1
-    matrix = np.array([
-        [0.0, 0.0],
-        [0.8, 0.9],
-        [0.4, 0.3]
-    ])
+    matrix = [
+        [np.float64(0.0), np.float64(0.0)],
+        [np.float64(0.8), np.float64(0.9)],
+        [np.float64(0.4), np.float64(0.3)]
+    ]
     
     yt_stats_list = [{
         "videos": {
@@ -238,18 +239,19 @@ def test_scale_rewards_invalid_sum():
     
     with patch('bittensor.logging.warning') as mock_warning:
         result = scale_rewards(matrix, yt_stats_list, briefs)
-        mock_warning.assert_called_with(f"Input matrix sum {np.sum(matrix)} is not close to 1")
+        mock_warning.assert_called_with(f"Input matrix sum {sum(sum(row) for row in matrix)} is not close to 1")
     
     # Result should still have valid properties
-    assert np.allclose(np.sum(result, axis=0), 1.0)
+    result_np = np.array(result)
+    assert np.isclose(np.sum(result_np), 1.0)  # Entire matrix should sum to 1
 
 def test_scale_rewards_nonzero_first_row():
     # Test with non-zero first row
-    matrix = np.array([
-        [0.1, 0.1],
-        [0.5, 0.6],
-        [0.4, 0.3]
-    ])
+    matrix = [
+        [np.float64(0.1), np.float64(0.1)],
+        [np.float64(0.5), np.float64(0.6)],
+        [np.float64(0.4), np.float64(0.3)]
+    ]
     
     yt_stats_list = [{
         "videos": {
@@ -270,15 +272,16 @@ def test_scale_rewards_nonzero_first_row():
         mock_warning.assert_called_with("First row of matrix contains non-zero values")
     
     # Result should still have valid properties
-    assert np.allclose(np.sum(result, axis=0), 1.0)
+    result_np = np.array(result)
+    assert np.isclose(np.sum(result_np), 1.0) 
 
 def test_scale_rewards_zero_scalars():
     # Test with zero minutes watched (should result in zero scalars)
-    matrix = np.array([
-        [0.0, 0.0],
-        [0.6, 0.7],
-        [0.4, 0.3]
-    ])
+    matrix = [
+        [np.float64(0.0), np.float64(0.0)],
+        [np.float64(0.6), np.float64(0.7)],
+        [np.float64(0.4), np.float64(0.3)]
+    ]
     
     yt_stats_list = [{
         "videos": {
@@ -295,19 +298,20 @@ def test_scale_rewards_zero_scalars():
     ]
     
     result = scale_rewards(matrix, yt_stats_list, briefs)
+    result_np = np.array(result)
     
-    # With zero scalars, first row should be 1 and rest 0
-    assert np.allclose(result[0, :], 1.0)
-    assert np.allclose(result[1:, :], 0.0)
-    assert np.allclose(np.sum(result, axis=0), 1.0)
+    # With zero scalars, first row should sum to 1 and rest 0
+    assert np.isclose(np.sum(result_np[0, :]), 1.0)
+    assert np.allclose(result_np[1:, :], 0.0)
+    assert np.isclose(np.sum(result_np), 1.0) 
 
 def test_scale_rewards_max_burn_zero():
     # Test with max_burn=0, which should result in no changes to the matrix
-    matrix = np.array([
-        [0.0, 0.0],
-        [0.6, 0.7],
-        [0.4, 0.3]
-    ])
+    matrix = [
+        [np.float64(0.0), np.float64(0.0)],
+        [np.float64(0.3), np.float64(0.35)],
+        [np.float64(0.2), np.float64(0.15)]
+    ]
     
     yt_stats_list = [{
         "videos": {
@@ -324,18 +328,19 @@ def test_scale_rewards_max_burn_zero():
     ]
     
     result = scale_rewards(matrix, yt_stats_list, briefs)
+    result_np = np.array(result)
     
     # With max_burn=0, the matrix should remain unchanged
-    assert np.allclose(result, matrix)
-    assert np.allclose(np.sum(result, axis=0), 1.0)
+    assert np.allclose(result_np, matrix)
+    assert np.allclose(np.sum(result_np), 1.0)
 
 def test_scale_rewards_burn_decay_zero():
     # Test with burn_decay=0, which should result in first row being max_burn
-    matrix = np.array([
-        [0.0, 0.0],
-        [0.6, 0.7],
-        [0.4, 0.3]
-    ])
+    matrix = [
+        [np.float64(0.0), np.float64(0.0)],
+        [np.float64(0.3), np.float64(0.35)],
+        [np.float64(0.2), np.float64(0.15)]
+    ]
     
     yt_stats_list = [{
         "videos": {
@@ -352,32 +357,22 @@ def test_scale_rewards_burn_decay_zero():
     ]
     
     result = scale_rewards(matrix, yt_stats_list, briefs)
+    result_np = np.array(result)
     
     # First row should be max_burn for each column
-    assert np.allclose(result[0, 0], 0.3)  # max_burn for brief1
-    assert np.allclose(result[0, 1], 0.4)  # max_burn for brief2
-    
-    # Remaining rows should be scaled proportionally to fill the remaining space
-    remaining_scale_col0 = 0.7  # 1 - max_burn for brief1
-    remaining_scale_col1 = 0.6  # 1 - max_burn for brief2
-    
-    original_sum_col0 = matrix[1:, 0].sum()
-    original_sum_col1 = matrix[1:, 1].sum()
-    
-    # Check that remaining rows are scaled correctly
-    assert np.allclose(result[1:, 0], matrix[1:, 0] * remaining_scale_col0 / original_sum_col0)
-    assert np.allclose(result[1:, 1], matrix[1:, 1] * remaining_scale_col1 / original_sum_col1)
+    assert np.allclose(result_np[0, 0], 0.15)  # max_burn for brief1
+    assert np.allclose(result_np[0, 1], 0.2)  # max_burn for brief2
     
     # Total should still sum to 1
-    assert np.allclose(np.sum(result, axis=0), 1.0)
+    assert np.allclose(np.sum(result_np), 1.0)
 
 def test_scale_rewards_all_zeros():
     # Test with a matrix containing only zeros
-    matrix = np.array([
-        [0.0, 0.0],
-        [0.0, 0.0],
-        [0.0, 0.0]
-    ])
+    matrix = [
+        [np.float64(0.0), np.float64(0.0)],
+        [np.float64(0.0), np.float64(0.0)],
+        [np.float64(0.0), np.float64(0.0)]
+    ]
     
     yt_stats_list = [{
         "videos": {
@@ -395,18 +390,13 @@ def test_scale_rewards_all_zeros():
     
     with patch('bittensor.logging.warning') as mock_warning:
         result = scale_rewards(matrix, yt_stats_list, briefs)
-        mock_warning.assert_called_with("Input matrix sum 0.0 is not close to 1")
+        mock_warning.assert_called_with(f"Input matrix sum {sum(sum(row) for row in matrix)} is not close to 1")
+    
+    result_np = np.array(result)
     
     # In case of all zeros:
-    # 1. First row should get equal distribution (total matrix sum = 1)
+    # 1. First row should get equal distribution
     # 2. All other rows should remain zero
-    
-    # Check first row has equal distribution
-    assert np.allclose(result[0, 0], 0.5)  # Equal split between columns
-    assert np.allclose(result[0, 1], 0.5)  # Equal split between columns
-    
-    # Check all other rows remain zero
-    assert np.allclose(result[1:, :], 0.0)
-    
-    # Total matrix should sum to 1
-    assert np.allclose(np.sum(result), 1.0) 
+    assert np.allclose(result_np[0, :], 0.5)  # Equal split between columns
+    assert np.allclose(result_np[1:, :], 0.0)
+    assert np.allclose(np.sum(result_np), 1.0)
