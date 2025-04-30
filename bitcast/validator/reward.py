@@ -97,11 +97,20 @@ def get_rewards(
     return rewards, yt_stats_list
 
 def normalise_scores(scores_matrix):
+    """
+    Normalizes the scores matrix in two steps:
+    1. Normalize each brief's scores across all miners so each column sums to 1.
+    2. Normalize each miner's scores by the number of briefs.
+    3. Sum each miner's normalized scores to produce a final reward per miner.
+    """
     res = normalize_across_miners(scores_matrix)
     res = normalize_across_briefs(res)
     return sum_scores(res)
 
 def normalize_across_miners(scores_matrix):
+    """
+    For each brief (column), normalize scores so the sum across all miners is 1.
+    """
     if scores_matrix.size == 0:
         return []
 
@@ -122,13 +131,73 @@ def normalize_across_miners(scores_matrix):
     return normalized_scores_matrix
 
 def normalize_across_briefs(normalized_scores_matrix):
+    """
+    For each miner (row), divide each score by the number of briefs.
+    """
     if not normalized_scores_matrix:
         return []
     num_briefs = len(normalized_scores_matrix[0])
     return [[score / num_briefs for score in row] for row in normalized_scores_matrix]
 
 def sum_scores(scores_matrix):
+    """
+    For each miner (row), sum all normalized scores to get a single reward value.
+    """
     final_scores = []
     for row in scores_matrix:
         final_scores.append(sum(row))
     return final_scores
+
+def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dict]) -> dict:
+    """
+    Calculate the emissions scalar for each brief based on total minutes watched and burn parameters.
+    
+    Args:
+        yt_stats_list (List[dict]): List of YouTube statistics from all miners
+        briefs (List[dict]): List of briefs containing max_burn and burn_decay parameters
+        
+    Returns:
+        dict: Dictionary mapping brief IDs to their emission scalars (0-1)
+    """
+    # First calculate total minutes per brief
+    brief_total_minutes = {}
+    for stats in yt_stats_list:
+        try:
+            if isinstance(stats, dict) and "videos" in stats:
+                videos = stats["videos"]
+                if isinstance(videos, dict):
+                    # Handle case where videos is a dictionary
+                    for video_id, video_data in videos.items():
+                        if isinstance(video_data, dict):
+                            minutes = float(video_data.get("estimatedMinutesWatched", 0))
+                            matching_briefs = video_data.get("matching_brief_ids", [])
+                            for brief_id in matching_briefs:
+                                brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + minutes
+                elif isinstance(videos, list):
+                    # Handle case where videos is a list
+                    for video_data in videos:
+                        if isinstance(video_data, dict):
+                            minutes = float(video_data.get("estimatedMinutesWatched", 0))
+                            matching_briefs = video_data.get("matching_brief_ids", [])
+                            for brief_id in matching_briefs:
+                                brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + minutes
+        except Exception as e:
+            bt.logging.warning(f"Error processing stats: {e}")
+            continue
+    
+    bt.logging.info(f"Total minutes watched per brief: {brief_total_minutes}")
+    
+    # Calculate emission scalar for each brief
+    brief_scalars = {}
+    for brief in briefs:
+        brief_id = brief["id"]
+        max_burn = brief.get("max_burn")
+        burn_decay = brief.get("burn_decay")
+        total_minutes = brief_total_minutes.get(brief_id, 0.0)
+        
+        # Calculate scalar using the formula: (1-max_burn) + max_burn*(1-exp(-burn_decay * x))
+        scalar = (1 - max_burn) + max_burn * (1 - np.exp(-burn_decay * total_minutes))
+        brief_scalars[brief_id] = scalar
+        
+    bt.logging.info(f"Emission scalars per brief: {brief_scalars}")
+    return brief_scalars
