@@ -28,13 +28,6 @@ else
     exit 1
 fi
 
-# Stop miner process if it's already running on pm2
-if pm2 list | grep -q "$MINER_PROCESS_NAME"; then
-  echo "Process '$MINER_PROCESS_NAME' is already running. Deleting it..."
-  pm2 delete "$MINER_PROCESS_NAME"
-fi
-
-echo "Starting miner process with pm2"
 cd "$PROJECT_ROOT"
 
 # Default values for optional parameters
@@ -60,12 +53,18 @@ if [ -z "$NETUID" ] || [ -z "$WALLET_NAME" ] || [ -z "$HOTKEY_NAME" ]; then
     exit 1
 fi
 
-# Run the miner with environment variables using pm2
-pm2 start python --name "$MINER_PROCESS_NAME" -- neurons/miner.py \
-    --netuid "$NETUID" \
-    --subtensor.chain_endpoint "$SUBTENSOR_CHAIN_ENDPOINT" \
-    --subtensor.network "$SUBTENSOR_NETWORK" \
-    --wallet.name "$WALLET_NAME" \
-    --wallet.hotkey "$HOTKEY_NAME" \
-    --axon.port "$PORT" \
-    $LOGGING $DEV_MODE_FLAG $DISABLE_AUTO_UPDATE_FLAG
+# STOP MINER PROCESS
+if pm2 list | grep -q "$MINER_PROCESS_NAME"; then
+    echo "Process '$MINER_PROCESS_NAME' is already running. Restarting it..."
+    pm2 restart "$MINER_PROCESS_NAME"
+else
+    echo "Process '$MINER_PROCESS_NAME' is not running. Starting it for the first time..."
+    pm2 start python --name "$MINER_PROCESS_NAME" -- neurons/miner.py \
+        --netuid "$NETUID" \
+        --subtensor.chain_endpoint "$SUBTENSOR_CHAIN_ENDPOINT" \
+        --subtensor.network "$SUBTENSOR_NETWORK" \
+        --wallet.name "$WALLET_NAME" \
+        --wallet.hotkey "$HOTKEY_NAME" \
+        --axon.port "$PORT" \
+        $LOGGING $DEV_MODE_FLAG $DISABLE_AUTO_UPDATE_FLAG
+fi
