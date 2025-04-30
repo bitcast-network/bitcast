@@ -45,7 +45,7 @@ TRANSCRIPT_MAX_RETRY = 10
 # validation cycle
 VALIDATOR_CYCLE = 14400 #4 hours
 
-DISCRETE_MODE = False
+DISCRETE_MODE = True
 
 # Log out all non-sensitive config variables
 bt.logging.info(f"BITCAST_BRIEFS_ENDPOINT: {BITCAST_BRIEFS_ENDPOINT}")
