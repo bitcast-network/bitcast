@@ -5,9 +5,10 @@ set -e
 
 # Get the absolute path of the project root
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_PARENT="$(cd "$PROJECT_ROOT/.." && pwd)"
 
 MINER_PROCESS_NAME="bitcast_miner"
-VENV_PATH="$PROJECT_ROOT/venv_bitcast"
+VENV_PATH="$PROJECT_PARENT/venv_bitcast"
 
 # Activate virtual environment
 if [ ! -d "$VENV_PATH" ]; then

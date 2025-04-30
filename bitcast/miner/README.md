@@ -47,7 +47,7 @@ Make sure your server meets these before you start.
    chmod +x scripts/setup_env.sh
    ./scripts/setup_env.sh
    ```  
-   This creates a Python virtual environment at `bitcast/venv_bitcast/` and installs dependencies.
+   This creates a Python virtual environment at `../venv_bitcast/` and installs dependencies.
 
 ---
 
@@ -135,7 +135,7 @@ Make sure your server meets these before you start.
 
 1. **Activate the virtual environment**  
    ```bash
-   source venv_bitcast/bin/activate
+   source ../venv_bitcast/bin/activate
    ```
 
 2. **Register Bittensor Wallet & Subnet**  

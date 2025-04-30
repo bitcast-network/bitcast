@@ -28,7 +28,8 @@ def run_auto_update(neuron_type):
             print("Running the autoupdate steps...")
             # Run setup script with venv activation
             project_root = os.path.abspath(os.path.join(script_dir, ".."))
-            venv_path = f"{project_root}/venv_bitcast"
+            project_parent = os.path.abspath(os.path.join(project_root, ".."))
+            venv_path = f"{project_parent}/venv_bitcast"
             setup_cmd = f"source {venv_path}/bin/activate && {project_root}/scripts/setup_env.sh"
             subprocess.run(setup_cmd, shell=True, executable='/bin/bash')
             
