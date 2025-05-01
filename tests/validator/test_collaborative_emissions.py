@@ -7,7 +7,9 @@ def test_calculate_brief_emissions_scalar():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1"]
             }
         }
@@ -20,6 +22,8 @@ def test_calculate_brief_emissions_scalar():
     
     result = calculate_brief_emissions_scalar(yt_stats_list, briefs)
     expected = 1 - 0.5 + 0.5 * (1 - np.exp(-0.01 * 100))
+    print(f"result: {result}")
+    print(f"expected: {expected}")
     assert np.isclose(result["brief1"], expected)
 
 def test_calculate_brief_emissions_scalar_zero_minutes():
@@ -27,7 +31,9 @@ def test_calculate_brief_emissions_scalar_zero_minutes():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 0,
+                "analytics": {
+                    "estimatedMinutesWatched": 0
+                },
                 "matching_brief_ids": ["brief1"]
             }
         }
@@ -48,7 +54,9 @@ def test_calculate_brief_emissions_scalar_high_minutes():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 1000,
+                "analytics": {
+                    "estimatedMinutesWatched": 1000
+                },
                 "matching_brief_ids": ["brief1"]
             }
         }
@@ -68,7 +76,9 @@ def test_calculate_brief_emissions_scalar_multiple_briefs():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 50,
+                "analytics": {
+                    "estimatedMinutesWatched": 50
+                },
                 "matching_brief_ids": ["brief1", "brief2"]
             }
         }
@@ -97,11 +107,15 @@ def test_calculate_brief_emissions_scalar_multiple_videos():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 30,
+                "analytics": {
+                    "estimatedMinutesWatched": 30
+                },
                 "matching_brief_ids": ["brief1"]
             },
             "video2": {
-                "estimatedMinutesWatched": 20,
+                "analytics": {
+                    "estimatedMinutesWatched": 20
+                },
                 "matching_brief_ids": ["brief1"]
             }
         }
@@ -141,7 +155,9 @@ def test_calculate_brief_emissions_scalar_burn_decay_zero():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1"]
             }
         }
@@ -160,7 +176,9 @@ def test_calculate_brief_emissions_scalar_max_burn_zero():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1"]
             }
         }
@@ -185,11 +203,15 @@ def test_scale_rewards_basic():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1"]
             },
             "video2": {
-                "estimatedMinutesWatched": 50,
+                "analytics": {
+                    "estimatedMinutesWatched": 50
+                },
                 "matching_brief_ids": ["brief2"]
             }
         }
@@ -226,7 +248,9 @@ def test_scale_rewards_invalid_sum():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1", "brief2"]
             }
         }
@@ -256,7 +280,9 @@ def test_scale_rewards_nonzero_first_row():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1", "brief2"]
             }
         }
@@ -286,7 +312,9 @@ def test_scale_rewards_zero_scalars():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 0,
+                "analytics": {
+                    "estimatedMinutesWatched": 0
+                },
                 "matching_brief_ids": ["brief1", "brief2"]
             }
         }
@@ -316,7 +344,9 @@ def test_scale_rewards_max_burn_zero():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1", "brief2"]
             }
         }
@@ -345,7 +375,9 @@ def test_scale_rewards_burn_decay_zero():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1", "brief2"]
             }
         }
@@ -377,7 +409,9 @@ def test_scale_rewards_all_zeros():
     yt_stats_list = [{
         "videos": {
             "video1": {
-                "estimatedMinutesWatched": 100,
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
                 "matching_brief_ids": ["brief1", "brief2"]
             }
         }
