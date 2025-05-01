@@ -21,6 +21,7 @@ import time
 import typing
 import bittensor as bt
 import threading
+import random
 
 import bitcast
 from bitcast.base.miner import BaseMinerNeuron
@@ -131,7 +132,8 @@ def auto_update_loop(config):
     while True:
         if not config.neuron.disable_auto_update:
             run_auto_update('miner')
-        time.sleep(300)  # Check for updates every 5 minutes
+        sleep_time = random.randint(600, 900)  # Random time between 10 and 15 minutes
+        time.sleep(sleep_time)
 
 if __name__ == "__main__":
 
