@@ -25,15 +25,7 @@ def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dic
                     # Handle case where videos is a dictionary
                     for video_id, video_data in videos.items():
                         if isinstance(video_data, dict):
-                            minutes = float(video_data.get("estimatedMinutesWatched", 0))
-                            matching_briefs = video_data.get("matching_brief_ids", [])
-                            for brief_id in matching_briefs:
-                                brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + minutes
-                elif isinstance(videos, list):
-                    # Handle case where videos is a list
-                    for video_data in videos:
-                        if isinstance(video_data, dict):
-                            minutes = float(video_data.get("estimatedMinutesWatched", 0))
+                            minutes = float(video_data.get("analytics", {}).get("estimatedMinutesWatched", 0))
                             matching_briefs = video_data.get("matching_brief_ids", [])
                             for brief_id in matching_briefs:
                                 brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + minutes
