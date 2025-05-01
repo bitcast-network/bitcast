@@ -56,7 +56,9 @@ async def forward(self):
     rewards, yt_stats_list = get_rewards(self, miner_uids, responses=responses)
 
     # Log the rewards for monitoring purposes
-    bt.logging.info(f"Scored responses: {rewards}")
+    bt.logging.info("UID Weights:")
+    for uid, reward in zip(miner_uids, rewards):
+        bt.logging.info(f"UID {uid}: {reward}")
     
     # Update the scores based on the rewards
     self.update_scores(rewards, miner_uids)
