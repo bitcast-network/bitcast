@@ -24,7 +24,7 @@ from bitcast.protocol import AccessTokenSynapse
 from bitcast.validator.reward import get_rewards
 from bitcast.utils.uids import get_all_uids
 from bitcast.validator.utils.publish_stats import publish_stats
-from bitcast.validator.config import VALIDATOR_CYCLE
+from bitcast.validator.utils.config import VALIDATOR_CYCLE
 
 async def forward(self):
     """

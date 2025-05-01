@@ -1,7 +1,7 @@
 import pytest
 from bitcast.validator.socials.youtube.youtube_utils import get_video_transcript
 from unittest.mock import MagicMock, patch
-from bitcast.validator.config import TRANSCRIPT_MAX_RETRY
+from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY
 from bitcast.validator.socials.youtube.youtube_scoring import update_video_score, check_video_brief_matches
 
 

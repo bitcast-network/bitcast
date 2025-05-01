@@ -1,7 +1,7 @@
 import requests
 import bittensor as bt
 from datetime import datetime, timezone, timedelta
-from bitcast.validator.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY
+from bitcast.validator.utils.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY
 
 def get_briefs(all: bool = False):
     """

@@ -1,8 +1,8 @@
 import bittensor as bt
 from datetime import datetime, timedelta
 from bitcast.validator.socials.youtube import youtube_utils
-from bitcast.validator.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
-from bitcast.validator.config import (
+from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
+from bitcast.validator.utils.config import (
     YT_MIN_SUBS, 
     YT_MIN_CHANNEL_AGE, 
     YT_MIN_CHANNEL_RETENTION, 

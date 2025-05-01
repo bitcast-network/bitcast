@@ -2,24 +2,14 @@ import asyncio
 import bittensor as bt
 from datetime import datetime, timedelta
 from googleapiclient.discovery import build
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.socials.youtube.youtube_evaluation import (
     vet_channel,
     vet_videos,
-    calculate_video_score,
-    process_video_vetting,
-    vet_video,
-    initialize_decision_details,
-    check_video_privacy,
-    check_video_retention,
-    check_manual_captions,
-    get_video_transcript,
-    check_prompt_injection,
-    evaluate_content_against_briefs
+    calculate_video_score
 )
-from bitcast.validator.config import (
+from bitcast.validator.utils.config import (
     YT_MIN_SUBS, 
     YT_MIN_CHANNEL_AGE, 
     YT_MIN_CHANNEL_RETENTION, 
@@ -29,7 +19,7 @@ from bitcast.validator.config import (
     DISCRETE_MODE,
     YT_LOOKBACK
 )
-from bitcast.validator.config import (
+from bitcast.validator.utils.config import (
     RAPID_API_KEY
 )
 

@@ -3,7 +3,7 @@ import requests
 import time
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
-from bitcast.validator.config import TRANSCRIPT_MAX_RETRY
+from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY
 import httpx
 import hashlib
 import asyncio

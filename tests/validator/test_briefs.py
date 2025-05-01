@@ -2,8 +2,8 @@ from pathlib import Path
 
 import requests
 from datetime import datetime, timezone, timedelta
-from bitcast.validator.briefs import get_briefs
-from bitcast.validator.config import YT_REWARD_DELAY
+from bitcast.validator.utils.briefs import get_briefs
+from bitcast.validator.utils.config import YT_REWARD_DELAY
 
 class MockResponse:
     def __init__(self, json_data, status_code=200):

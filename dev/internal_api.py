@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 from bitcast.validator.socials.youtube.youtube_scoring import vet_video
 from bitcast.validator.socials.youtube import youtube_utils
-from bitcast.validator.config import RAPID_API_KEY
+from bitcast.validator.utils.config import RAPID_API_KEY
 
 # Note: This API is intended solely for the use of the subnet development team.
 # It can be ignored by anyone else.

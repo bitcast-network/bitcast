@@ -1,6 +1,6 @@
 import requests
 import bittensor as bt
-from bitcast.validator.config import BITCAST_STATS_ENDPOINT
+from bitcast.validator.utils.config import BITCAST_STATS_ENDPOINT
 from typing import List, Dict, Any
 import numpy as np
 import threading

@@ -10,7 +10,7 @@ import os
 from typing import Optional
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from bitcast.validator.config import (
+from bitcast.validator.utils.config import (
     OPENAI_API_KEY,
     DISABLE_LLM_CACHING,
     LANGCHAIN_API_KEY,

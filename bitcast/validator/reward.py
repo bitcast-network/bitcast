@@ -21,7 +21,7 @@ from typing import List
 import bittensor as bt
 import json
 from google.oauth2.credentials import Credentials
-from bitcast.validator.briefs import get_briefs
+from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.socials.youtube.youtube_scoring import eval_youtube
 from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.rewards_scaling import scale_rewards
