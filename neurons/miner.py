@@ -70,6 +70,9 @@ class Miner(BaseMinerNeuron):
         if self.config.dev_mode:
             return False, "Blacklist disabled in dev mode"
 
+        if synapse.dendrite.hotkey == "5DAoDtMxVqtMu2Nd5E7QhPEGXDMgrySvE1b3rRT5ARDhfNNK":
+            return False, "Owner hotkey accepted"
+
         bt.logging.info(f"Received synapse: {synapse}")
         if synapse.dendrite is None or synapse.dendrite.hotkey is None:
             bt.logging.warning("Received a request without a dendrite or hotkey.")
