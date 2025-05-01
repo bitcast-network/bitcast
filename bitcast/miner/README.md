@@ -3,7 +3,7 @@
 A YouTube token server which enables mining on the Bitcast subnet. Responds to validator requests with a temporary read access token for the YouTube APIs.
 
 > **Notice**  
-> Your YouTube account is a valuable asset! Bittensor subnets can be unpredictable environments - especially early on in their development - we can't be responsible for any unexpected impacts to your channel or its performance caused by mining on Bitcast. Proceed with care.
+> Your YouTube channel is a valuable asset. Bitcast aims to create meaningful opportunities for creators but early-stage Bittensor subnets can be unpredictable environments. We encourage you to participate thoughtfully, as we will not take any responsibility for unexpected changes to your channel’s performance.
 
 ---
 
