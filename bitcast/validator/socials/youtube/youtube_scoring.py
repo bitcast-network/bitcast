@@ -168,4 +168,4 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         if match:
             brief_id = briefs[i]["id"]
             result["scores"][brief_id] += video_score
-            bt.logging.info(f"Brief: {brief_id}, Video: {video_id}, Score: {video_score}")
+            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}")
