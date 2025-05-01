@@ -272,13 +272,17 @@ def calculate_video_score(video_id, youtube_analytics_client):
     """Calculate the score for a video based on analytics data."""
     start_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1)).strftime('%Y-%m-%d')
     end_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY)).strftime('%Y-%m-%d')
+    today = datetime.now().strftime('%Y-%m-%d')
 
-    video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, start_date, end_date, dimensions='day')
+    # Get all analytics data from start_date to today
+    daily_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, start_date, today, dimensions='day')
 
-    total_minutes_watched = sum(item.get('estimatedMinutesWatched', 0) for item in video_analytics)
+    # Calculate score using only the data between start_date and end_date
+    scoreable_days = [item for item in daily_analytics if item.get('day', '') <= end_date]
+    total_minutes_watched = sum(item.get('estimatedMinutesWatched', 0) for item in scoreable_days)
 
     # Return both the score and the daily analytics data
     return {
         "score": total_minutes_watched,
-        "daily_analytics": video_analytics
+        "daily_analytics": daily_analytics
     } 
