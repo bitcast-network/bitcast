@@ -13,6 +13,13 @@ from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
 # This list is shared between youtube_scoring.py and youtube_evaluation.py
 scored_video_ids = []
 
+# Retry configuration for YouTube API calls
+YT_API_RETRY_CONFIG = {
+    'stop': stop_after_attempt(3),
+    'wait': wait_fixed(0.5),
+    'reraise': True
+}
+
 def reset_scored_videos():
     """Reset the global scored_video_ids list.
     
@@ -37,6 +44,7 @@ def mark_video_as_scored(video_id):
 # Channel Analytics Functions
 # ============================================================================
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_channel_data(youtube_data_client, discrete_mode=False):
     """Get basic channel information."""
     account_info = youtube_data_client.channels().list(
@@ -62,6 +70,7 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
 
     return channel_info
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, dimensions=""):
     """Get comprehensive channel analytics including traffic sources."""
     if end_date is None:
@@ -125,6 +134,7 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
 
     return analytics_info
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_traffic_source_views_analytics(youtube_analytics_client, start_date, end_date):
     """Get traffic source analytics for views."""
     try:
@@ -150,6 +160,7 @@ def get_traffic_source_views_analytics(youtube_analytics_client, start_date, end
         bt.logging.warning(f"Error getting traffic source views analytics: {e}")
         return {}
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_traffic_source_minutes_analytics(youtube_analytics_client, start_date, end_date):
     """Get traffic source analytics for minutes watched."""
     try:
@@ -175,6 +186,7 @@ def get_traffic_source_minutes_analytics(youtube_analytics_client, start_date, e
         bt.logging.warning(f"Error getting traffic source minutes analytics: {e}")
         return {}
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_country_views_analytics(youtube_analytics_client, start_date, end_date):
     """Get views analytics by country."""
     try:
@@ -200,6 +212,7 @@ def get_country_views_analytics(youtube_analytics_client, start_date, end_date):
         bt.logging.warning(f"Error getting country views analytics: {e}")
         return {}
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_country_minutes_analytics(youtube_analytics_client, start_date, end_date):
     """Get minutes watched analytics by country."""
     try:
@@ -229,6 +242,7 @@ def get_country_minutes_analytics(youtube_analytics_client, start_date, end_date
 # Video Playlist and List Management
 # ============================================================================
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_uploads_playlist_id(youtube):
     """Retrieve the channel's uploads playlist id."""
     channels_response = youtube.channels().list(
@@ -242,6 +256,7 @@ def get_uploads_playlist_id(youtube):
     uploads_playlist_id = channels_response["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
     return uploads_playlist_id
 
+@retry(**YT_API_RETRY_CONFIG)
 def list_all_videos(youtube, uploads_playlist_id):
     """List all videos in the uploads playlist."""
     videos = []
@@ -260,6 +275,7 @@ def list_all_videos(youtube, uploads_playlist_id):
             break
     return videos
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_all_uploads(youtube_data_client, max_age_days=365):
     """Get all video IDs uploaded within the specified time period."""
     uploads_playlist_id = get_uploads_playlist_id(youtube_data_client)
@@ -282,6 +298,7 @@ def get_all_uploads(youtube_data_client, max_age_days=365):
 # Video Analytics Functions
 # ============================================================================
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_video_data(youtube_data_client, video_id, discrete_mode=False):
     """Get basic video information."""
     video_response = youtube_data_client.videos().list(
@@ -314,6 +331,7 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
 
     return stats
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, dimensions=""):
     """Get comprehensive video analytics including traffic sources."""
     if end_date is None:
@@ -382,6 +400,7 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
 
     return analytics_info
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_video_traffic_source_views_analytics(youtube_analytics_client, video_id, start_date, end_date):
     """Get traffic source analytics for views for a specific video."""
     try:
@@ -408,6 +427,7 @@ def get_video_traffic_source_views_analytics(youtube_analytics_client, video_id,
         bt.logging.warning(f"Error getting traffic source views analytics for video {video_id}: {e}")
         return {}
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date):
     """Get traffic source analytics for minutes watched for a specific video."""
     try:
@@ -434,6 +454,7 @@ def get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_i
         bt.logging.warning(f"Error getting traffic source minutes analytics for video {video_id}: {e}")
         return {}
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_video_country_views_analytics(youtube_analytics_client, video_id, start_date, end_date):
     """Get views analytics by country for a specific video."""
     try:
@@ -460,6 +481,7 @@ def get_video_country_views_analytics(youtube_analytics_client, video_id, start_
         bt.logging.warning(f"Error getting country views analytics for video {video_id}: {e}")
         return {}
 
+@retry(**YT_API_RETRY_CONFIG)
 def get_video_country_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date):
     """Get minutes watched analytics by country for a specific video."""
     try:
