@@ -24,7 +24,7 @@ from bitcast.protocol import AccessTokenSynapse
 from bitcast.validator.reward import get_rewards
 from bitcast.utils.uids import get_all_uids
 from bitcast.validator.utils.publish_stats import publish_stats
-from bitcast.validator.utils.config import VALIDATOR_CYCLE
+from bitcast.validator.utils.config import VALIDATOR_WAIT, VALIDATOR_STEPS_INTERVAL
 
 async def forward(self):
     """
@@ -36,33 +36,34 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    # TODO(developer): Define how the validator selects a miner to query, how often, etc.
-    # get_random_uids is an example method, but you can replace it with your own.
-    miner_uids = get_all_uids(self)
 
-    # The dendrite client queries the network.
-    responses = await self.dendrite(
-        # Send the query to selected miner axons in the network.
-        axons=[self.metagraph.axons[uid] for uid in miner_uids],
-        # Request an access token from miners
-        synapse=AccessTokenSynapse(),
-        # Don't deserialize the responses to get the AccessTokenSynapse objects directly
-        deserialize=False,
-    )
+    if self.step % VALIDATOR_STEPS_INTERVAL == 0:
 
-    bt.logging.info(f"Number of responses received: {len(responses)}")
+        miner_uids = get_all_uids(self)
 
-    # Get rewards for the responses
-    rewards, yt_stats_list = get_rewards(self, miner_uids, responses=responses)
+        # The dendrite client queries the network.
+        responses = await self.dendrite(
+            # Send the query to selected miner axons in the network.
+            axons=[self.metagraph.axons[uid] for uid in miner_uids],
+            # Request an access token from miners
+            synapse=AccessTokenSynapse(),
+            # Don't deserialize the responses to get the AccessTokenSynapse objects directly
+            deserialize=False,
+        )
 
-    # Log the rewards for monitoring purposes
-    bt.logging.info("UID Weights:")
-    for uid, reward in zip(miner_uids, rewards):
-        bt.logging.info(f"UID {uid}: {reward}")
-    
-    # Update the scores based on the rewards
-    self.update_scores(rewards, miner_uids)
+        bt.logging.info(f"Number of responses received: {len(responses)}")
 
-    publish_stats(self.wallet, yt_stats_list, miner_uids)
+        # Get rewards for the responses
+        rewards, yt_stats_list = get_rewards(self, miner_uids, responses=responses)
 
-    time.sleep(VALIDATOR_CYCLE)
+        # Log the rewards for monitoring purposes
+        bt.logging.info("UID Weights:")
+        for uid, reward in zip(miner_uids, rewards):
+            bt.logging.info(f"UID {uid}: {reward}")
+        
+        # Update the scores based on the rewards
+        self.update_scores(rewards, miner_uids)
+
+        publish_stats(self.wallet, yt_stats_list, miner_uids)
+
+    time.sleep(VALIDATOR_WAIT)

@@ -7,7 +7,7 @@ import bittensor as bt
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -43,7 +43,8 @@ YT_MIN_VIDEO_RETENTION = 10
 TRANSCRIPT_MAX_RETRY = 10
 
 # validation cycle
-VALIDATOR_CYCLE = 14400 #4 hours
+VALIDATOR_WAIT = 60 # 60 seconds
+VALIDATOR_STEPS_INTERVAL = 240 # 4 hours
 
 DISCRETE_MODE = True
 
@@ -63,5 +64,6 @@ bt.logging.info(f"YT_ROLLING_WINDOW: {YT_ROLLING_WINDOW}")
 bt.logging.info(f"YT_REWARD_DELAY: {YT_REWARD_DELAY}")
 bt.logging.info(f"YT_LOOKBACK: {YT_LOOKBACK}")
 bt.logging.info(f"TRANSCRIPT_MAX_RETRY: {TRANSCRIPT_MAX_RETRY}")
-bt.logging.info(f"UPDATE_BLOCKS: {VALIDATOR_CYCLE}")
+bt.logging.info(f"VALIDATOR_WAIT: {VALIDATOR_WAIT}")
+bt.logging.info(f"VALIDATOR_STEPS_INTERVAL: {VALIDATOR_STEPS_INTERVAL}")
 bt.logging.info(f"DISCRETE_MODE: {DISCRETE_MODE}")
