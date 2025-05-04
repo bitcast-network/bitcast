@@ -10,6 +10,10 @@ from bitcast.validator.utils.config import RAPID_API_KEY
 
 app = FastAPI()
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 class VideoRequest(BaseModel):
     video_id: str
     briefs: List[Dict[str, Any]]
