@@ -54,6 +54,12 @@ SUBTENSOR_CHAIN_ENDPOINT=${SUBTENSOR_CHAIN_ENDPOINT:-"wss://entrypoint-finney.op
 PORT=${PORT:-8092}
 LOGGING=${LOGGING:-"--logging.debug"}
 
+# Handle boolean flags
+DISABLE_AUTO_UPDATE_FLAG=""
+if [ "${DISABLE_AUTO_UPDATE,,}" = "true" ]; then
+    DISABLE_AUTO_UPDATE_FLAG="--disable_auto_update"
+fi
+
 # Clear cache if specified 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -79,5 +85,5 @@ if pm2 list | grep -q "$VALIDATOR_PROCESS_NAME"; then
   pm2 restart "$VALIDATOR_PROCESS_NAME"
 else
   echo "Process '$VALIDATOR_PROCESS_NAME' is not running. Starting it for the first time..."
-  pm2 start python --name "$VALIDATOR_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE
+  pm2 start python --name "$VALIDATOR_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE_FLAG
 fi

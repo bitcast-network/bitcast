@@ -71,6 +71,7 @@ class Validator(BaseValidatorNeuron):
 
 def auto_update_loop(config):
     while True:
+        bt.logging.info(f"auto update: {config.neuron.disable_auto_update}")
         if not config.neuron.disable_auto_update:
             run_auto_update('validator')
         sleep_time = random.randint(600, 900)  # Random time between 10 and 15 minutes
