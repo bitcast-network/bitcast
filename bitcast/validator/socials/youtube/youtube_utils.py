@@ -353,7 +353,7 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     ).execute()
 
     if not analytics_response.get("rows"):
-        bt.logging.warning(f"No analytics data found for video ID: {video_id}")
+        bt.logging.warning("No analytics data found for video")
         return []
 
     # Define metric names in the same order as the metrics_list
@@ -424,7 +424,7 @@ def get_video_traffic_source_views_analytics(youtube_analytics_client, video_id,
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source views analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting traffic source views analytics: {e}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -451,7 +451,7 @@ def get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_i
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source minutes analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting traffic source minutes analytics: {e}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -478,7 +478,7 @@ def get_video_country_views_analytics(youtube_analytics_client, video_id, start_
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country views analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting country views analytics: {e}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -505,7 +505,7 @@ def get_video_country_minutes_analytics(youtube_analytics_client, video_id, star
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country minutes analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting country minutes analytics: {e}")
         return {}
 
 # ============================================================================
@@ -526,7 +526,7 @@ def _fetch_transcript(video_id, rapid_api_key):
         bt.logging.info("Transcript fetched successfully")
         return transcript_data[0].get("transcription", [])
     elif isinstance(transcript_data, dict) and transcript_data.get("error") == "This video has no subtitles.":
-        bt.logging.warning(f"No subtitles available for video_id {video_id}")
+        bt.logging.warning("No subtitles available for video")
         raise Exception("No subtitles available")
     else:
         bt.logging.warning(f"Error retrieving transcript: {transcript_data}")
