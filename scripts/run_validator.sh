@@ -57,7 +57,7 @@ LOGGING=${LOGGING:-"--logging.debug"}
 # Handle boolean flags
 DISABLE_AUTO_UPDATE_FLAG=""
 if [ "${DISABLE_AUTO_UPDATE,,}" = "true" ]; then
-    DISABLE_AUTO_UPDATE_FLAG="--disable_auto_update"
+    DISABLE_AUTO_UPDATE_FLAG="--neuron.disable_auto_update"
 fi
 
 # Clear cache if specified 
