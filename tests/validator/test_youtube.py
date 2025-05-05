@@ -39,7 +39,7 @@ async def test_update_video_score():
         # Test case 1: First video with score 2
         video_id_1 = "test_video_id_1"
         video_matches[video_id_1] = [True]  # Add to video_matches
-        result["videos"][video_id_1] = {"details": {}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_1] = {"details": {"bitcastVideoId": video_id_1}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 2, "daily_analytics": {}}
         update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result)
         assert result["scores"]["test_brief"] == 2, "First score should be 2"
@@ -47,7 +47,7 @@ async def test_update_video_score():
         # Test case 2: Second video with score 4
         video_id_2 = "test_video_id_2"
         video_matches[video_id_2] = [True]  # Add to video_matches
-        result["videos"][video_id_2] = {"details": {}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_2] = {"details": {"bitcastVideoId": video_id_2}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 4, "daily_analytics": {}}
         update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result)
         assert result["scores"]["test_brief"] == 6, "Score should be sum of 2 and 4"
@@ -55,7 +55,7 @@ async def test_update_video_score():
         # Test case 3: Third video with score 2
         video_id_3 = "test_video_id_3"
         video_matches[video_id_3] = [True]  # Add to video_matches
-        result["videos"][video_id_3] = {"details": {}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_3] = {"details": {"bitcastVideoId": video_id_3}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 2, "daily_analytics": {}}
         update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result)
         assert result["scores"]["test_brief"] == 8, "Score should be sum of 2, 4, and 2"
@@ -63,7 +63,7 @@ async def test_update_video_score():
         # Test case 4: Fourth video with score 0
         video_id_4 = "test_video_id_4"
         video_matches[video_id_4] = [True]  # Add to video_matches
-        result["videos"][video_id_4] = {"details": {}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_4] = {"details": {"bitcastVideoId": video_id_4}, "analytics": {}}  # Initialize video data
         mock_calculate.return_value = {"score": 0, "daily_analytics": {}}
         update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result)
         assert result["scores"]["test_brief"] == 8, "Score should remain 8 (sum of 2, 4, 2, and 0)"
