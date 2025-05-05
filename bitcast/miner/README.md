@@ -87,6 +87,10 @@ Make sure your server meets these before you start.
      bitcast/miner/secrets/client_secret.json
      ```
 
+5. **Publish App**  
+   - Go to **Audience**.
+   - Click **Publish App**.
+
 ---
 
 ## 🚀 Run Miner
@@ -170,7 +174,6 @@ Make sure your server meets these before you start.
 
 ## 🔄 Staying Healthy
 
-- If you believe your YouTube account has come under any kind of attack reach out to the subnet team and it will be statistically investigated
 - Once healthy, your miner auto-detects and scores new uploads.  
 - **Briefs change**—check [content briefs](http://dashboard.bitcast.network/briefs) regularly.  
 
