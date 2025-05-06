@@ -3,11 +3,40 @@ import requests
 import time
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
-from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY
+from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY, CACHE_DIRS
 import httpx
 import hashlib
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
+from diskcache import Cache
+import os
+import json
+
+# Cache configuration - caching video analytics
+CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days in seconds
+
+class YouTubeCache:
+    def __init__(self):
+        self.cache = Cache(CACHE_DIRS["youtube"])
+        
+    def get_video_cache(self, video_id):
+        """Get cached data for a video."""
+        return self.cache.get(f"video_{video_id}")
+        
+    def set_video_cache(self, video_id, data):
+        """Set cached data for a video with expiration."""
+        self.cache.set(f"video_{video_id}", data, expire=CACHE_EXPIRY)
+        
+    def clear_expired(self):
+        """Clear expired cache entries."""
+        self.cache.expire()
+        
+    def clear_all(self):
+        """Clear all cache entries."""
+        self.cache.clear()
+
+# Initialize global cache instance
+youtube_cache = YouTubeCache()
 
 # Global list to track which videos have already been scored
 # This list is shared between youtube_scoring.py and youtube_evaluation.py

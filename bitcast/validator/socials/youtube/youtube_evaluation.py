@@ -77,6 +77,18 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 results[video_id] = [False] * len(briefs)
                 continue
                 
+            # Check cache for this video
+            cached_data = youtube_utils.youtube_cache.get_video_cache(video_id)
+            if cached_data:
+                # If cached data exists and publishDateCheck failed last time, use cached data
+                if not cached_data.get("decision_details", {}).get("publishDateCheck", True):
+                    bt.logging.info(f"Using cached data (failed publishDateCheck)")
+                    results[video_id] = cached_data["results"]
+                    video_data_dict[video_id] = cached_data["video_data"]
+                    video_analytics_dict[video_id] = cached_data["video_analytics"]
+                    video_decision_details[video_id] = {**cached_data["decision_details"], "cache_used": True}
+                    continue
+            
             # Process the video
             process_video_vetting(
                 video_id, 
@@ -88,6 +100,15 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 video_analytics_dict, 
                 video_decision_details
             )
+            
+            # Cache the results
+            cache_data = {
+                "results": results[video_id],
+                "video_data": video_data_dict[video_id],
+                "video_analytics": video_analytics_dict[video_id],
+                "decision_details": video_decision_details[video_id]
+            }
+            youtube_utils.youtube_cache.set_video_cache(video_id, cache_data)
             
             # Only mark the video as scored if processing was successful
             youtube_utils.mark_video_as_scored(video_id)
@@ -164,7 +185,8 @@ def initialize_decision_details():
         "promptInjectionCheck": None,
         "contentAgainstBriefCheck": [],
         "publicVideo": None,
-        "publishDateCheck": None
+        "publishDateCheck": None,
+        "cache_used": False
     }
 
 def check_video_privacy(video_data, decision_details, briefs):

@@ -7,22 +7,23 @@ from diskcache import Cache
 import secrets
 import atexit
 import os
-from typing import Optional
+from typing import Optional, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from bitcast.validator.utils.config import (
     OPENAI_API_KEY,
     DISABLE_LLM_CACHING,
     LANGCHAIN_API_KEY,
-    LANGCHAIN_TRACING_V2
+    LANGCHAIN_TRACING_V2,
+    CACHE_DIRS
 )
 
 class OpenaiClient:
     _instance = None
     _lock = Lock()
-    _cache: Optional[Cache] = None
+    _cache = None
+    _cache_dir = CACHE_DIRS["openai"]
     _cache_lock = Lock()
-    _cache_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cache')
 
     def __new__(cls):
         if cls._instance is None:
@@ -33,19 +34,15 @@ class OpenaiClient:
 
     @classmethod
     def initialize_cache(cls) -> None:
-        """Initialize the cache with size limits and eviction policy."""
-        if not DISABLE_LLM_CACHING and cls._cache is None:
-            with cls._cache_lock:
-                if cls._cache is None:
-                    # Ensure cache directory exists
-                    os.makedirs(cls._cache_dir, exist_ok=True)
-                    cls._cache = Cache(
-                        directory=cls._cache_dir,
-                        size_limit=2**30,  # 1GB limit
-                        eviction_policy='least-recently-used'
-                    )
-                    # Register cleanup on program exit
-                    atexit.register(cls.cleanup)
+        """Initialize the cache if it hasn't been initialized yet."""
+        if cls._cache is None:
+            os.makedirs(cls._cache_dir, exist_ok=True)
+            cls._cache = Cache(
+                directory=cls._cache_dir,
+                size_limit=1e9,  # 1GB
+                disk_min_file_size=0,
+                disk_pickle_protocol=4,
+            )
 
     @classmethod
     def cleanup(cls) -> None:

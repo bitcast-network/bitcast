@@ -5,29 +5,27 @@ from diskcache import Cache
 import os
 from threading import Lock
 import atexit
-from bitcast.validator.utils.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY
+from bitcast.validator.utils.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY, CACHE_DIRS
 
 class BriefsCache:
     _instance = None
     _lock = Lock()
     _cache: Cache = None
-    _cache_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cache', 'briefs')
+    _cache_dir = CACHE_DIRS["briefs"]
 
     @classmethod
     def initialize_cache(cls) -> None:
-        """Initialize the cache with size limits and eviction policy."""
+        """Initialize the cache if it hasn't been initialized yet."""
         if cls._cache is None:
-            with cls._lock:
-                if cls._cache is None:
-                    # Ensure cache directory exists
-                    os.makedirs(cls._cache_dir, exist_ok=True)
-                    cls._cache = Cache(
-                        directory=cls._cache_dir,
-                        size_limit=2**20,  # 1MB limit
-                        eviction_policy='least-recently-used'
-                    )
-                    # Register cleanup on program exit
-                    atexit.register(cls.cleanup)
+            os.makedirs(cls._cache_dir, exist_ok=True)
+            cls._cache = Cache(
+                directory=cls._cache_dir,
+                size_limit=1e9,  # 1GB
+                disk_min_file_size=0,
+                disk_pickle_protocol=4,
+            )
+            # Register cleanup on program exit
+            atexit.register(cls.cleanup)
 
     @classmethod
     def cleanup(cls) -> None:
