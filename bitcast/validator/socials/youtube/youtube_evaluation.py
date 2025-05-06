@@ -201,7 +201,7 @@ def check_video_privacy(video_data, decision_details, briefs):
         return True
 
 def check_video_publish_date(video_data, briefs, decision_details):
-    """Check if the video was published after the brief's start date (minus buffer days)."""
+    """Check if the video was published after the earliest brief's start date (minus buffer days)."""
     try:
         video_publish_date = datetime.strptime(video_data["publishedAt"], '%Y-%m-%dT%H:%M:%SZ').date()
         
