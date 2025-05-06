@@ -42,9 +42,6 @@ def eval_youtube(creds, briefs):
     channel_vet_result = vet_channel(channel_data, channel_analytics)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
     
-    if not channel_vet_result:
-        return result
-    
     # Process videos and update the result
     result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
     
@@ -112,6 +109,11 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
                     youtube_analytics_client, 
                     result
                 )
+        
+        # If channel vetting failed, set all scores to 0 but keep the video data
+        if not result["yt_account"]["channel_vet_result"]:
+            result["scores"] = {brief["id"]: 0 for brief in briefs}
+            
     except Exception as e:
         bt.logging.error(f"Error during video evaluation: {e}")
     
