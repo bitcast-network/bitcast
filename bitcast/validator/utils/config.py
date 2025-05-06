@@ -15,7 +15,7 @@ CACHE_DIRS = {
     "briefs": os.path.join(CACHE_ROOT, "briefs")
 }
 
-__version__ = "0.1.1"
+__version__ = "1.1.0"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
