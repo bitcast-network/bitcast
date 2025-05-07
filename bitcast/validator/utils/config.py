@@ -7,7 +7,15 @@ import bittensor as bt
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-__version__ = "0.1.1"
+# Cache Configuration
+CACHE_ROOT = Path(__file__).resolve().parents[2] / "cache"
+CACHE_DIRS = {
+    "youtube": os.path.join(CACHE_ROOT, "youtube"),
+    "openai": os.path.join(CACHE_ROOT, "openai"),
+    "briefs": os.path.join(CACHE_ROOT, "briefs")
+}
+
+__version__ = "1.1.0"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')

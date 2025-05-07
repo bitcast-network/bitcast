@@ -3,11 +3,40 @@ import requests
 import time
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
-from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY
+from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY, CACHE_DIRS
 import httpx
 import hashlib
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
+from diskcache import Cache
+import os
+import json
+
+# Cache configuration - caching video analytics
+CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days in seconds
+
+class YouTubeCache:
+    def __init__(self):
+        self.cache = Cache(CACHE_DIRS["youtube"])
+        
+    def get_video_cache(self, video_id):
+        """Get cached data for a video."""
+        return self.cache.get(f"video_{video_id}")
+        
+    def set_video_cache(self, video_id, data):
+        """Set cached data for a video with expiration."""
+        self.cache.set(f"video_{video_id}", data, expire=CACHE_EXPIRY)
+        
+    def clear_expired(self):
+        """Clear expired cache entries."""
+        self.cache.expire()
+        
+    def clear_all(self):
+        """Clear all cache entries."""
+        self.cache.clear()
+
+# Initialize global cache instance
+youtube_cache = YouTubeCache()
 
 # Global list to track which videos have already been scored
 # This list is shared between youtube_scoring.py and youtube_evaluation.py
@@ -65,7 +94,8 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
         "channel_start": account_info['items'][0]['snippet']['publishedAt'],
         "viewCount": account_info['items'][0]['statistics']['viewCount'],
         "subCount": account_info['items'][0]['statistics']['subscriberCount'],
-        "videoCount": account_info['items'][0]['statistics']['videoCount']
+        "videoCount": account_info['items'][0]['statistics']['videoCount'],
+        "url": f"https://www.youtube.com/channel/{channel_id}"
     }
 
     return channel_info
@@ -120,17 +150,26 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     # Get country data for minutes watched
     country_minutes = get_country_minutes_analytics(youtube_analytics_client, start_date, end_date)
     
+    # Get subscribers gained including 30 days prior if dimensions is "day"
+    if dimensions == "day":
+        past_date = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+    else:
+        past_date = start_date
+    subscribers_gained = get_subscribers_gained_analytics(youtube_analytics_client, past_date, end_date)
+    
     if isinstance(analytics_info, dict):
         analytics_info["trafficSourceViews"] = traffic_source_views
         analytics_info["trafficSourceMinutes"] = traffic_source_minutes
         analytics_info["countryViews"] = country_views
         analytics_info["countryMinutes"] = country_minutes
+        analytics_info["subscribersGained"] = subscribers_gained
     else:
         for entry in analytics_info:
             entry["trafficSourceViews"] = traffic_source_views
             entry["trafficSourceMinutes"] = traffic_source_minutes
             entry["countryViews"] = country_views
             entry["countryMinutes"] = country_minutes
+            entry["subscribersGained"] = subscribers_gained
 
     return analytics_info
 
@@ -236,6 +275,32 @@ def get_country_minutes_analytics(youtube_analytics_client, start_date, end_date
         return country_data
     except Exception as e:
         bt.logging.warning(f"Error getting country minutes analytics: {e}")
+        return {}
+
+@retry(**YT_API_RETRY_CONFIG)
+def get_subscribers_gained_analytics(youtube_analytics_client, start_date, end_date):
+    """Get subscribers gained analytics by day."""
+    try:
+        subscribers_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="day",
+            metrics="subscribersGained"
+        ).execute()
+
+        if not subscribers_response.get("rows"):
+            return {}
+
+        subscribers_data = {}
+        for row in subscribers_response.get("rows", []):
+            date = row[0]
+            subscribers = row[1]
+            subscribers_data[date] = subscribers
+
+        return subscribers_data
+    except Exception as e:
+        bt.logging.warning(f"Error getting subscribers gained analytics: {e}")
         return {}
 
 # ============================================================================
@@ -353,7 +418,7 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     ).execute()
 
     if not analytics_response.get("rows"):
-        bt.logging.warning(f"No analytics data found for video ID: {video_id}")
+        bt.logging.warning("No analytics data found for video")
         return []
 
     # Define metric names in the same order as the metrics_list
@@ -424,7 +489,7 @@ def get_video_traffic_source_views_analytics(youtube_analytics_client, video_id,
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source views analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting traffic source views analytics: {e}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -451,7 +516,7 @@ def get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_i
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source minutes analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting traffic source minutes analytics: {e}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -478,7 +543,7 @@ def get_video_country_views_analytics(youtube_analytics_client, video_id, start_
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country views analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting country views analytics: {e}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -505,7 +570,7 @@ def get_video_country_minutes_analytics(youtube_analytics_client, video_id, star
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country minutes analytics for video {video_id}: {e}")
+        bt.logging.warning(f"Error getting country minutes analytics: {e}")
         return {}
 
 # ============================================================================
@@ -526,7 +591,7 @@ def _fetch_transcript(video_id, rapid_api_key):
         bt.logging.info("Transcript fetched successfully")
         return transcript_data[0].get("transcription", [])
     elif isinstance(transcript_data, dict) and transcript_data.get("error") == "This video has no subtitles.":
-        bt.logging.warning(f"No subtitles available for video_id {video_id}")
+        bt.logging.warning("No subtitles available for video")
         raise Exception("No subtitles available")
     else:
         bt.logging.warning(f"Error retrieving transcript: {transcript_data}")

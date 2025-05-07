@@ -33,8 +33,7 @@ def reward(uid, briefs, response) -> dict:
     """
     bt.logging.info(f"===== Reward function called for UID: {uid} =====")
 
-    # Give the burn UID low score.
-    # If a brief has no valid videos its portion of emissions is burned.
+    # Give the burn UID 0 score for now.
     if uid == 0:
         bt.logging.info(f"Special case: Setting all scores to 0 for UID: {uid}")
         return {"scores": {brief["id"]: 0 for brief in briefs}}

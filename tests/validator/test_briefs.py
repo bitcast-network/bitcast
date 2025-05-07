@@ -2,7 +2,7 @@ from pathlib import Path
 
 import requests
 from datetime import datetime, timezone, timedelta
-from bitcast.validator.utils.briefs import get_briefs
+from bitcast.validator.utils.briefs import get_briefs, BriefsCache
 from bitcast.validator.utils.config import YT_REWARD_DELAY
 
 class MockResponse:
@@ -64,13 +64,26 @@ def test_get_briefs_active(monkeypatch):
 
 def test_get_briefs_error(monkeypatch):
     """
-    Test that get_briefs returns an empty list when a RequestException is raised.
+    Test that get_briefs returns cached data when available, or empty list when no cache exists.
     """
+    # First test: No cache available
+    cache = BriefsCache.get_cache()
+    cache.delete("briefs_True")  # Ensure no cache exists
+    
     def mock_get(*args, **kwargs):
         raise requests.exceptions.RequestException("API error")
+    
     monkeypatch.setattr(requests, "get", mock_get)
     briefs = get_briefs(all=True)
-    assert briefs == []
+    assert briefs == []  # Should return empty list when no cache exists
+    
+    # Second test: Cache available
+    cache_data = [{"id": "cached_brief", "start_date": "2020-01-01", "end_date": "2020-01-02"}]
+    cache.set("briefs_True", cache_data)
+    
+    briefs = get_briefs(all=True)
+    assert len(briefs) == 1
+    assert briefs[0]["id"] == "cached_brief"  # Should return cached data
 
 def test_get_briefs_date_parsing_error(monkeypatch):
     """
@@ -142,3 +155,68 @@ def test_get_briefs_with_reward_delay(monkeypatch):
     
     briefs = get_briefs()
     assert len(briefs) == 0  # Should not be included as it's beyond the reward delay period
+
+def test_get_briefs_caching_success(monkeypatch):
+    """
+    Test that get_briefs caches successful API responses.
+    """
+    mock_data = {
+        "briefs": [
+            {"id": "brief1", "start_date": "2020-01-01", "end_date": "2020-01-02"}
+        ]
+    }
+
+    def mock_get(*args, **kwargs):
+        return MockResponse(mock_data)
+
+    monkeypatch.setattr(requests, "get", mock_get)
+    
+    # First call - should fetch from API and cache
+    briefs = get_briefs(all=True)
+    assert len(briefs) == 1
+    assert briefs[0]["id"] == "brief1"
+    
+    # Verify cache was populated
+    cache = BriefsCache.get_cache()
+    cached_briefs = cache.get("briefs_True")
+    assert cached_briefs is not None
+    assert len(cached_briefs) == 1
+    assert cached_briefs[0]["id"] == "brief1"
+
+def test_get_briefs_caching_fallback(monkeypatch):
+    """
+    Test that get_briefs falls back to cached data when API fails.
+    """
+    # First, populate the cache with some data
+    cache = BriefsCache.get_cache()
+    cache_data = [{"id": "cached_brief", "start_date": "2020-01-01", "end_date": "2020-01-02"}]
+    cache.set("briefs_True", cache_data)
+    
+    # Mock API to fail
+    def mock_get(*args, **kwargs):
+        raise requests.exceptions.RequestException("API error")
+    
+    monkeypatch.setattr(requests, "get", mock_get)
+    
+    # Call should use cached data
+    briefs = get_briefs(all=True)
+    assert len(briefs) == 1
+    assert briefs[0]["id"] == "cached_brief"
+
+def test_get_briefs_no_cache_fallback(monkeypatch):
+    """
+    Test that get_briefs returns empty list when API fails and no cache exists.
+    """
+    # Ensure cache is empty
+    cache = BriefsCache.get_cache()
+    cache.delete("briefs_True")
+    
+    # Mock API to fail
+    def mock_get(*args, **kwargs):
+        raise requests.exceptions.RequestException("API error")
+    
+    monkeypatch.setattr(requests, "get", mock_get)
+    
+    # Call should return empty list
+    briefs = get_briefs(all=True)
+    assert briefs == []
