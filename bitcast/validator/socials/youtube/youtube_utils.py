@@ -94,7 +94,8 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
         "channel_start": account_info['items'][0]['snippet']['publishedAt'],
         "viewCount": account_info['items'][0]['statistics']['viewCount'],
         "subCount": account_info['items'][0]['statistics']['subscriberCount'],
-        "videoCount": account_info['items'][0]['statistics']['videoCount']
+        "videoCount": account_info['items'][0]['statistics']['videoCount'],
+        "url": f"https://www.youtube.com/channel/{channel_id}"
     }
 
     return channel_info
@@ -149,17 +150,26 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     # Get country data for minutes watched
     country_minutes = get_country_minutes_analytics(youtube_analytics_client, start_date, end_date)
     
+    # Get subscribers gained including 30 days prior if dimensions is "day"
+    if dimensions == "day":
+        past_date = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+    else:
+        past_date = start_date
+    subscribers_gained = get_subscribers_gained_analytics(youtube_analytics_client, past_date, end_date)
+    
     if isinstance(analytics_info, dict):
         analytics_info["trafficSourceViews"] = traffic_source_views
         analytics_info["trafficSourceMinutes"] = traffic_source_minutes
         analytics_info["countryViews"] = country_views
         analytics_info["countryMinutes"] = country_minutes
+        analytics_info["subscribersGained"] = subscribers_gained
     else:
         for entry in analytics_info:
             entry["trafficSourceViews"] = traffic_source_views
             entry["trafficSourceMinutes"] = traffic_source_minutes
             entry["countryViews"] = country_views
             entry["countryMinutes"] = country_minutes
+            entry["subscribersGained"] = subscribers_gained
 
     return analytics_info
 
@@ -265,6 +275,32 @@ def get_country_minutes_analytics(youtube_analytics_client, start_date, end_date
         return country_data
     except Exception as e:
         bt.logging.warning(f"Error getting country minutes analytics: {e}")
+        return {}
+
+@retry(**YT_API_RETRY_CONFIG)
+def get_subscribers_gained_analytics(youtube_analytics_client, start_date, end_date):
+    """Get subscribers gained analytics by day."""
+    try:
+        subscribers_response = youtube_analytics_client.reports().query(
+            ids="channel==MINE",
+            startDate=start_date,
+            endDate=end_date,
+            dimensions="day",
+            metrics="subscribersGained"
+        ).execute()
+
+        if not subscribers_response.get("rows"):
+            return {}
+
+        subscribers_data = {}
+        for row in subscribers_response.get("rows", []):
+            date = row[0]
+            subscribers = row[1]
+            subscribers_data[date] = subscribers
+
+        return subscribers_data
+    except Exception as e:
+        bt.logging.warning(f"Error getting subscribers gained analytics: {e}")
         return {}
 
 # ============================================================================
