@@ -81,7 +81,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
             cached_data = youtube_utils.youtube_cache.get_video_cache(video_id)
             if cached_data:
                 # If cached data exists and publishDateCheck failed last time, use cached data
-                if not cached_data.get("decision_details", {}).get("publishDateCheck", True):
+                if cached_data.get("decision_details", {}).get("publishDateCheck") is False:
                     bt.logging.info(f"Using cached data (failed publishDateCheck)")
                     results[video_id] = cached_data["results"]
                     video_data_dict[video_id] = cached_data["video_data"]
