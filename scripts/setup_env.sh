@@ -29,7 +29,13 @@ fi
 # Virtual Environment Setup #
 ############################
 
-VENV_PATH="$PROJECT_PARENT/venv_bitcast"
+# Load environment variables from .env file if it exists
+if [ -f "$PROJECT_ROOT/bitcast/validator/.env" ]; then
+  export $(grep -v '^#' "$PROJECT_ROOT/bitcast/validator/.env" | sed 's/ *= */=/g' | xargs)
+fi
+
+# Set default virtual environment path if not specified in .env
+VENV_PATH=${VENV_PATH:-"$PROJECT_PARENT/venv_bitcast"}
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "$VENV_PATH" ]; then

@@ -41,13 +41,17 @@ def test_get_briefs_all(monkeypatch):
 def test_get_briefs_active(monkeypatch):
     """
     Test that get_briefs correctly filters briefs based on active dates when 'all' is False.
-    Only briefs whose start_date and end_date include the current date should be returned.
+    Only briefs whose delayed start_date and end_date include the current date should be returned.
     """
     current_date = datetime.now(timezone.utc).date()
-    current_date_str = current_date.strftime("%Y-%m-%d")
+    # Set start date to be YT_REWARD_DELAY days before current date
+    start_date = current_date - timedelta(days=YT_REWARD_DELAY)
+    # Set end date to be current date
+    end_date = current_date
+    
     mock_data = {
         "briefs": [
-            {"id": "active", "start_date": current_date_str, "end_date": current_date_str},
+            {"id": "active", "start_date": start_date.strftime("%Y-%m-%d"), "end_date": end_date.strftime("%Y-%m-%d")},
             {"id": "inactive", "start_date": "2000-01-01", "end_date": "2000-01-02"}
         ]
     }

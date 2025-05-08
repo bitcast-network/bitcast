@@ -7,8 +7,14 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_PARENT="$(cd "$PROJECT_ROOT/.." && pwd)"
 
-VALIDATOR_PROCESS_NAME="bitcast_validator"
-VENV_PATH="$PROJECT_PARENT/venv_bitcast"
+# Load environment variables from .env file
+if [ -f "$PROJECT_ROOT/bitcast/validator/.env" ]; then
+  export $(grep -v '^#' "$PROJECT_ROOT/bitcast/validator/.env" | sed 's/ *= */=/g' | xargs)
+fi
+
+# Set default values if variables are not set
+VENV_PATH=${VENV_PATH:-"$PROJECT_PARENT/venv_bitcast"}
+PM2_PROCESS_NAME=${PM2_PROCESS_NAME:-"bitcast_validator"}
 
 # Activate virtual environment
 if [ ! -d "$VENV_PATH" ]; then
@@ -19,11 +25,6 @@ fi
 
 echo "Activating virtual environment..."
 source "$VENV_PATH/bin/activate"
-
-# Load environment variables from .env file
-if [ -f "$PROJECT_ROOT/bitcast/validator/.env" ]; then
-  export $(grep -v '^#' "$PROJECT_ROOT/bitcast/validator/.env" | sed 's/ *= */=/g' | xargs)
-fi
 
 # Ensure required environment variables are set
 if [ -z "$RAPID_API_KEY" ]; then
@@ -80,10 +81,10 @@ if ! wandb login $WANDB_API_KEY; then
 fi
 
 # STOP VALIDATOR PROCESS
-if pm2 list | grep -q "$VALIDATOR_PROCESS_NAME"; then
-  echo "Process '$VALIDATOR_PROCESS_NAME' is already running. Restarting it..."
-  pm2 restart "$VALIDATOR_PROCESS_NAME"
+if pm2 list | grep -q "$PM2_PROCESS_NAME"; then
+  echo "Process '$PM2_PROCESS_NAME' is already running. Restarting it..."
+  pm2 restart "$PM2_PROCESS_NAME"
 else
-  echo "Process '$VALIDATOR_PROCESS_NAME' is not running. Starting it for the first time..."
-  pm2 start python --name "$VALIDATOR_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE_FLAG
+  echo "Process '$PM2_PROCESS_NAME' is not running. Starting it for the first time..."
+  pm2 start python --name "$PM2_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE_FLAG
 fi
