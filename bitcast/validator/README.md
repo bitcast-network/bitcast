@@ -65,6 +65,8 @@ Ensure your machine meets these requirements before proceeding with setup.
    - `RAPID_API_KEY`: Your RapidAPI key
    - `OPENAI_API_KEY`: Your OpenAI API key
    - `WANDB_API_KEY`: Your Weights & Biases API key
+   - `VENV_PATH`: (Optional) Custom path to Python virtual environment
+   - `PM2_PROCESS_NAME`: (Optional) Custom name for PM2 process (default: bitcast_validator)
 
 4. **Register on Bittensor Network**
    ```bash
