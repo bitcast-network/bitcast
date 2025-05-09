@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import bittensor as bt
 
-env_path = Path(__file__).parent / '.env'
+env_path = Path(__file__).parents[1] / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # Cache Configuration
@@ -15,7 +15,7 @@ CACHE_DIRS = {
     "briefs": os.path.join(CACHE_ROOT, "briefs")
 }
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
