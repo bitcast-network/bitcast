@@ -24,10 +24,10 @@ def test_get_rewards():
     # Mock yt_stats to be returned by reward function, including videos with minutes watched
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},
-        {"scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
         }},
-        {"scores": {"brief1": 15, "brief2": 15, "brief3": 15}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 15, "brief2": 15, "brief3": 15}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 20}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
         }}
     ]
@@ -76,13 +76,13 @@ def test_get_rewards_identical_responses():
     # Mock yt_stats to be returned by reward function - all identical except for uid 0
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
-        {"scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
         }},  # Scores for response 1
-        {"scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
         }},  # Scores for response 2
-        {"scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
         }}   # Scores for response 3
     ]
@@ -127,13 +127,13 @@ def test_get_rewards_with_zeros():
     # Mock yt_stats to be returned by reward function - each has a zero in one position, uid 0 all zeros
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
-        {"scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief2", "brief3"]}
         }},  # Scores for response 1
-        {"scores": {"brief1": 10, "brief2": 0, "brief3": 10}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 0, "brief3": 10}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief3"]}
         }},  # Scores for response 2
-        {"scores": {"brief1": 10, "brief2": 10, "brief3": 0}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 0}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief2"]}
         }}   # Scores for response 3
     ]
@@ -178,13 +178,13 @@ def test_get_rewards_all_zeros_in_first_position():
     # Mock yt_stats to be returned by reward function - all have zero in first position, uid 0 all zeros
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
-        {"scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief2", "brief3"]}
         }},  # Scores for response 1
-        {"scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief2", "brief3"]}
         }},  # Scores for response 2
-        {"scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief2", "brief3"]}
         }}   # Scores for response 3
     ]
@@ -309,10 +309,10 @@ def test_normalise_scores():
     scores_matrix = np.array([[0, 0, 0], [10, 30, 2], [90, 70, 2]])
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}},
-        {"scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
         }},
-        {"scores": {"brief1": 90, "brief2": 70, "brief3": 2}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 90, "brief2": 70, "brief3": 2}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 20}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
         }}
     ]
@@ -326,9 +326,9 @@ def test_normalise_scores():
     # Test with empty matrix
     assert np.array(normalise_scores(np.array([]), [], MOCK_TEST_BRIEFS)).size == 0
     
-    # # Test with single row
+    # Test with single row
     scores_matrix = np.array([[10, 30, 2]])
-    mock_yt_stats = [{"scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
+    mock_yt_stats = [{"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
         "video1": {"analytics": {"estimatedMinutesWatched": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"]}
     }}]
     final_scores = normalise_scores(scores_matrix, mock_yt_stats, MOCK_TEST_BRIEFS)
@@ -337,10 +337,10 @@ def test_normalise_scores():
     # Test with all zeros
     scores_matrix = np.array([[0, 0], [0, 0]])
     mock_yt_stats = [
-        {"scores": {"brief1": 0, "brief2": 0}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 0}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 0}, "matching_brief_ids": ["brief1", "brief2"]}
         }},
-        {"scores": {"brief1": 0, "brief2": 0}, "videos": {
+        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 0}, "videos": {
             "video1": {"analytics": {"estimatedMinutesWatched": 0}, "matching_brief_ids": ["brief1", "brief2"]}
         }}
     ]

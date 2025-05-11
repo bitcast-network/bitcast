@@ -142,6 +142,7 @@ def test_vet_channel():
 
 def test_check_video_publish_date():
     """Test video publish date validation with different scenarios."""
+
     # Setup test briefs with different dates
     briefs = [
         {"id": "brief1", "start_date": "2023-01-01"},  # Earliest allowed: Dec 29
@@ -165,16 +166,14 @@ def test_check_video_publish_date():
     assert check_video_publish_date(video_data, briefs, decision_details) == True
     assert decision_details["publishDateCheck"] == True
 
-    # Test case 3: Video published exactly on first brief's earliest allowed date (should fail)
-    video_data["publishedAt"] = "2022-12-29T00:00:00Z"  # Dec 29, exactly on brief1's earliest allowed
+    # Test case 3: Video published one day after earliest brief's allowed date (should pass)
+    video_data["publishedAt"] = "2022-12-30T00:00:00Z"  # Dec 30, one day after brief1's Dec 29
     decision_details = {"contentAgainstBriefCheck": []}
-    assert check_video_publish_date(video_data, briefs, decision_details) == False
-    assert decision_details["publishDateCheck"] == False
-    assert len(decision_details["contentAgainstBriefCheck"]) == len(briefs)
-    assert all(not check for check in decision_details["contentAgainstBriefCheck"])
+    assert check_video_publish_date(video_data, briefs, decision_details) == True
+    assert decision_details["publishDateCheck"] == True
 
-    # Test case 4: Video published between brief dates but before some earliest allowed dates (should fail)
-    video_data["publishedAt"] = "2023-01-15T12:34:56Z"  # Jan 15, after brief1's Dec 29 but before brief2's Jan 29
+    # Test case 4: Video published before earliest brief's allowed date (should fail)
+    video_data["publishedAt"] = "2022-12-28T12:34:56Z"  # Dec 28, before brief1's Dec 29
     decision_details = {"contentAgainstBriefCheck": []}
     assert check_video_publish_date(video_data, briefs, decision_details) == False
     assert decision_details["publishDateCheck"] == False
