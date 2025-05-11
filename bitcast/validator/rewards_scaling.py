@@ -7,6 +7,7 @@ import bittensor as bt
 def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dict]) -> dict:
     """
     Calculate the emissions scalar for each brief based on total minutes watched and burn parameters.
+    Only counts stats from vetted channels (where channel_vet_result is True).
     
     Args:
         yt_stats_list (List[dict]): List of YouTube statistics from all miners
@@ -19,7 +20,11 @@ def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dic
     brief_total_minutes = {}
     for stats in yt_stats_list:
         try:
-            if isinstance(stats, dict) and "videos" in stats:
+            # Only process stats from vetted channels
+            if not isinstance(stats, dict) or not stats.get("yt_account", {}).get("channel_vet_result", False):
+                continue
+                
+            if "videos" in stats:
                 videos = stats["videos"]
                 if isinstance(videos, dict):
                     # Handle case where videos is a dictionary
