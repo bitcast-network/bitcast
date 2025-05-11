@@ -210,17 +210,27 @@ def check_video_publish_date(video_data, briefs, decision_details):
     """Check if the video was published after the earliest brief's start date (minus buffer days)."""
     try:
         video_publish_date = datetime.strptime(video_data["publishedAt"], '%Y-%m-%dT%H:%M:%SZ').date()
+
+        # If no briefs, there are no date restrictions
+        if not briefs:
+            print("No briefs provided - no date restrictions")
+            decision_details["publishDateCheck"] = True
+            return True
         
-        for brief in briefs:
-            brief_start_date = datetime.strptime(brief["start_date"], "%Y-%m-%d").date()
-            # Calculate the earliest allowed publish date by subtracting the buffer days
-            earliest_allowed_date = brief_start_date - timedelta(days=YT_VIDEO_RELEASE_BUFFER)
-            
-            if video_publish_date < earliest_allowed_date:
-                bt.logging.warning(f"Video was published before the allowed period")
-                decision_details["publishDateCheck"] = False
-                decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
-                return False
+        # Find the earliest start date among all briefs
+        earliest_brief_date = min(
+            datetime.strptime(brief["start_date"], "%Y-%m-%d").date()
+            for brief in briefs
+        )
+        
+        # Calculate the earliest allowed publish date by subtracting the buffer days
+        earliest_allowed_date = earliest_brief_date - timedelta(days=YT_VIDEO_RELEASE_BUFFER)
+        
+        if video_publish_date < earliest_allowed_date:
+            bt.logging.warning(f"Video was published before the allowed period")
+            decision_details["publishDateCheck"] = False
+            decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
+            return False
         
         decision_details["publishDateCheck"] = True
         return True
