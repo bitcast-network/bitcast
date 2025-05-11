@@ -5,6 +5,9 @@ from bitcast.validator.rewards_scaling import calculate_brief_emissions_scalar, 
 def test_calculate_brief_emissions_scalar():
     # Test case 1: Basic curve test with single brief
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -29,6 +32,9 @@ def test_calculate_brief_emissions_scalar():
 def test_calculate_brief_emissions_scalar_zero_minutes():
     # Test case 2: Zero minutes watched should return 0
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -52,6 +58,9 @@ def test_calculate_brief_emissions_scalar_zero_minutes():
 def test_calculate_brief_emissions_scalar_high_minutes():
     # Test case 3: Very high minutes (approaching asymptote)
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -74,6 +83,9 @@ def test_calculate_brief_emissions_scalar_high_minutes():
 def test_calculate_brief_emissions_scalar_multiple_briefs():
     # Test case 4: Multiple briefs with different parameters
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -105,6 +117,9 @@ def test_calculate_brief_emissions_scalar_multiple_briefs():
 def test_calculate_brief_emissions_scalar_multiple_videos():
     # Test case 5: Multiple videos contributing to same brief
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -137,7 +152,9 @@ def test_calculate_brief_emissions_scalar_invalid_stats():
         {"invalid_key": "value"},  # Missing videos key
         None,  # None value
         {"videos": None},  # None videos
-        {"videos": "invalid"}  # Invalid videos type
+        {"videos": "invalid"},  # Invalid videos type
+        {"yt_account": {"channel_vet_result": False}},  # Non-vetted channel
+        {"yt_account": {"channel_vet_result": True}, "videos": {}}  # Vetted but no videos
     ]
     briefs = [{
         "id": "brief1",
@@ -153,6 +170,9 @@ def test_calculate_brief_emissions_scalar_invalid_stats():
 def test_calculate_brief_emissions_scalar_burn_decay_zero():
     # Test case: burn_decay is 0
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -174,6 +194,9 @@ def test_calculate_brief_emissions_scalar_burn_decay_zero():
 def test_calculate_brief_emissions_scalar_max_burn_zero():
     # Test case: max_burn is 0, should follow normal formula
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -201,6 +224,9 @@ def test_scale_rewards_basic():
     ]
     
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -246,6 +272,9 @@ def test_scale_rewards_invalid_sum():
     ]
     
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -278,6 +307,9 @@ def test_scale_rewards_nonzero_first_row():
     ]
     
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -299,7 +331,7 @@ def test_scale_rewards_nonzero_first_row():
     
     # Result should still have valid properties
     result_np = np.array(result)
-    assert np.isclose(np.sum(result_np), 1.0) 
+    assert np.isclose(np.sum(result_np), 1.0)
 
 def test_scale_rewards_zero_scalars():
     # Test with zero minutes watched (should result in zero scalars)
@@ -310,6 +342,9 @@ def test_scale_rewards_zero_scalars():
     ]
     
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -331,7 +366,7 @@ def test_scale_rewards_zero_scalars():
     # With zero scalars, first row should sum to 1 and rest 0
     assert np.isclose(np.sum(result_np[0, :]), 1.0)
     assert np.allclose(result_np[1:, :], 0.0)
-    assert np.isclose(np.sum(result_np), 1.0) 
+    assert np.isclose(np.sum(result_np), 1.0)
 
 def test_scale_rewards_max_burn_zero():
     # Test with max_burn=0, which should result in no changes to the matrix
@@ -342,6 +377,9 @@ def test_scale_rewards_max_burn_zero():
     ]
     
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -373,6 +411,9 @@ def test_scale_rewards_burn_decay_zero():
     ]
     
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
@@ -407,6 +448,9 @@ def test_scale_rewards_all_zeros():
     ]
     
     yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
         "videos": {
             "video1": {
                 "analytics": {
