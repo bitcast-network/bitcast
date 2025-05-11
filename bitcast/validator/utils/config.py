@@ -12,7 +12,8 @@ CACHE_ROOT = Path(__file__).resolve().parents[2] / "cache"
 CACHE_DIRS = {
     "youtube": os.path.join(CACHE_ROOT, "youtube"),
     "openai": os.path.join(CACHE_ROOT, "openai"),
-    "briefs": os.path.join(CACHE_ROOT, "briefs")
+    "briefs": os.path.join(CACHE_ROOT, "briefs"),
+    "blacklist": os.path.join(CACHE_ROOT, "blacklist")
 }
 
 __version__ = "1.1.2"
@@ -21,6 +22,7 @@ __version__ = "1.1.2"
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
 BITCAST_BRIEFS_ENDPOINT = f"{BITCAST_SERVER_URL}:8013/briefs"
 BITCAST_STATS_ENDPOINT = f"{BITCAST_SERVER_URL}:8003/submit"
+BITCAST_BLACKLIST_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist"
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
