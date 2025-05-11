@@ -9,20 +9,10 @@ from bitcast.validator.utils.blacklist import BlacklistCache
 
 def clear_all_caches():
     """Clear all cache directories and instances."""
-    # Clear YouTube cache
-    youtube_cache.clear_all()
-    
-    # Clear OpenAI cache
-    if OpenaiClient._cache:
-        OpenaiClient._cache.clear()
-    
-    # Clear Briefs cache
-    if BriefsCache._cache:
-        BriefsCache._cache.clear()
-    
-    # Clear Blacklist cache
-    if BlacklistCache._cache:
-        BlacklistCache._cache.clear()
+    clear_youtube_cache()
+    clear_openai_cache()
+    clear_briefs_cache()
+    clear_blacklist_cache()
     
     # Clear all cache directories
     for cache_dir in CACHE_DIRS.values():
@@ -32,17 +22,45 @@ def clear_all_caches():
 
 def clear_expired_caches():
     """Clear expired entries from all caches."""
-    # Clear expired YouTube cache entries
+    clear_expired_youtube_cache()
+    clear_expired_openai_cache()
+    clear_expired_briefs_cache()
+    clear_expired_blacklist_cache()
+
+def clear_youtube_cache():
+    """Clear YouTube cache."""
+    youtube_cache.clear_all()
+
+def clear_openai_cache():
+    """Clear OpenAI cache."""
+    if OpenaiClient._cache:
+        OpenaiClient._cache.clear()
+
+def clear_briefs_cache():
+    """Clear Briefs cache."""
+    if BriefsCache._cache:
+        BriefsCache._cache.clear()
+
+def clear_blacklist_cache():
+    """Clear Blacklist cache."""
+    if BlacklistCache._cache:
+        BlacklistCache._cache.clear()
+
+def clear_expired_youtube_cache():
+    """Clear expired YouTube cache entries."""
     youtube_cache.clear_expired()
-    
-    # Clear expired OpenAI cache entries
+
+def clear_expired_openai_cache():
+    """Clear expired OpenAI cache entries."""
     if OpenaiClient._cache:
         OpenaiClient._cache.expire()
-    
-    # Clear expired Briefs cache entries
+
+def clear_expired_briefs_cache():
+    """Clear expired Briefs cache entries."""
     if BriefsCache._cache:
         BriefsCache._cache.expire()
-        
-    # Clear expired Blacklist cache entries
+
+def clear_expired_blacklist_cache():
+    """Clear expired Blacklist cache entries."""
     if BlacklistCache._cache:
-        BlacklistCache._cache.expire() 
+        BlacklistCache._cache.expire()
