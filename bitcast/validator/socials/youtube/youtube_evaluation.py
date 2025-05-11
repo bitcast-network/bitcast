@@ -15,9 +15,15 @@ from bitcast.validator.utils.config import (
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER
 )
+from bitcast.validator.utils.blacklist import is_blacklisted
 
 def vet_channel(channel_data, channel_analytics):
     bt.logging.info(f"Checking channel")
+
+    # Check if channel is blacklisted
+    if is_blacklisted(channel_data["bitcastChannelId"]):
+        bt.logging.warning(f"Channel is blacklisted: {channel_data['bitcastChannelId']}")
+        return False
 
     # Calculate channel age
     channel_age_days = calculate_channel_age(channel_data)
