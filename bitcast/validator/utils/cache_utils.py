@@ -5,6 +5,7 @@ from bitcast.validator.utils.config import CACHE_DIRS, CACHE_ROOT
 from bitcast.validator.socials.youtube.youtube_utils import youtube_cache
 from bitcast.validator.clients.OpenaiClient import OpenaiClient
 from bitcast.validator.utils.briefs import BriefsCache
+from bitcast.validator.utils.blacklist import BlacklistCache
 
 def clear_all_caches():
     """Clear all cache directories and instances."""
@@ -18,6 +19,10 @@ def clear_all_caches():
     # Clear Briefs cache
     if BriefsCache._cache:
         BriefsCache._cache.clear()
+    
+    # Clear Blacklist cache
+    if BlacklistCache._cache:
+        BlacklistCache._cache.clear()
     
     # Clear all cache directories
     for cache_dir in CACHE_DIRS.values():
@@ -36,4 +41,8 @@ def clear_expired_caches():
     
     # Clear expired Briefs cache entries
     if BriefsCache._cache:
-        BriefsCache._cache.expire() 
+        BriefsCache._cache.expire()
+        
+    # Clear expired Blacklist cache entries
+    if BlacklistCache._cache:
+        BlacklistCache._cache.expire() 

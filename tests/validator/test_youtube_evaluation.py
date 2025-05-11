@@ -74,6 +74,50 @@ def test_check_channel_criteria():
     channel_analytics["estimatedMinutesWatched"] = YT_MIN_MINS_WATCHED - 100
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == False
 
+@patch('bitcast.validator.utils.blacklist.get_blacklist')
+def test_vet_channel_blacklisted(mock_get_blacklist):
+    """Test that vet_channel fails when channel is blacklisted."""
+    # Setup test data
+    channel_data = {
+        "bitcastChannelId": "blacklisted_channel",
+        "subCount": str(YT_MIN_SUBS + 1000),
+        "channel_start": (datetime.now() - timedelta(days=YT_MIN_CHANNEL_AGE + 10)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    }
+    channel_analytics = {
+        "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
+        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+    }
+    
+    # Mock blacklist to include our test channel
+    mock_get_blacklist.return_value = ["blacklisted_channel"]
+    
+    # Channel should fail vetting even if it meets all other criteria
+    result = vet_channel(channel_data, channel_analytics)
+    assert result == False
+    mock_get_blacklist.assert_called_once()
+
+@patch('bitcast.validator.utils.blacklist.get_blacklist')
+def test_vet_channel_not_blacklisted(mock_get_blacklist):
+    """Test that vet_channel proceeds with normal checks when channel is not blacklisted."""
+    # Setup test data
+    channel_data = {
+        "bitcastChannelId": "valid_channel",
+        "subCount": str(YT_MIN_SUBS + 1000),
+        "channel_start": (datetime.now() - timedelta(days=YT_MIN_CHANNEL_AGE + 10)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    }
+    channel_analytics = {
+        "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
+        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+    }
+    
+    # Mock blacklist to be empty
+    mock_get_blacklist.return_value = []
+    
+    # Channel should pass vetting if it meets all criteria
+    result = vet_channel(channel_data, channel_analytics)
+    assert result == True
+    mock_get_blacklist.assert_called_once()
+
 def test_vet_channel():
     """Test channel vetting with different scenarios."""
     # Test case 1: Channel passes all checks

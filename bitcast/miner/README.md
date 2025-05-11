@@ -13,9 +13,10 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
 > **Note: Content requirements are likely to increase over time**
 
 1. **YouTube account**  
-   - ≥ 50 subscribers  
-   - ≥ 10% average retention (over the last 365 days)  
-   - ≥ 1000 minutes watched (over the last 365 days)
+   - 21+ days old
+   - ≥ 100 subscribers
+   - ≥ 10% average retention (over the last 90 days)
+   - ≥ 1000 minutes watched (over the last 90 days)
 
 2. **Videos**  
    - Public  

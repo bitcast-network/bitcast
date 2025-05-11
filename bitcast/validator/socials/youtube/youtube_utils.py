@@ -11,6 +11,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
 from diskcache import Cache
 import os
 import json
+import re
 
 # Cache configuration - caching video analytics
 CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days in seconds
@@ -196,7 +197,7 @@ def get_traffic_source_views_analytics(youtube_analytics_client, start_date, end
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source views analytics: {e}")
+        bt.logging.warning(f"Error getting traffic source views analytics: {_format_error(e)}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -222,7 +223,7 @@ def get_traffic_source_minutes_analytics(youtube_analytics_client, start_date, e
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source minutes analytics: {e}")
+        bt.logging.warning(f"Error getting traffic source minutes analytics: {_format_error(e)}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -248,7 +249,7 @@ def get_country_views_analytics(youtube_analytics_client, start_date, end_date):
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country views analytics: {e}")
+        bt.logging.warning(f"Error getting country views analytics: {_format_error(e)}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -274,7 +275,7 @@ def get_country_minutes_analytics(youtube_analytics_client, start_date, end_date
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country minutes analytics: {e}")
+        bt.logging.warning(f"Error getting country minutes analytics: {_format_error(e)}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -300,7 +301,7 @@ def get_subscribers_gained_analytics(youtube_analytics_client, start_date, end_d
 
         return subscribers_data
     except Exception as e:
-        bt.logging.warning(f"Error getting subscribers gained analytics: {e}")
+        bt.logging.warning(f"Error getting subscribers gained analytics: {_format_error(e)}")
         return {}
 
 # ============================================================================
@@ -489,7 +490,7 @@ def get_video_traffic_source_views_analytics(youtube_analytics_client, video_id,
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source views analytics: {e}")
+        bt.logging.warning(f"Error getting traffic source views analytics: {_format_error(e)}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -516,7 +517,7 @@ def get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_i
 
         return traffic_sources
     except Exception as e:
-        bt.logging.warning(f"Error getting traffic source minutes analytics: {e}")
+        bt.logging.warning(f"Error getting traffic source minutes analytics: {_format_error(e)}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -543,7 +544,7 @@ def get_video_country_views_analytics(youtube_analytics_client, video_id, start_
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country views analytics: {e}")
+        bt.logging.warning(f"Error getting country views analytics: {_format_error(e)}")
         return {}
 
 @retry(**YT_API_RETRY_CONFIG)
@@ -570,7 +571,7 @@ def get_video_country_minutes_analytics(youtube_analytics_client, video_id, star
 
         return country_data
     except Exception as e:
-        bt.logging.warning(f"Error getting country minutes analytics: {e}")
+        bt.logging.warning(f"Error getting country minutes analytics: {_format_error(e)}")
         return {}
 
 # ============================================================================
@@ -603,3 +604,25 @@ def get_video_transcript(video_id, rapid_api_key):
         return _fetch_transcript(video_id, rapid_api_key)
     except RetryError:
         return None
+
+def _format_error(e):
+    """Format error message to include only error type and brief summary."""
+    error_type = type(e).__name__
+    
+    # For HTTP errors, try to extract status code and error message
+    if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+        return f"{error_type} ({e.response.status_code})"
+    
+    # For API errors, try to extract error code and message
+    if hasattr(e, 'error') and isinstance(e.error, dict):
+        error_details = e.error.get('details', [{}])[0]
+        error_message = error_details.get('message', 'unknown error')
+        return f"{error_type} ({error_message})"
+    
+    # For other errors, return type and first line of message, excluding URLs
+    error_msg = str(e)
+    # Remove URLs from error message
+    error_msg = re.sub(r'https?://\S+', '', error_msg)
+    # Get first line and clean up
+    error_msg = error_msg.split('\n')[0].strip()
+    return f"{error_type} ({error_msg})"

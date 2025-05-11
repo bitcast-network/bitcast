@@ -12,15 +12,17 @@ CACHE_ROOT = Path(__file__).resolve().parents[2] / "cache"
 CACHE_DIRS = {
     "youtube": os.path.join(CACHE_ROOT, "youtube"),
     "openai": os.path.join(CACHE_ROOT, "openai"),
-    "briefs": os.path.join(CACHE_ROOT, "briefs")
+    "briefs": os.path.join(CACHE_ROOT, "briefs"),
+    "blacklist": os.path.join(CACHE_ROOT, "blacklist")
 }
 
-__version__ = "1.1.2"
+__version__ = "1.2.0"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
 BITCAST_BRIEFS_ENDPOINT = f"{BITCAST_SERVER_URL}:8013/briefs"
 BITCAST_STATS_ENDPOINT = f"{BITCAST_SERVER_URL}:8003/submit"
+BITCAST_BLACKLIST_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist"
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
@@ -32,16 +34,15 @@ LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY')
 LANGCHAIN_TRACING_V2 = os.getenv('LANGCHAIN_TRACING_V2')
 
 # youtube scoring
-YT_LOOKBACK = 365
+YT_LOOKBACK = 90
 YT_ROLLING_WINDOW = 7
 YT_REWARD_DELAY = 2
 YT_VIDEO_RELEASE_BUFFER = 3
 
 # youtube channel
-YT_MIN_CHANNEL_AGE = 0
-YT_MIN_SUBS = 50
+YT_MIN_CHANNEL_AGE = 21
+YT_MIN_SUBS = 100
 YT_MIN_MINS_WATCHED = 1000
-YT_MIN_CHANNEL_WATCH_HOURS = 0
 YT_MIN_CHANNEL_RETENTION = 10
 
 # youtube video
@@ -64,7 +65,6 @@ bt.logging.info(f"LANGCHAIN_TRACING_V2: {LANGCHAIN_TRACING_V2}")
 bt.logging.info(f"YT_MIN_SUBS: {YT_MIN_SUBS}")
 bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")
 bt.logging.info(f"YT_MIN_MINS_WATCHED: {YT_MIN_MINS_WATCHED}")
-bt.logging.info(f"YT_MIN_CHANNEL_WATCH_HOURS: {YT_MIN_CHANNEL_WATCH_HOURS}")
 bt.logging.info(f"YT_MIN_CHANNEL_RETENTION: {YT_MIN_CHANNEL_RETENTION}")
 bt.logging.info(f"YT_MIN_VIDEO_RETENTION: {YT_MIN_VIDEO_RETENTION}")
 bt.logging.info(f"YT_VIDEO_RELEASE_BUFFER: {YT_VIDEO_RELEASE_BUFFER}")
