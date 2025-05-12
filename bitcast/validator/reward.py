@@ -62,6 +62,20 @@ def reward(uid, briefs, response) -> dict:
 
     return yt_stats
 
+def apply_brief_weights(scores_matrix: np.ndarray, briefs: List[dict]) -> np.ndarray:
+    """
+    Applies brief weights to the scores matrix.
+    
+    Args:
+        scores_matrix: Matrix of scores where each row is a miner and each column is a brief
+        briefs: List of brief dictionaries containing weight information
+        
+    Returns:
+        np.ndarray: Scores matrix with brief weights applied
+    """
+    brief_weights = np.array([brief.get("weight", 100) for brief in briefs])
+    return scores_matrix * brief_weights
+
 def get_rewards(
     self,
     uids,
@@ -81,7 +95,6 @@ def get_rewards(
 
     bt.logging.info(f"List of UIDs: {uids}")
 
-
     yt_stats_list = [reward(uid, briefs, response) for uid, response in zip(uids, responses)]
     
     # Convert dictionary scores to matrix format for normalization
@@ -91,6 +104,8 @@ def get_rewards(
         scores_matrix.append(scores)
     
     scores_matrix = np.array(scores_matrix)
+    scores_matrix = apply_brief_weights(scores_matrix, briefs)
+    
     youtube_utils.reset_scored_videos()
     rewards = normalise_scores(scores_matrix, yt_stats_list, briefs)
 
