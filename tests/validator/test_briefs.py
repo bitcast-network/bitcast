@@ -22,7 +22,7 @@ def test_get_briefs_all(monkeypatch):
     Test that get_briefs returns all briefs when the 'all' flag is True.
     """
     mock_data = {
-        "briefs": [
+        "items": [
             {"id": "brief1", "start_date": "2020-01-01", "end_date": "2020-01-02"},
             {"id": "brief2", "start_date": "2021-01-01", "end_date": "2021-01-02"}
         ]
@@ -50,7 +50,7 @@ def test_get_briefs_active(monkeypatch):
     end_date = current_date
     
     mock_data = {
-        "briefs": [
+        "items": [
             {"id": "active", "start_date": start_date.strftime("%Y-%m-%d"), "end_date": end_date.strftime("%Y-%m-%d")},
             {"id": "inactive", "start_date": "2000-01-01", "end_date": "2000-01-02"}
         ]
@@ -95,7 +95,7 @@ def test_get_briefs_date_parsing_error(monkeypatch):
     Malformed date strings should result in the corresponding brief being skipped.
     """
     mock_data = {
-        "briefs": [
+        "items": [
             {"id": "invalid", "start_date": "invalid-date", "end_date": "invalid-date"}
         ]
     }
@@ -118,7 +118,7 @@ def test_get_briefs_with_reward_delay(monkeypatch):
     
     # Create a brief that ended yesterday (should be included due to reward delay)
     mock_data = {
-        "briefs": [
+        "items": [
             {
                 "id": "recently_ended", 
                 "start_date": start_date.strftime("%Y-%m-%d"), 
@@ -148,7 +148,7 @@ def test_get_briefs_with_reward_delay(monkeypatch):
     old_start_date = old_end_date - timedelta(days=5)
     
     mock_data = {
-        "briefs": [
+        "items": [
             {
                 "id": "beyond_delay", 
                 "start_date": old_start_date.strftime("%Y-%m-%d"), 
@@ -165,7 +165,7 @@ def test_get_briefs_caching_success(monkeypatch):
     Test that get_briefs caches successful API responses.
     """
     mock_data = {
-        "briefs": [
+        "items": [
             {"id": "brief1", "start_date": "2020-01-01", "end_date": "2020-01-02"}
         ]
     }

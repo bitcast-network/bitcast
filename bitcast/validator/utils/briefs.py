@@ -69,7 +69,7 @@ def get_briefs(all: bool = False):
         briefs_data = response.json()
         
         # Handle both "items" and "briefs" keys in the response
-        briefs_list = briefs_data.get("items") or briefs_data.get("briefs") or []
+        briefs_list = briefs_data.get("items") or []
         bt.logging.info(f"Fetched {len(briefs_list)} briefs.")
 
         filtered_briefs = []
