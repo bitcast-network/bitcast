@@ -30,6 +30,7 @@ WANDB_PROJECT = os.getenv('WANDB_PROJECT', 'bitcast_vali_logs')
 
 # optional
 DISABLE_LLM_CACHING = os.getenv('DISABLE_LLM_CACHING', 'False').lower() == 'true'
+DISABLE_YOUTUBE_CACHING = os.getenv('DISABLE_YOUTUBE_CACHING', 'False').lower() == 'true'
 LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY')
 LANGCHAIN_TRACING_V2 = os.getenv('LANGCHAIN_TRACING_V2')
 
@@ -61,6 +62,7 @@ DISCRETE_MODE = True
 bt.logging.info(f"BITCAST_BRIEFS_ENDPOINT: {BITCAST_BRIEFS_ENDPOINT}")
 bt.logging.info(f"BITCAST_STATS_ENDPOINT: {BITCAST_STATS_ENDPOINT}")
 bt.logging.info(f"DISABLE_LLM_CACHING: {DISABLE_LLM_CACHING}")
+bt.logging.info(f"DISABLE_YOUTUBE_CACHING: {DISABLE_YOUTUBE_CACHING}")
 bt.logging.info(f"LANGCHAIN_TRACING_V2: {LANGCHAIN_TRACING_V2}")
 bt.logging.info(f"YT_MIN_SUBS: {YT_MIN_SUBS}")
 bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")
