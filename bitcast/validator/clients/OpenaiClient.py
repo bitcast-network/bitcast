@@ -101,7 +101,7 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
     )
 
     try:
-        cache = OpenaiClient.get_cache()
+        cache = None if DISABLE_LLM_CACHING else OpenaiClient.get_cache()
         if cache is not None and prompt_content in cache:
             meets_brief = cache[prompt_content]
             emoji = "✅" if meets_brief else "❌"
@@ -165,7 +165,7 @@ def check_for_prompt_injection(description, transcript):
     injection_prompt = injection_prompt_template.replace(placeholder_token, token)
 
     try:
-        cache = OpenaiClient.get_cache()
+        cache = None if DISABLE_LLM_CACHING else OpenaiClient.get_cache()
         if cache is not None and injection_prompt_template in cache:
             injection_detected = cache[injection_prompt_template]
             bt.logging.info(f"Prompt Injection: {injection_detected} (cache)")
