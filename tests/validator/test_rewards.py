@@ -291,18 +291,36 @@ def test_normalize_across_miners():
     assert np.allclose(normalized_scores, [[0, 0], [0, 0]])
 
 def test_normalize_across_briefs():
-    # Test with regular matrix
+    # Test with regular matrix and equal weights
     normalized_scores_matrix = [[0.4, 0.2, 0.4, 0.2], [0.6, 0.8, 0.6, 0.8]]
-    normalized_across_briefs = normalize_across_briefs(normalized_scores_matrix)
+    briefs = [{"weight": 100}, {"weight": 100}, {"weight": 100}, {"weight": 100}]
+    normalized_across_briefs = normalize_across_briefs(normalized_scores_matrix, briefs)
     assert np.allclose(normalized_across_briefs, [[0.1, 0.05, 0.1, 0.05], [0.15, 0.2, 0.15, 0.2]])
-    
+
     # Test with empty matrix
-    assert normalize_across_briefs(np.array([])).size == 0
+    assert normalize_across_briefs(np.array([]), []).size == 0
     
     # Test with single brief
     normalized_scores_matrix = [[0.4], [0.6]]
-    normalized_across_briefs = normalize_across_briefs(normalized_scores_matrix)
+    briefs = [{"weight": 100}]
+    normalized_across_briefs = normalize_across_briefs(normalized_scores_matrix, briefs)
     assert np.allclose(normalized_across_briefs, [[0.4], [0.6]])
+
+    # Test with different weights
+    normalized_scores_matrix = [[0.4, 0.2], [0.6, 0.8]]
+    briefs = [{"weight": 200}, {"weight": 100}]  # First brief has double weight
+    normalized_across_briefs = normalize_across_briefs(normalized_scores_matrix, briefs)
+    # Expected: First column gets 2/3 weight, second column gets 1/3 weight
+    expected = np.array([[0.4 * 2/3, 0.2 * 1/3], [0.6 * 2/3, 0.8 * 1/3]])
+    assert np.allclose(normalized_across_briefs, expected)
+
+    # Test with missing weights (should default to 100)
+    normalized_scores_matrix = [[0.4, 0.2], [0.6, 0.8]]
+    briefs = [{"weight": 200}, {}]  # Second brief has no weight specified
+    normalized_across_briefs = normalize_across_briefs(normalized_scores_matrix, briefs)
+    # Expected: First column gets 2/3 weight, second column gets 1/3 weight (default 100)
+    expected = np.array([[0.4 * 2/3, 0.2 * 1/3], [0.6 * 2/3, 0.8 * 1/3]])
+    assert np.allclose(normalized_across_briefs, expected)
 
 def test_normalise_scores():
     # Test with regular matrix
@@ -402,7 +420,7 @@ def test_get_rewards_with_brief_weights():
         expected_result = np.array([0.0, 0.5, 0.5])
         
         # Check that the result matches the expected values (with some tolerance for floating point)
-        np.testing.assert_allclose(result, expected_result, rtol=1e-5)
+        np.testing.assert_allclose(result, expected_result, rtol=1e-5, atol=1e-10)
         
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
