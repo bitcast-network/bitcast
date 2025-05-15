@@ -57,8 +57,6 @@ class Validator(BaseValidatorNeuron):
 
         bt.logging.info("load_state()")
         self.load_state()
-        
-        clear_youtube_cache()
 
     async def forward(self):
         """

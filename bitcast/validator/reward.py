@@ -81,7 +81,6 @@ def get_rewards(
 
     bt.logging.info(f"List of UIDs: {uids}")
 
-
     yt_stats_list = [reward(uid, briefs, response) for uid, response in zip(uids, responses)]
     
     # Convert dictionary scores to matrix format for normalization
@@ -91,6 +90,7 @@ def get_rewards(
         scores_matrix.append(scores)
     
     scores_matrix = np.array(scores_matrix)
+    
     youtube_utils.reset_scored_videos()
     rewards = normalise_scores(scores_matrix, yt_stats_list, briefs)
 
@@ -100,12 +100,12 @@ def normalise_scores(scores_matrix, yt_stats_list, briefs):
     """
     Normalizes the scores matrix in three steps:
     1. Normalize each brief's scores across all miners so each column sums to 1.
-    2. Normalize each miner's scores by the number of briefs. Matrix should now sum to 1.
+    2. Normalize each miner's scores by the weighted number of briefs. Matrix should now sum to 1.
     3. Scale rewards to determine burn portions.
     4. Sum each miner's normalized and scaled scores to produce a final reward per miner.
     """
     res = normalize_across_miners(scores_matrix)
-    res = normalize_across_briefs(res)
+    res = normalize_across_briefs(res, briefs)
     res = scale_rewards(res, yt_stats_list, briefs)  # Apply scaling after normalization but before summing
     return sum_scores(res)
 
@@ -121,16 +121,28 @@ def normalize_across_miners(scores_matrix):
     col_sums[col_sums == 0] = 1  # Avoid division by zero
     return scores_matrix / col_sums
 
-def normalize_across_briefs(normalized_scores_matrix):
+def normalize_across_briefs(normalized_scores_matrix, briefs):
     """
-    For each miner (row), divide each score by the number of briefs.
+    For each miner (row), normalize scores by the weighted sum of briefs.
+    The weights are taken from the briefs' weight field (defaulting to 100 if not specified).
     """
     if isinstance(normalized_scores_matrix, list):
         normalized_scores_matrix = np.array(normalized_scores_matrix, dtype=np.float64)
     if normalized_scores_matrix.size == 0:
         return np.array([])
-    num_briefs = normalized_scores_matrix.shape[1]
-    return normalized_scores_matrix / num_briefs
+    
+    # Get weights for each brief, defaulting to 100 if not specified
+    brief_weights = np.array([brief.get("weight", 100) for brief in briefs])
+    total_weight = np.sum(brief_weights)
+    
+    # Instead of multiplying and then dividing, just divide by the number of briefs
+    # when weights are equal (which is the common case)
+    if np.all(brief_weights == brief_weights[0]):
+        return normalized_scores_matrix / len(briefs)
+    
+    # For different weights, use the weighted average
+    # Apply weights to columns (briefs) instead of rows (miners)
+    return normalized_scores_matrix * (brief_weights / total_weight)[np.newaxis, :]
 
 def sum_scores(scores_matrix):
     """
