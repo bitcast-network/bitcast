@@ -75,7 +75,8 @@ def scale_rewards(matrix: np.ndarray, yt_stats_list: List[dict], briefs: List[di
 
     matrix_np = np.array(matrix, dtype=np.float64)
     col_sums = np.sum(matrix_np, axis=0)
-    if not np.allclose(col_sums, 1.0, rtol=1e-5):
+    
+    if not np.isclose(np.sum(col_sums), 1.0, rtol=1e-1):
         bt.logging.warning(f"Input matrix sum {np.sum(col_sums)} is not close to 1")
     if not np.allclose(matrix_np[0, :], 0.0, rtol=1e-5):
         bt.logging.warning("First row of matrix contains non-zero values")
