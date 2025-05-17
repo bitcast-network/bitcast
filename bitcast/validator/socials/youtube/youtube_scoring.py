@@ -146,8 +146,11 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         "decision_details": video_decision_details.get(video_id, {})
     }
     
-    # Calculate and store the score if the video matches a brief
-    if matches_any_brief:
+    # Check the overall vetting result
+    video_vet_result = video_decision_details.get(video_id, {}).get("video_vet_result", False)
+    
+    # Calculate and store the score if the video passes vetting and matches a brief
+    if video_vet_result and matches_any_brief:
         update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result)
     else:
         result["videos"][video_id]["score"] = 0
