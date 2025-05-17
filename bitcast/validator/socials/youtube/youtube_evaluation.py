@@ -161,25 +161,25 @@ def vet_video(video_id, briefs, video_data, video_analytics):
     
     # Check if the video is public
     if not check_video_privacy(video_data, decision_details, briefs):
-        if not ECO_MODE:
+        if ECO_MODE:  # Changed: if ECO_MODE is True, we return early
             return {"met_brief_ids": [], "decision_details": decision_details}
         failed = True
     
     # Check if video was published after brief start date
     if not check_video_publish_date(video_data, briefs, decision_details):
-        if not ECO_MODE:
+        if ECO_MODE:  # Changed: if ECO_MODE is True, we return early
             return {"met_brief_ids": [], "decision_details": decision_details}
         failed = True
     
     # Check video retention
     if not check_video_retention(video_data, video_analytics, decision_details, briefs):
-        if not ECO_MODE:
+        if ECO_MODE:
             return {"met_brief_ids": [], "decision_details": decision_details}
         failed = True
     
     # Check for manual captions
     if not check_manual_captions(video_id, video_data, decision_details, briefs):
-        if not ECO_MODE:
+        if ECO_MODE:
             return {"met_brief_ids": [], "decision_details": decision_details}
         failed = True
     
@@ -187,19 +187,19 @@ def vet_video(video_id, briefs, video_data, video_analytics):
     transcript = get_video_transcript(video_id, video_data)
     if transcript is None:
         decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
-        if not ECO_MODE:
+        if ECO_MODE:
             return {"met_brief_ids": [], "decision_details": decision_details}
         failed = True
     
     # Check for prompt injection
     if transcript is not None and not check_prompt_injection(video_id, video_data, transcript, decision_details, briefs):
-        if not ECO_MODE:
+        if ECO_MODE:
             return {"met_brief_ids": [], "decision_details": decision_details}
         failed = True
     
-    # Evaluate content against briefs if not failed or if in ECO_MODE
+    # Evaluate content against briefs if not failed or if not in ECO_MODE
     met_brief_ids = []
-    if transcript is not None and (not failed or ECO_MODE):
+    if transcript is not None and (not failed or not ECO_MODE):
         met_brief_ids = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
     
     # Set anyBriefMatched based on whether any brief matched

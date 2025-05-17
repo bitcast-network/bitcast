@@ -44,6 +44,7 @@ def eval_youtube(creds, briefs):
     result["yt_account"]["channel_vet_result"] = channel_vet_result
 
     if not channel_vet_result and ECO_MODE:
+        bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")
         return result
 
     briefs = channel_briefs_filter(briefs, channel_analytics)
