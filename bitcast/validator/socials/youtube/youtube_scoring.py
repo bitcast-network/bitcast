@@ -17,7 +17,8 @@ from bitcast.validator.utils.config import (
     YT_REWARD_DELAY, 
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
-    YT_LOOKBACK
+    YT_LOOKBACK,
+    ECO_MODE
 )
 from bitcast.validator.utils.config import (
     RAPID_API_KEY
@@ -41,6 +42,9 @@ def eval_youtube(creds, briefs):
     # Vet the channel and store the result
     channel_vet_result = vet_channel(channel_data, channel_analytics)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
+
+    if not channel_vet_result and ECO_MODE:
+        return result
 
     briefs = channel_briefs_filter(briefs, channel_analytics)
     

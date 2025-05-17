@@ -262,6 +262,7 @@ def reset_scored_videos():
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_YOUTUBE_CACHING', True)
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
+@patch('bitcast.validator.utils.config.ECO_MODE', False)
 def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
                         mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):

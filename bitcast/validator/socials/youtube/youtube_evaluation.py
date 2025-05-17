@@ -14,7 +14,8 @@ from bitcast.validator.utils.config import (
     YT_MIN_MINS_WATCHED,
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER,
-    DISABLE_YOUTUBE_CACHING
+    DISABLE_YOUTUBE_CACHING,
+    ECO_MODE
 )
 from bitcast.validator.utils.blacklist import is_blacklisted
 
@@ -155,34 +156,54 @@ def vet_video(video_id, briefs, video_data, video_analytics):
     # Initialize decision details structure
     decision_details = initialize_decision_details()
     
+    # Track overall result for non-ECO_MODE early exits
+    failed = False
+    
     # Check if the video is public
     if not check_video_privacy(video_data, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+        if not ECO_MODE:
+            return {"met_brief_ids": [], "decision_details": decision_details}
+        failed = True
     
     # Check if video was published after brief start date
     if not check_video_publish_date(video_data, briefs, decision_details):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+        if not ECO_MODE:
+            return {"met_brief_ids": [], "decision_details": decision_details}
+        failed = True
     
     # Check video retention
     if not check_video_retention(video_data, video_analytics, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+        if not ECO_MODE:
+            return {"met_brief_ids": [], "decision_details": decision_details}
+        failed = True
     
     # Check for manual captions
     if not check_manual_captions(video_id, video_data, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+        if not ECO_MODE:
+            return {"met_brief_ids": [], "decision_details": decision_details}
+        failed = True
     
     # Get and check transcript
     transcript = get_video_transcript(video_id, video_data)
     if transcript is None:
         decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
-        return {"met_brief_ids": [], "decision_details": decision_details}
+        if not ECO_MODE:
+            return {"met_brief_ids": [], "decision_details": decision_details}
+        failed = True
     
     # Check for prompt injection
-    if not check_prompt_injection(video_id, video_data, transcript, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+    if transcript is not None and not check_prompt_injection(video_id, video_data, transcript, decision_details, briefs):
+        if not ECO_MODE:
+            return {"met_brief_ids": [], "decision_details": decision_details}
+        failed = True
     
-    # Evaluate content against briefs
-    met_brief_ids = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+    # Evaluate content against briefs if not failed or if in ECO_MODE
+    met_brief_ids = []
+    if transcript is not None and (not failed or ECO_MODE):
+        met_brief_ids = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+    
+    # Set anyBriefMatched based on whether any brief matched
+    decision_details["anyBriefMatched"] = any(decision_details["contentAgainstBriefCheck"])
     
     return {"met_brief_ids": met_brief_ids, "decision_details": decision_details}
 
@@ -195,7 +216,8 @@ def initialize_decision_details():
         "contentAgainstBriefCheck": [],
         "publicVideo": None,
         "publishDateCheck": None,
-        "cache_used": False
+        "anyBriefMatched": False,
+        "cache_used": False,
     }
 
 def check_video_privacy(video_data, decision_details, briefs):
