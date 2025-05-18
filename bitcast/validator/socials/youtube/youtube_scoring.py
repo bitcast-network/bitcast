@@ -123,9 +123,9 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
                         result
                     )
                 except Exception as e:
-                    bt.logging.error(f"Error processing video {video_id}: {e}", exc_info=True)
+                    bt.logging.error(f"Error processing video {video_data_dict[video_id]['bitcastVideoId']}: {e}", exc_info=True)
             else:
-                bt.logging.warning(f"Video {video_id} missing from data dict or analytics dict")
+                bt.logging.warning(f"Video missing from data dict or analytics dict")
         
         # If channel vetting failed, set all scores to 0 but keep the video data
         if not result["yt_account"]["channel_vet_result"]:
@@ -145,7 +145,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     
     # Check if this video matches any briefs
     if video_id not in video_matches:
-        bt.logging.warning(f"Video {video_id} not found in video_matches dictionary")
+        bt.logging.warning(f"Video {video_data['bitcastVideoId']} not found in video_matches dictionary")
         matches_any_brief, matching_brief_ids = False, []
     else:
         matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)

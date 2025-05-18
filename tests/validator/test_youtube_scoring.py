@@ -230,7 +230,10 @@ def test_process_videos_empty_briefs():
         mock_get_uploads.return_value = ["video1", "video2"]
         mock_vet_videos.return_value = (
             {},  # video_matches
-            {"video1": {"details": {}}, "video2": {"details": {}}},  # video_data_dict
+            {
+                "video1": {"bitcastVideoId": "video1"}, 
+                "video2": {"bitcastVideoId": "video2"}
+            },  # video_data_dict
             {"video1": {"analytics": {}}, "video2": {"analytics": {}}},  # video_analytics_dict
             {}  # video_decision_details
         )

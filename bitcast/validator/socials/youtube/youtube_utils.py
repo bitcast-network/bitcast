@@ -346,7 +346,7 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
     ).execute()
 
     if not video_response["items"]:
-        raise Exception(f"No video found with ID: {video_id}")
+        raise Exception(f"No video found matching ID")
 
     if discrete_mode:
         bitcast_video_id = "bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]
