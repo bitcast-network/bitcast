@@ -42,17 +42,18 @@ class Validator(BaseValidatorNeuron):
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
 
-        # Initialize wandb
-        try:
-            wandb.init(
-                entity="bitcast_network",
-                project=WANDB_PROJECT,
-                name=f"validator-{self.uid}-{__version__}",
-                config=self.config,
-                reinit=True
-            )
-        except Exception as e:
-            bt.logging.error(f"Failed to initialize wandb run: {e}")
+        # Initialize wandb only if disable_set_weights is False
+        if not self.config.neuron.disable_set_weights:
+            try:
+                wandb.init(
+                    entity="bitcast_network",
+                    project=WANDB_PROJECT,
+                    name=f"validator-{self.uid}-{__version__}",
+                    config=self.config,
+                    reinit=True
+                )
+            except Exception as e:
+                bt.logging.error(f"Failed to initialize wandb run: {e}")
 
         bt.logging.info("load_state()")
         self.load_state()
