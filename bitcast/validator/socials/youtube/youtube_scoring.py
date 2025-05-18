@@ -17,7 +17,8 @@ from bitcast.validator.utils.config import (
     YT_REWARD_DELAY, 
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
-    YT_LOOKBACK
+    YT_LOOKBACK,
+    ECO_MODE
 )
 from bitcast.validator.utils.config import (
     RAPID_API_KEY
@@ -25,6 +26,7 @@ from bitcast.validator.utils.config import (
 
 def eval_youtube(creds, briefs):
     bt.logging.info(f"Scoring Youtube Content")
+    bt.logging.info(f"Number of briefs received: {len(briefs)}")
     
     # Initialize the result structure and get API clients
     result, youtube_data_client, youtube_analytics_client = initialize_youtube_evaluation(creds, briefs)
@@ -42,10 +44,15 @@ def eval_youtube(creds, briefs):
     channel_vet_result = vet_channel(channel_data, channel_analytics)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
 
-    briefs = channel_briefs_filter(briefs, channel_analytics)
+    if not channel_vet_result and ECO_MODE:
+        bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")
+        return result
+
+    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
+    bt.logging.info(f"After filtering, number of briefs: {len(filtered_briefs)}")
     
     # Process videos and update the result
-    result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
+    result = process_videos(youtube_data_client, youtube_analytics_client, filtered_briefs, result)
     
     return result
 
@@ -91,7 +98,10 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
 def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
     """Process videos, calculate scores, and update the result structure."""
     try:
+        bt.logging.info(f"Processing videos with {len(briefs)} briefs")
+        
         video_ids = youtube_utils.get_all_uploads(youtube_data_client, YT_LOOKBACK)
+        bt.logging.info(f"Retrieved {len(video_ids)} videos")
         
         # Vet videos and store the results
         video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
@@ -101,23 +111,29 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
         # Process each video and update the result
         for video_id in video_ids:
             if video_id in video_data_dict and video_id in video_analytics_dict:
-                process_single_video(
-                    video_id, 
-                    video_data_dict, 
-                    video_analytics_dict, 
-                    video_matches, 
-                    video_decision_details, 
-                    briefs, 
-                    youtube_analytics_client, 
-                    result
-                )
+                try:
+                    process_single_video(
+                        video_id, 
+                        video_data_dict, 
+                        video_analytics_dict, 
+                        video_matches, 
+                        video_decision_details, 
+                        briefs, 
+                        youtube_analytics_client, 
+                        result
+                    )
+                except Exception as e:
+                    bt.logging.error(f"Error processing video {video_id}: {e}", exc_info=True)
+            else:
+                bt.logging.warning(f"Video {video_id} missing from data dict or analytics dict")
         
         # If channel vetting failed, set all scores to 0 but keep the video data
         if not result["yt_account"]["channel_vet_result"]:
+            bt.logging.info("Channel vetting failed, setting all scores to 0")
             result["scores"] = {brief["id"]: 0 for brief in briefs}
             
     except Exception as e:
-        bt.logging.error(f"Error during video evaluation: {e}")
+        bt.logging.error(f"Error during video evaluation: {e}", exc_info=True)
     
     return result
 
@@ -128,7 +144,11 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     video_analytics = video_analytics_dict[video_id]
     
     # Check if this video matches any briefs
-    matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
+    if video_id not in video_matches:
+        bt.logging.warning(f"Video {video_id} not found in video_matches dictionary")
+        matches_any_brief, matching_brief_ids = False, []
+    else:
+        matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
     
     # Store video details in the result
     result["videos"][video_id] = {
@@ -141,8 +161,11 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         "decision_details": video_decision_details.get(video_id, {})
     }
     
-    # Calculate and store the score if the video matches a brief
-    if matches_any_brief:
+    # Check the overall vetting result
+    video_vet_result = video_decision_details.get(video_id, {}).get("video_vet_result", False)
+    
+    # Calculate and store the score if the video passes vetting and matches a brief
+    if video_vet_result and matches_any_brief:
         update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result)
     else:
         result["videos"][video_id]["score"] = 0
@@ -152,7 +175,16 @@ def check_video_brief_matches(video_id, video_matches, briefs):
     matches_any_brief = False
     matching_brief_ids = []
     
-    for i, match in enumerate(video_matches.get(video_id, [])):
+    matches_for_video = video_matches.get(video_id, [])
+    
+    # Ensure we don't go out of bounds
+    if len(matches_for_video) > len(briefs):
+        matches_for_video = matches_for_video[:len(briefs)]
+    
+    for i, match in enumerate(matches_for_video):
+        if i >= len(briefs):
+            continue
+            
         if match:
             matches_any_brief = True
             matching_brief_ids.append(briefs[i]["id"])
@@ -168,11 +200,20 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
     
     # Update the score for the matching brief
-    for i, match in enumerate(video_matches.get(video_id, [])):
+    matches_for_video = video_matches.get(video_id, [])
+    
+    # Ensure we don't go out of bounds
+    if len(matches_for_video) > len(briefs):
+        matches_for_video = matches_for_video[:len(briefs)]
+    
+    for i, match in enumerate(matches_for_video):
+        if i >= len(briefs):
+            continue
+            
         if match:
             brief_id = briefs[i]["id"]
             result["scores"][brief_id] += video_score
-            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}")
+            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details'].get('bitcastVideoId', 'unknown')}, Score: {video_score}")
 
 def check_subscriber_range(sub_count, subs_range):
     """
@@ -220,10 +261,12 @@ def channel_briefs_filter(briefs, channel_analytics):
         List[dict]: Filtered list of briefs
     """
     if not briefs:
+        bt.logging.warning("No briefs provided to channel_briefs_filter")
         return []
         
     # Get channel's subscriber count
     sub_count = int(channel_analytics.get("subCount", 0))
+    bt.logging.info(f"Channel subscriber count: {sub_count}")
     
     # Filter briefs based on subscriber count range
     filtered_briefs = []

@@ -165,7 +165,7 @@ Make sure your server meets these before you start.
 
 ## ℹ️ General Notes
 
-- **2-day emissions delay:** You’ll begin receiving miner emissions **2 days** after the miner starts.  
+- **3-day emissions delay:** You’ll begin receiving miner emissions **3 days** after the miner starts.  
 - **Validator polling:** Each validator sends a request roughly every **4 hours**.  
 - **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)  
 - **Single YouTube account:** Each miner instance supports only **one** YouTube account. To connect multiple accounts, run multiple miners.  
