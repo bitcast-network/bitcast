@@ -29,7 +29,6 @@ from bitcast.base.validator import BaseValidatorNeuron
 from bitcast.validator import forward
 from bitcast.validator.utils.config import __version__, WANDB_PROJECT
 from core.auto_update import run_auto_update
-from bitcast.validator.utils.cache_utils import clear_youtube_cache
 
 class Validator(BaseValidatorNeuron):
     """
