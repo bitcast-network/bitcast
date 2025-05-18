@@ -14,7 +14,6 @@ from bitcast.validator.utils.config import (
     YT_MIN_MINS_WATCHED,
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER,
-    DISABLE_YOUTUBE_CACHING,
     ECO_MODE
 )
 from bitcast.validator.utils.blacklist import is_blacklisted
@@ -85,19 +84,6 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 results[video_id] = [False] * len(briefs)
                 continue
                 
-            # Check cache for this video if caching is enabled
-            if not DISABLE_YOUTUBE_CACHING:
-                cached_data = youtube_utils.youtube_cache.get_video_cache(video_id)
-                if cached_data:
-                    # If cached data exists and publishDateCheck failed last time, use cached data
-                    if cached_data.get("decision_details", {}).get("publishDateCheck") is False:
-                        bt.logging.info(f"Using cached data (failed publishDateCheck)")
-                        results[video_id] = cached_data["results"]
-                        video_data_dict[video_id] = cached_data["video_data"]
-                        video_analytics_dict[video_id] = cached_data["video_analytics"]
-                        video_decision_details[video_id] = {**cached_data["decision_details"], "cache_used": True}
-                        continue
-            
             # Process the video
             process_video_vetting(
                 video_id, 
@@ -109,16 +95,6 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 video_analytics_dict, 
                 video_decision_details
             )
-            
-            # Cache the results if caching is enabled
-            if not DISABLE_YOUTUBE_CACHING:
-                cache_data = {
-                    "results": results[video_id],
-                    "video_data": video_data_dict[video_id],
-                    "video_analytics": video_analytics_dict[video_id],
-                    "decision_details": video_decision_details[video_id]
-                }
-                youtube_utils.youtube_cache.set_video_cache(video_id, cache_data)
             
             # Only mark the video as scored if processing was successful
             youtube_utils.mark_video_as_scored(video_id)
@@ -215,7 +191,6 @@ def initialize_decision_details():
         "publicVideo": None,
         "publishDateCheck": None,
         "anyBriefMatched": False,
-        "cache_used": False,
         "video_vet_result": True  # Initialize as True, will be set to False if any check fails
     }
 
