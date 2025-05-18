@@ -19,14 +19,13 @@ from bitcast.validator.utils.config import (
 # Mock functions to isolate testing of ECO_MODE
 class Mocks:
     @staticmethod
-    def mock_check_video_privacy(video_data, decision_details, briefs):
+    def mock_check_video_privacy(video_data, decision_details):
         decision_details["publicVideo"] = True
         return True
     
     @staticmethod
-    def mock_check_video_privacy_fail(video_data, decision_details, briefs):
+    def mock_check_video_privacy_fail(video_data, decision_details):
         decision_details["publicVideo"] = False
-        decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
         return False
     
     @staticmethod
@@ -35,12 +34,12 @@ class Mocks:
         return True
     
     @staticmethod
-    def mock_check_video_retention(video_data, video_analytics, decision_details, briefs):
+    def mock_check_video_retention(video_data, video_analytics, decision_details):
         decision_details["averageViewPercentageCheck"] = True
         return True
     
     @staticmethod
-    def mock_check_manual_captions(video_id, video_data, decision_details, briefs):
+    def mock_check_manual_captions(video_id, video_data, decision_details):
         decision_details["manualCaptionsCheck"] = True
         return True
     
@@ -49,7 +48,7 @@ class Mocks:
         return "Sample transcript text for testing."
     
     @staticmethod
-    def mock_check_prompt_injection(video_id, video_data, transcript, decision_details, briefs):
+    def mock_check_prompt_injection(video_id, video_data, transcript, decision_details):
         decision_details["promptInjectionCheck"] = True
         return True
 
@@ -91,15 +90,15 @@ def test_eco_mode_enabled_early_return():
         assert "decision_details" in result
         assert result["decision_details"]["video_vet_result"] == False
         assert result["decision_details"]["publicVideo"] == False
-        assert result["decision_details"]["contentAgainstBriefCheck"] == [False, False]
+        assert result["decision_details"]["contentAgainstBriefCheck"] == [None, None]
         assert result["met_brief_ids"] == []
 
 
-# Test ECO_MODE disabled with early return flag set
+# Test ECO_MODE disabled with full evaluation
 @patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', False)
 @patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', Mocks.mock_check_video_privacy_fail)
 def test_eco_mode_disabled_continues_despite_early_return():
-    """Test that when ECO_MODE is disabled, the function continues execution but still skips checks."""
+    """Test that when ECO_MODE is disabled, the function continues execution and runs all checks."""
     # Setup
     video_id = "test_video_1"
     briefs = [{"id": "brief1"}, {"id": "brief2"}]
@@ -109,8 +108,8 @@ def test_eco_mode_disabled_continues_despite_early_return():
     }
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
-    # The key difference with ECO_MODE is that even though checks are skipped,
-    # we don't exit the function early, so we need to patch evaluate_content_against_briefs too
+    # In the new implementation, when ECO_MODE is disabled, ALL checks are run
+    # even if a previous check failed
     with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date') as mock_publish_date, \
          patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention') as mock_retention, \
          patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions') as mock_captions, \
@@ -121,13 +120,15 @@ def test_eco_mode_disabled_continues_despite_early_return():
         # Call the function
         result = vet_video(video_id, briefs, video_data, video_analytics)
         
-        # With ECO_MODE disabled, we don't return early but we still skip subsequent checks
-        # because of the "if not early_return" conditions
-        mock_publish_date.assert_not_called()
-        mock_retention.assert_not_called()
-        mock_captions.assert_not_called()
-        mock_transcript.assert_not_called()
-        mock_prompt_injection.assert_not_called()
+        # With ECO_MODE disabled, we expect ALL checks to be called
+        # even though the privacy check failed
+        mock_publish_date.assert_called_once()
+        mock_retention.assert_called_once()
+        mock_captions.assert_called_once()
+        mock_transcript.assert_called_once()
+        mock_prompt_injection.assert_called_once()
+        
+        # But we don't expect brief evaluation since all_checks_passed is False
         mock_evaluate.assert_not_called()
         
         # Verify result contains expected values
@@ -137,9 +138,8 @@ def test_eco_mode_disabled_continues_despite_early_return():
         assert len(result["decision_details"].get("contentAgainstBriefCheck", [])) == len(briefs)
         assert result["met_brief_ids"] == []
         
-        # The main difference with ECO_MODE disabled is that the function continues
-        # to process after all checks (though most are skipped)
-        # and eventually calculates anyBriefMatched
+        # The main difference with ECO_MODE disabled is that all checks are run
+        # to ensure all fields are populated
         assert "anyBriefMatched" in result["decision_details"]
         assert result["decision_details"]["anyBriefMatched"] == False
 
@@ -247,41 +247,56 @@ def test_eco_mode_disabled_full_pipeline():
         assert result["decision_details"]["video_vet_result"] == True
 
 
-# Test that the early_return flag is properly set when checks fail
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', True)
-def test_early_return_flag():
-    """Test that the early_return flag is properly set when checks fail."""
+# Test that all checks are properly evaluated when ECO_MODE is false
+@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', False)
+def test_non_eco_mode_all_checks_evaluated():
+    """Test that all checks are properly evaluated when ECO_MODE is false."""
     video_id = "test_video_1"
     briefs = [{"id": "brief1"}]
     video_data = {"bitcastVideoId": video_id}
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
-    # Set up a spy on check_prompt_injection to verify early_return value
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
-               return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date', 
-               return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention', 
-               return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions', 
-               return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript', 
-               return_value="Mock transcript"), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection') as mock_prompt_injection, \
+    # Create a side effect for check_video_privacy to set publicVideo to False
+    def mock_check_video_privacy_side_effect(video_data, decision_details):
+        decision_details["publicVideo"] = False
+        return False
+    
+    # Create a side effect for check_prompt_injection to set promptInjectionCheck to True
+    def mock_check_prompt_injection_side_effect(video_id, video_data, transcript, decision_details):
+        decision_details["promptInjectionCheck"] = True
+        return True
+    
+    # Set up a scenario where privacy check fails
+    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy',
+               side_effect=mock_check_video_privacy_side_effect), \
+         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date',
+               return_value=True) as mock_publish_date, \
+         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention',
+               return_value=True) as mock_retention, \
+         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions',
+               return_value=True) as mock_captions, \
+         patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript',
+               return_value="Mock transcript") as mock_transcript, \
+         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection',
+               side_effect=mock_check_prompt_injection_side_effect) as mock_prompt_injection, \
          patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs'):
         
-        # Set up mock to capture early_return value by storing it
-        def side_effect(video_id, video_data, transcript, decision_details, briefs):
-            # Store the value of early_return by checking if check_prompt_injection was called
-            setattr(mock_prompt_injection, "was_called", True)
-            return True
-            
-        mock_prompt_injection.side_effect = side_effect
-        
+        # Call the function
         result = vet_video(video_id, briefs, video_data, video_analytics)
         
-        # Verify prompt injection check was called (indicating early_return was False)
-        assert hasattr(mock_prompt_injection, "was_called")
+        # Verify all checks were called even though privacy failed
+        mock_publish_date.assert_called_once()
+        mock_retention.assert_called_once()
+        mock_captions.assert_called_once()
+        mock_transcript.assert_called_once()
+        mock_prompt_injection.assert_called_once()
+        
+        # Verify the result has proper fields set
+        assert result["decision_details"]["video_vet_result"] == False
+        assert result["decision_details"]["publicVideo"] == False
+        assert result["decision_details"]["promptInjectionCheck"] == True  # Now correctly set to True
+        assert "contentAgainstBriefCheck" in result["decision_details"]
+        assert all(not check for check in result["decision_details"]["contentAgainstBriefCheck"])
 
 
 # Test for multiple failures in different checks with ECO_MODE

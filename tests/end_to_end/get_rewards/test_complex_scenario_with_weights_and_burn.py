@@ -24,7 +24,7 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 
 # Patch environment variables before importing modules
-with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
+with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true', 'ECO_MODE': 'false'}):
     from bitcast.validator.socials.youtube.youtube_evaluation import (
         vet_channel,
         vet_videos,
@@ -248,6 +248,7 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
+@patch('bitcast.validator.utils.config.ECO_MODE', False)
 def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
                         mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
