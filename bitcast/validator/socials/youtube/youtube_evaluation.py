@@ -14,7 +14,7 @@ from bitcast.validator.utils.config import (
     YT_MIN_MINS_WATCHED,
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER,
-    DISABLE_YOUTUBE_CACHING
+    ECO_MODE
 )
 from bitcast.validator.utils.blacklist import is_blacklisted
 
@@ -84,19 +84,6 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 results[video_id] = [False] * len(briefs)
                 continue
                 
-            # Check cache for this video if caching is enabled
-            if not DISABLE_YOUTUBE_CACHING:
-                cached_data = youtube_utils.youtube_cache.get_video_cache(video_id)
-                if cached_data:
-                    # If cached data exists and publishDateCheck failed last time, use cached data
-                    if cached_data.get("decision_details", {}).get("publishDateCheck") is False:
-                        bt.logging.info(f"Using cached data (failed publishDateCheck)")
-                        results[video_id] = cached_data["results"]
-                        video_data_dict[video_id] = cached_data["video_data"]
-                        video_analytics_dict[video_id] = cached_data["video_analytics"]
-                        video_decision_details[video_id] = {**cached_data["decision_details"], "cache_used": True}
-                        continue
-            
             # Process the video
             process_video_vetting(
                 video_id, 
@@ -109,16 +96,6 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 video_decision_details
             )
             
-            # Cache the results if caching is enabled
-            if not DISABLE_YOUTUBE_CACHING:
-                cache_data = {
-                    "results": results[video_id],
-                    "video_data": video_data_dict[video_id],
-                    "video_analytics": video_analytics_dict[video_id],
-                    "decision_details": video_decision_details[video_id]
-                }
-                youtube_utils.youtube_cache.set_video_cache(video_id, cache_data)
-            
             # Only mark the video as scored if processing was successful
             youtube_utils.mark_video_as_scored(video_id)
             
@@ -130,12 +107,35 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
 
     return results, video_data_dict, video_analytics_dict, video_decision_details
 
+def calculate_scorable_proportion(video_analytics):
+    
+    traffic_source_minutes = video_analytics.get('trafficSourceMinutes', {})
+    if not traffic_source_minutes:
+        return 0  # If no data, assume all traffic is non scorable
+        
+    total_minutes = sum(traffic_source_minutes.values())
+    if total_minutes == 0:
+        return 0  # If no traffic, assume all traffic is non scorable
+        
+    advertising_minutes = traffic_source_minutes.get('ADVERTISING', 0)
+    non_advertising_minutes = total_minutes - advertising_minutes
+    
+    return non_advertising_minutes / total_minutes
+
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
                          results, video_data_dict, video_analytics_dict, video_decision_details):
     """Process the vetting of a single video."""
     # Get video data and analytics
     video_data = youtube_utils.get_video_data(youtube_data_client, video_id, DISCRETE_MODE)
     video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id)
+    
+    if not ECO_MODE:
+        # Get additional analytics data
+        additional_analytics = youtube_utils.get_additional_video_analytics(youtube_analytics_client, video_id)
+        video_analytics.update(additional_analytics)
+    
+    # Calculate scorable proportion and add it to video analytics
+    video_analytics['scorable_proportion'] = calculate_scorable_proportion(video_analytics)
     
     # Store video data and analytics regardless of vetting result
     video_data_dict[video_id] = video_data
@@ -147,43 +147,76 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     results[video_id] = decision_details["contentAgainstBriefCheck"]
     video_decision_details[video_id] = decision_details
     
-    bt.logging.info(f"Video meets {sum(decision_details['contentAgainstBriefCheck'])} briefs.")
+    valid_checks = [check for check in decision_details["contentAgainstBriefCheck"] if check is not None]
+    bt.logging.info(f"Video meets {sum(valid_checks)} briefs.")
+
 
 def vet_video(video_id, briefs, video_data, video_analytics):
     bt.logging.info(f"=== Evaluating video: {video_data['bitcastVideoId']} ===")
-
+    
     # Initialize decision details structure
     decision_details = initialize_decision_details()
+    all_checks_passed = True
+    
+    # Helper function to handle check failures
+    def handle_check_failure():
+        decision_details["video_vet_result"] = False
+        nonlocal all_checks_passed
+        all_checks_passed = False
+        if ECO_MODE:
+            decision_details["contentAgainstBriefCheck"] = [None] * len(briefs)
+            return True  # Return early
+        return False  # Continue with other checks
+    
+    # Run all the validation checks sequentially
     
     # Check if the video is public
-    if not check_video_privacy(video_data, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+    if not check_video_privacy(video_data, decision_details):
+        if handle_check_failure():
+            return {"met_brief_ids": [], "decision_details": decision_details}
     
     # Check if video was published after brief start date
     if not check_video_publish_date(video_data, briefs, decision_details):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+        if handle_check_failure():
+            return {"met_brief_ids": [], "decision_details": decision_details}
     
     # Check video retention
-    if not check_video_retention(video_data, video_analytics, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+    if not check_video_retention(video_data, video_analytics, decision_details):
+        if handle_check_failure():
+            return {"met_brief_ids": [], "decision_details": decision_details}
     
     # Check for manual captions
-    if not check_manual_captions(video_id, video_data, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+    if not check_manual_captions(video_id, video_data, decision_details):
+        if handle_check_failure():
+            return {"met_brief_ids": [], "decision_details": decision_details}
     
-    # Get and check transcript
+    # Get transcript
     transcript = get_video_transcript(video_id, video_data)
     if transcript is None:
-        decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
-        return {"met_brief_ids": [], "decision_details": decision_details}
+        if handle_check_failure():
+            return {"met_brief_ids": [], "decision_details": decision_details}
     
     # Check for prompt injection
-    if not check_prompt_injection(video_id, video_data, transcript, decision_details, briefs):
-        return {"met_brief_ids": [], "decision_details": decision_details}
+    if transcript is not None and not check_prompt_injection(video_id, video_data, transcript, decision_details):
+        if handle_check_failure():
+            return {"met_brief_ids": [], "decision_details": decision_details}
+    elif transcript is None:
+        # If transcript is None, set prompt injection check to False
+        decision_details["promptInjectionCheck"] = False
     
-    # Evaluate content against briefs
-    met_brief_ids = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+    # Evaluate content against briefs if all checks passed
+    met_brief_ids = []
+    if all_checks_passed and transcript is not None:
+        # Only now set contentAgainstBriefCheck
+        met_brief_ids = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+    else:
+        # If any check failed, set all briefs to false
+        decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
     
+    # Set anyBriefMatched based on whether any brief matched
+    decision_details["anyBriefMatched"] = any(decision_details["contentAgainstBriefCheck"])
+    
+    # Return the final result
     return {"met_brief_ids": met_brief_ids, "decision_details": decision_details}
 
 def initialize_decision_details():
@@ -195,15 +228,14 @@ def initialize_decision_details():
         "contentAgainstBriefCheck": [],
         "publicVideo": None,
         "publishDateCheck": None,
-        "cache_used": False
+        "video_vet_result": True
     }
 
-def check_video_privacy(video_data, decision_details, briefs):
+def check_video_privacy(video_data, decision_details):
     """Check if the video is public."""
     if video_data.get("privacyStatus") != "public":
-        bt.logging.warning(f"Video is not public - exiting early")
+        bt.logging.warning(f"Video is not public")
         decision_details["publicVideo"] = False
-        decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
         return False
     else:
         decision_details["publicVideo"] = True
@@ -232,7 +264,6 @@ def check_video_publish_date(video_data, briefs, decision_details):
         if video_publish_date < earliest_allowed_date:
             bt.logging.warning(f"Video was published before the allowed period")
             decision_details["publishDateCheck"] = False
-            decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
             return False
         
         decision_details["publishDateCheck"] = True
@@ -240,27 +271,24 @@ def check_video_publish_date(video_data, briefs, decision_details):
     except Exception as e:
         bt.logging.error(f"Error checking video publish date: {e}")
         decision_details["publishDateCheck"] = False
-        decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
         return False
 
-def check_video_retention(video_data, video_analytics, decision_details, briefs):
+def check_video_retention(video_data, video_analytics, decision_details):
     """Check if the video meets the minimum retention criteria."""
-    averageViewPercentage = float(video_analytics.get("averageViewPercentage", 0))
+    averageViewPercentage = float(video_analytics.get("averageViewPercentage", -1))
     if averageViewPercentage < YT_MIN_VIDEO_RETENTION:
         bt.logging.info(f"Avg retention check failed for video: {video_data['bitcastVideoId']}. {averageViewPercentage} <= {YT_MIN_VIDEO_RETENTION}%.")
         decision_details["averageViewPercentageCheck"] = False
-        decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
         return False
     else:
         decision_details["averageViewPercentageCheck"] = True
         return True
 
-def check_manual_captions(video_id, video_data, decision_details, briefs):
+def check_manual_captions(video_id, video_data, decision_details):
     """Check if the video has manual captions."""
     if video_data.get("caption"):
         bt.logging.info(f"Manual captions detected for video: {video_data['bitcastVideoId']} - skipping eval")
         decision_details["manualCaptionsCheck"] = False
-        decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
         return False
     else:
         decision_details["manualCaptionsCheck"] = True
@@ -277,17 +305,16 @@ def get_video_transcript(video_id, video_data):
             transcript = None
 
     if transcript is None:
-        bt.logging.warning(f"Transcript retrieval failed for video: {video_data['bitcastVideoId']} - exiting early")
+        bt.logging.warning(f"Transcript retrieval failed for video: {video_data['bitcastVideoId']}")
         return None
         
     return transcript
 
-def check_prompt_injection(video_id, video_data, transcript, decision_details, briefs):
+def check_prompt_injection(video_id, video_data, transcript, decision_details):
     """Check if the video contains prompt injection."""
     if check_for_prompt_injection(video_data["description"], transcript):
         bt.logging.warning(f"Prompt injection detected for video: {video_data['bitcastVideoId']} - skipping eval")
         decision_details["promptInjectionCheck"] = False
-        decision_details["contentAgainstBriefCheck"].extend([False] * len(briefs))
         return False
     else:
         decision_details["promptInjectionCheck"] = True

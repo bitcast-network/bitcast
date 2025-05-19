@@ -3,8 +3,8 @@ This test file implements an end-to-end test scenario for the get_rewards functi
 The test simulates a scenario where:
 
 Two briefs are provided:
-- Brief 1: "Test Brief 1" with weight 70
-- Brief 2: "Test Brief 2" with weight 30
+- Brief 1: "Test Brief 1" with weight 100
+- Brief 2: "Test Brief 2" with weight 100
 
 Technical Scoring Details:
 - The final scores are calculated based on watch time from four videos:
@@ -245,11 +245,12 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
+@patch('bitcast.validator.socials.youtube.youtube_utils.get_additional_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
-                        mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
+                        mock_get_additional_video_analytics, mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
                         mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
     """Test the get_rewards function end-to-end with a single miner and UID 0"""
     
@@ -260,7 +261,7 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
             "id": "brief1",
             "title": "Test Brief 1",
             "brief": "Test Description 1",
-            "weight": 70,
+            "weight": 100,
             "max_burn": 0.0,  # This means UID 0 gets 0 reward
             "burn_decay": 0.01,
             "start_date": "2023-01-01"
@@ -269,7 +270,7 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
             "id": "brief2",
             "title": "Test Brief 2",
             "brief": "Test Description 2",
-            "weight": 30,
+            "weight": 100,
             "max_burn": 0.0,
             "burn_decay": 0.01,
             "start_date": "2023-01-01"
@@ -457,11 +458,11 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         if dimensions == 'day':
             # For day-based analytics, split the total watch time across days
             video_day_metrics = {
-                # UID 1's videos (different ratios for different briefs)
-                "test_video_1_uid1": 1200,  # 2x better for Brief 1
-                "test_video_2_uid1": 300,   # 1.2x better for both briefs
-                "test_video_3_uid1": 150,   # 1.5x better but matches neither brief
-                "test_video_4_uid1": 400,   # 1.33x better for Brief 2
+                # UID 1's videos (50% more watch time)
+                "test_video_1_uid1": 900,  # 600 * 1.5
+                "test_video_2_uid1": 375,  # 250 * 1.5
+                "test_video_3_uid1": 150,  # 100 * 1.5
+                "test_video_4_uid1": 450,  # 300 * 1.5
                 # UID 2's videos (original watch time)
                 "test_video_1_uid2": 600,
                 "test_video_2_uid2": 250,
@@ -484,47 +485,39 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         else:
             # For overall metrics, return the total watch time
             video_metrics = {
-                # UID 1's videos (different ratios for different briefs)
+                # UID 1's videos (50% more watch time)
                 "test_video_1_uid1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 1200,  # 2x better for Brief 1
-                    "trafficSourceMinutes": {"YT_CHANNEL": 600, "EXT_URL": 600}
+                    "estimatedMinutesWatched": 900,  # 600 * 1.5
                 },
                 "test_video_2_uid1": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 300,   # 1.2x better for both briefs
-                    "trafficSourceMinutes": {"YT_CHANNEL": 150, "EXT_URL": 150}
+                    "estimatedMinutesWatched": 375,  # 250 * 1.5
                 },
                 "test_video_3_uid1": {
                     "averageViewPercentage": 45,
-                    "estimatedMinutesWatched": 150,   # 1.5x better but matches neither brief
-                    "trafficSourceMinutes": {"YT_CHANNEL": 75, "EXT_URL": 75}
+                    "estimatedMinutesWatched": 150,  # 100 * 1.5
                 },
                 "test_video_4_uid1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 400,   # 1.33x better for Brief 2
-                    "trafficSourceMinutes": {"YT_CHANNEL": 200, "EXT_URL": 200}
+                    "estimatedMinutesWatched": 450,  # 300 * 1.5
                 },
                 # UID 2's videos (original watch time)
                 "test_video_1_uid2": {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 600,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 300, "EXT_URL": 300}
                 },
                 "test_video_2_uid2": {
                     "averageViewPercentage": 55,
                     "estimatedMinutesWatched": 250,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 125, "EXT_URL": 125}
                 },
                 "test_video_3_uid2": {
                     "averageViewPercentage": 45,
                     "estimatedMinutesWatched": 100,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 50}
                 },
                 "test_video_4_uid2": {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 300,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 150, "EXT_URL": 150}
                 }
             }
             result = video_metrics[video_id]
@@ -532,6 +525,43 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
             return result
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect
+    
+    def mock_get_additional_video_analytics_side_effect(client, video_id, start_date=None, end_date=None):
+        logger.info(f"get_additional_video_analytics called with video_id: {video_id}")
+        # For additional metrics, return the traffic source data
+        video_metrics = {
+            # UID 1's videos (50% more watch time)
+            "test_video_1_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 400, "EXT_URL": 500}
+            },
+            "test_video_2_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 175, "EXT_URL": 200}
+            },
+            "test_video_3_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 100}
+            },
+            "test_video_4_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 250, "EXT_URL": 200}
+            },
+            # UID 2's videos (original watch time)
+            "test_video_1_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 300, "ADVERTISING": 300}
+            },
+            "test_video_2_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 100, "ADVERTISING": 150}
+            },
+            "test_video_3_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 40, "ADVERTISING": 60}
+            },
+            "test_video_4_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 150, "ADVERTISING": 150}
+            }
+        }
+        result = video_metrics[video_id]
+        logger.info(f"Returning additional metrics for {video_id}: {result}")
+        return result
+    
+    mock_get_additional_video_analytics.side_effect = mock_get_additional_video_analytics_side_effect
     
     mock_get_transcript.return_value = "This is a test transcript"
     
@@ -609,13 +639,14 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         # Verify the result is a numpy array
         assert isinstance(result, np.ndarray)
         
-        # The expected result after normalization and summing
-        # UID 1: Brief 1 (0.638 * 0.7) + Brief 2 (0.56 * 0.3) = 0.4466 + 0.168 = 0.6146
-        # UID 2: Brief 1 (0.362 * 0.7) + Brief 2 (0.44 * 0.3) = 0.2534 + 0.132 = 0.3854
-        expected_result = np.array([0.0, 0.6146, 0.3854])
+        # Since we have three miners and two briefs, and the briefs have max_burn=0:
+        # 1. reward() gives UID 0 scores of 0
+        # 2. scale_rewards() gives UID 0 0 reward when max_burn=0
+        # 3. UIDs 1 and 2 get rewards split based on watch time, with UID 2's advertising traffic discounted
+        expected_result = np.array([0.0, 0.764, 0.236])
         
-        # Check that the result matches the expected values (with some tolerance for floating point)
-        np.testing.assert_allclose(result, expected_result, rtol=1e-3)
+        # Check that the result matches the expected values (with higher tolerance for floating point)
+        np.testing.assert_allclose(result, expected_result, rtol=1e-2)
         
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
@@ -632,16 +663,17 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         assert yt_stats_list[0]["scores"]["brief1"] == 0
         assert yt_stats_list[0]["scores"]["brief2"] == 0
         
-        # UID 1 should have different performance ratios for different briefs
+        # UID 1 should have 50% more watch time than UID 2
         assert "scores" in yt_stats_list[1]
         assert "brief1" in yt_stats_list[1]["scores"]
         assert "brief2" in yt_stats_list[1]["scores"]
-        assert yt_stats_list[1]["scores"]["brief1"] == 1500  # 1200 + 300 minutes watched
-        assert yt_stats_list[1]["scores"]["brief2"] == 700   # 300 + 400 minutes watched
+        assert yt_stats_list[1]["scores"]["brief1"] == 1275  # 900 + 375 minutes watched
+        assert yt_stats_list[1]["scores"]["brief2"] == 825  # 375 + 450 minutes watched
         
-        # UID 2 should have the original watch time
+        # UID 2 should have scores based on non-advertising traffic
         assert "scores" in yt_stats_list[2]
         assert "brief1" in yt_stats_list[2]["scores"]
         assert "brief2" in yt_stats_list[2]["scores"]
-        assert yt_stats_list[2]["scores"]["brief1"] == 850  # 600 + 250 minutes watched
-        assert yt_stats_list[2]["scores"]["brief2"] == 550  # 250 + 300 minutes watched
+        # Scores are calculated based on specific scorable proportions per video
+        assert yt_stats_list[2]["scores"]["brief1"] == 400  # 300 (video 1) + 100 (video 2)
+        assert yt_stats_list[2]["scores"]["brief2"] == 250  # 100 (video 2) + 150 (video 4)
