@@ -511,7 +511,13 @@ def get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_d
         for row in response.get("rows", []):
             dimension_values = row[:-1]  # All but last element are dimension values
             metric_value = row[-1]  # Last element is the metric value
-            key = tuple(dimension_values) if len(dimension_values) > 1 else dimension_values[0]
+            
+            # Convert tuple keys to string keys for JSON compatibility
+            if len(dimension_values) > 1:
+                key = "|".join(str(v) for v in dimension_values)
+            else:
+                key = str(dimension_values[0])
+                
             analytics_data[key] = metric_value
 
         return analytics_data
