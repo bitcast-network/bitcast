@@ -13,7 +13,8 @@ def test_calculate_brief_emissions_scalar():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -40,7 +41,8 @@ def test_calculate_brief_emissions_scalar_zero_minutes():
                 "analytics": {
                     "estimatedMinutesWatched": 0
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -66,7 +68,8 @@ def test_calculate_brief_emissions_scalar_high_minutes():
                 "analytics": {
                     "estimatedMinutesWatched": 1000
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -91,7 +94,8 @@ def test_calculate_brief_emissions_scalar_multiple_briefs():
                 "analytics": {
                     "estimatedMinutesWatched": 50
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -125,13 +129,15 @@ def test_calculate_brief_emissions_scalar_multiple_videos():
                 "analytics": {
                     "estimatedMinutesWatched": 30
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             },
             "video2": {
                 "analytics": {
                     "estimatedMinutesWatched": 20
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -178,7 +184,8 @@ def test_calculate_brief_emissions_scalar_burn_decay_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -202,7 +209,8 @@ def test_calculate_brief_emissions_scalar_max_burn_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -232,13 +240,15 @@ def test_scale_rewards_basic():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {"video_vet_result": True}
             },
             "video2": {
                 "analytics": {
                     "estimatedMinutesWatched": 50
                 },
-                "matching_brief_ids": ["brief2"]
+                "matching_brief_ids": ["brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -280,7 +290,8 @@ def test_scale_rewards_invalid_sum():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -315,7 +326,8 @@ def test_scale_rewards_nonzero_first_row():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -350,7 +362,8 @@ def test_scale_rewards_zero_scalars():
                 "analytics": {
                     "estimatedMinutesWatched": 0
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -385,7 +398,8 @@ def test_scale_rewards_max_burn_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -419,7 +433,8 @@ def test_scale_rewards_burn_decay_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]
@@ -456,7 +471,8 @@ def test_scale_rewards_all_zeros():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {"video_vet_result": True}
             }
         }
     }]

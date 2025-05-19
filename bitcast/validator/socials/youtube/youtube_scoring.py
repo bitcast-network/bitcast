@@ -17,7 +17,8 @@ from bitcast.validator.utils.config import (
     YT_REWARD_DELAY, 
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
-    YT_LOOKBACK
+    YT_LOOKBACK,
+    ECO_MODE
 )
 from bitcast.validator.utils.config import (
     RAPID_API_KEY
@@ -41,6 +42,10 @@ def eval_youtube(creds, briefs):
     # Vet the channel and store the result
     channel_vet_result = vet_channel(channel_data, channel_analytics)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
+
+    if not channel_vet_result and ECO_MODE:
+        bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")
+        return result
 
     briefs = channel_briefs_filter(briefs, channel_analytics)
     
@@ -141,8 +146,11 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         "decision_details": video_decision_details.get(video_id, {})
     }
     
-    # Calculate and store the score if the video matches a brief
-    if matches_any_brief:
+    # Check the overall vetting result
+    video_vet_result = video_decision_details.get(video_id, {}).get("video_vet_result", False)
+    
+    # Calculate and store the score if the video passes vetting and matches a brief
+    if video_vet_result and matches_any_brief:
         update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, video_analytics.get("scorable_proportion", 0))
     else:
         result["videos"][video_id]["score"] = 0

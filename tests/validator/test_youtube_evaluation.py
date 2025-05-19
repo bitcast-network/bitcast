@@ -161,8 +161,6 @@ def test_check_video_publish_date():
     decision_details = {"contentAgainstBriefCheck": []}
     assert check_video_publish_date(video_data, briefs, decision_details) == False
     assert decision_details["publishDateCheck"] == False
-    assert len(decision_details["contentAgainstBriefCheck"]) == len(briefs)
-    assert all(not check for check in decision_details["contentAgainstBriefCheck"])
 
     # Test case 2: Video published after ALL briefs' earliest allowed dates (should pass)
     video_data["publishedAt"] = "2023-02-27T00:00:00Z"  # Feb 27, after all earliest allowed dates
@@ -219,25 +217,23 @@ def test_check_video_retention():
     video_data = {"bitcastVideoId": "test_video_1"}
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     decision_details = {"contentAgainstBriefCheck": []}
-    briefs = [{"id": "brief1"}]
     
-    assert check_video_retention(video_data, video_analytics, decision_details, briefs) == True
+    assert check_video_retention(video_data, video_analytics, decision_details) == True
     assert decision_details["averageViewPercentageCheck"] == True
 
     # Test case 2: Video fails retention criteria
     video_analytics["averageViewPercentage"] = YT_MIN_VIDEO_RETENTION - 5
     decision_details = {"contentAgainstBriefCheck": []}
     
-    assert check_video_retention(video_data, video_analytics, decision_details, briefs) == False
+    assert check_video_retention(video_data, video_analytics, decision_details) == False
     assert decision_details["averageViewPercentageCheck"] == False
-    assert len(decision_details["contentAgainstBriefCheck"]) == len(briefs)
-    assert all(not check for check in decision_details["contentAgainstBriefCheck"])
+    # We don't check contentAgainstBriefCheck as the implementation doesn't modify it
 
     # Test case 3: Missing analytics data
     video_analytics = {}
     decision_details = {"contentAgainstBriefCheck": []}
     
-    assert check_video_retention(video_data, video_analytics, decision_details, briefs) == False
+    assert check_video_retention(video_data, video_analytics, decision_details) == False
     assert decision_details["averageViewPercentageCheck"] == False
 
 def test_process_video_vetting():
