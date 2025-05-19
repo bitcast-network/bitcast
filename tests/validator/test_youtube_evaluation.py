@@ -161,8 +161,6 @@ def test_check_video_publish_date():
     decision_details = {"contentAgainstBriefCheck": []}
     assert check_video_publish_date(video_data, briefs, decision_details) == False
     assert decision_details["publishDateCheck"] == False
-    assert len(decision_details["contentAgainstBriefCheck"]) == len(briefs)
-    assert all(not check for check in decision_details["contentAgainstBriefCheck"])
 
     # Test case 2: Video published after ALL briefs' earliest allowed dates (should pass)
     video_data["publishedAt"] = "2023-02-27T00:00:00Z"  # Feb 27, after all earliest allowed dates
@@ -219,25 +217,23 @@ def test_check_video_retention():
     video_data = {"bitcastVideoId": "test_video_1"}
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     decision_details = {"contentAgainstBriefCheck": []}
-    briefs = [{"id": "brief1"}]
     
-    assert check_video_retention(video_data, video_analytics, decision_details, briefs) == True
+    assert check_video_retention(video_data, video_analytics, decision_details) == True
     assert decision_details["averageViewPercentageCheck"] == True
 
     # Test case 2: Video fails retention criteria
     video_analytics["averageViewPercentage"] = YT_MIN_VIDEO_RETENTION - 5
     decision_details = {"contentAgainstBriefCheck": []}
     
-    assert check_video_retention(video_data, video_analytics, decision_details, briefs) == False
+    assert check_video_retention(video_data, video_analytics, decision_details) == False
     assert decision_details["averageViewPercentageCheck"] == False
-    assert len(decision_details["contentAgainstBriefCheck"]) == len(briefs)
-    assert all(not check for check in decision_details["contentAgainstBriefCheck"])
+    # We don't check contentAgainstBriefCheck as the implementation doesn't modify it
 
     # Test case 3: Missing analytics data
     video_analytics = {}
     decision_details = {"contentAgainstBriefCheck": []}
     
-    assert check_video_retention(video_data, video_analytics, decision_details, briefs) == False
+    assert check_video_retention(video_data, video_analytics, decision_details) == False
     assert decision_details["averageViewPercentageCheck"] == False
 
 def test_process_video_vetting():
@@ -303,173 +299,4 @@ def test_process_video_vetting():
                 assert results[video_id] == [True]
                 assert video_data_dict[video_id] == video_data
                 assert video_analytics_dict[video_id] == video_analytics
-                assert video_decision_details[video_id]["contentAgainstBriefCheck"] == [True]
-
-# ============================================================================
-# Cache Integration Tests
-# ============================================================================
-
-def test_vet_videos_cache_usage():
-    """Test that vet_videos correctly uses cached data for videos that failed publishDateCheck."""
-    # Setup
-    video_id = "test_video_1"
-    briefs = [{"id": "test_brief"}]
-    youtube_data_client = MagicMock()
-    youtube_analytics_client = MagicMock()
-    
-    # Mock cached data with failed publishDateCheck
-    cached_data = {
-        "results": [False],
-        "video_data": {"title": "Cached Video"},
-        "video_analytics": {"views": 100},
-        "decision_details": {"publishDateCheck": False}
-    }
-    
-    # Mock the cache to return our test data
-    with patch('bitcast.validator.socials.youtube.youtube_utils.youtube_cache.get_video_cache', return_value=cached_data):
-        # Mock is_video_already_scored to return False
-        with patch('bitcast.validator.socials.youtube.youtube_utils.is_video_already_scored', return_value=False):
-            # Run vet_videos
-            results, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
-                [video_id], briefs, youtube_data_client, youtube_analytics_client
-            )
-            
-            # Verify cached data was used
-            assert results[video_id] == cached_data["results"]
-            assert video_data_dict[video_id] == cached_data["video_data"]
-            assert video_analytics_dict[video_id] == cached_data["video_analytics"]
-            expected_decision_details = {**cached_data["decision_details"], "cache_used": True}
-            assert video_decision_details[video_id] == expected_decision_details
-
-def test_vet_videos_cache_with_none_publish_date_check():
-    """Test that vet_videos does not use cached data when publishDateCheck is None."""
-    # Setup
-    video_id = "test_video_1"
-    briefs = [{"id": "test_brief"}]
-    youtube_data_client = MagicMock()
-    youtube_analytics_client = MagicMock()
-    
-    # Mock cached data with None publishDateCheck
-    cached_data = {
-        "results": [False],
-        "video_data": {"title": "Cached Video"},
-        "video_analytics": {"views": 100},
-        "decision_details": {"publishDateCheck": None}
-    }
-    
-    # Mock the cache to return our test data
-    with patch('bitcast.validator.socials.youtube.youtube_utils.youtube_cache.get_video_cache', return_value=cached_data):
-        # Mock is_video_already_scored to return False
-        with patch('bitcast.validator.socials.youtube.youtube_utils.is_video_already_scored', return_value=False):
-            # Mock process_video_vetting to return different data
-            mock_results = {video_id: [True]}
-            mock_video_data = {video_id: {"title": "New Video"}}
-            mock_analytics = {video_id: {"views": 200}}
-            mock_details = {video_id: {"publishDateCheck": True}}
-            
-            with patch('bitcast.validator.socials.youtube.youtube_evaluation.process_video_vetting') as mock_process:
-                # Mock the process_video_vetting function to update the results dictionary
-                def mock_process_impl(video_id, briefs, youtube_data_client, youtube_analytics_client, results, video_data_dict, video_analytics_dict, video_decision_details):
-                    results[video_id] = mock_results[video_id]
-                    video_data_dict[video_id] = mock_video_data[video_id]
-                    video_analytics_dict[video_id] = mock_analytics[video_id]
-                    video_decision_details[video_id] = mock_details[video_id]
-                
-                mock_process.side_effect = mock_process_impl
-                
-                # Run vet_videos
-                results, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
-                    [video_id], briefs, youtube_data_client, youtube_analytics_client
-                )
-                
-                # Verify new data was used instead of cached data
-                assert results[video_id] == mock_results[video_id]
-                assert video_data_dict[video_id] == mock_video_data[video_id]
-                assert video_analytics_dict[video_id] == mock_analytics[video_id]
-                assert video_decision_details[video_id] == mock_details[video_id]
-
-def test_vet_videos_no_cache_usage():
-    """Test that vet_videos processes videos normally when no cache hit or publishDateCheck passed."""
-    # Setup
-    video_id = "test_video_1"
-    briefs = [{"id": "test_brief"}]
-    youtube_data_client = MagicMock()
-    youtube_analytics_client = MagicMock()
-    
-    # Mock cached data with passed publishDateCheck
-    cached_data = {
-        "results": [False],
-        "video_data": {"title": "Cached Video"},
-        "video_analytics": {"views": 100},
-        "decision_details": {"publishDateCheck": True}
-    }
-    
-    # Mock the cache to return our test data
-    with patch('bitcast.validator.socials.youtube.youtube_utils.youtube_cache.get_video_cache', return_value=cached_data):
-        # Mock is_video_already_scored to return False
-        with patch('bitcast.validator.socials.youtube.youtube_utils.is_video_already_scored', return_value=False):
-            # Mock process_video_vetting to return different data
-            mock_results = {video_id: [True]}
-            mock_video_data = {video_id: {"title": "New Video"}}
-            mock_analytics = {video_id: {"views": 200}}
-            mock_details = {video_id: {"publishDateCheck": True}}
-            
-            with patch('bitcast.validator.socials.youtube.youtube_evaluation.process_video_vetting') as mock_process:
-                # Mock the process_video_vetting function to update the results dictionary
-                def mock_process_impl(video_id, briefs, youtube_data_client, youtube_analytics_client, results, video_data_dict, video_analytics_dict, video_decision_details):
-                    results[video_id] = mock_results[video_id]
-                    video_data_dict[video_id] = mock_video_data[video_id]
-                    video_analytics_dict[video_id] = mock_analytics[video_id]
-                    video_decision_details[video_id] = mock_details[video_id]
-                
-                mock_process.side_effect = mock_process_impl
-                
-                # Run vet_videos
-                results, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
-                    [video_id], briefs, youtube_data_client, youtube_analytics_client
-                )
-                
-                # Verify new data was used instead of cached data
-                assert results[video_id] == mock_results[video_id]
-                assert video_data_dict[video_id] == mock_video_data[video_id]
-                assert video_analytics_dict[video_id] == mock_analytics[video_id]
-                assert video_decision_details[video_id] == mock_details[video_id]
-
-def test_vet_videos_cache_storage():
-    """Test that vet_videos stores results in cache."""
-    # Setup
-    video_id = "test_video_1"
-    briefs = [{"id": "test_brief"}]
-    youtube_data_client = MagicMock()
-    youtube_analytics_client = MagicMock()
-    
-    # Mock process_video_vetting to return test data
-    test_results = {video_id: [True]}
-    test_video_data = {video_id: {"title": "Test Video"}}
-    test_analytics = {video_id: {"views": 100}}
-    test_details = {video_id: {"publishDateCheck": True}}
-    
-    with patch('bitcast.validator.socials.youtube.youtube_utils.is_video_already_scored', return_value=False):
-        with patch('bitcast.validator.socials.youtube.youtube_evaluation.process_video_vetting') as mock_process:
-            # Mock the process_video_vetting function to update the results dictionary
-            def mock_process_impl(video_id, briefs, youtube_data_client, youtube_analytics_client, results, video_data_dict, video_analytics_dict, video_decision_details):
-                results[video_id] = test_results[video_id]
-                video_data_dict[video_id] = test_video_data[video_id]
-                video_analytics_dict[video_id] = test_analytics[video_id]
-                video_decision_details[video_id] = test_details[video_id]
-            
-            mock_process.side_effect = mock_process_impl
-            
-            # Mock the cache set method to verify it's called correctly
-            with patch('bitcast.validator.socials.youtube.youtube_utils.youtube_cache.set_video_cache') as mock_set_cache:
-                # Run vet_videos
-                vet_videos([video_id], briefs, youtube_data_client, youtube_analytics_client)
-                
-                # Verify cache was called with correct data
-                mock_set_cache.assert_called_once()
-                cache_args = mock_set_cache.call_args[0]
-                assert cache_args[0] == video_id
-                assert cache_args[1]["results"] == test_results[video_id]
-                assert cache_args[1]["video_data"] == test_video_data[video_id]
-                assert cache_args[1]["video_analytics"] == test_analytics[video_id]
-                assert cache_args[1]["decision_details"] == test_details[video_id] 
+                assert video_decision_details[video_id]["contentAgainstBriefCheck"] == [True] 

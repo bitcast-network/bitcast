@@ -16,34 +16,34 @@ def test_update_video_score():
         # Test case 1: First video with score 2
         video_id_1 = "test_video_id_1"
         video_matches[video_id_1] = [True]  # Add to video_matches
-        result["videos"][video_id_1] = {"details": {"bitcastVideoId": video_id_1}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_1] = {"details": {"bitcastVideoId": video_id_1}, "analytics": {"scorable_proportion": 1.0}}  # Initialize video data
         mock_calculate.return_value = {"score": 2, "daily_analytics": {}}
-        update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result)
+        update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result, 1.0)
         assert result["scores"]["test_brief"] == 2, "First score should be 2"
         
         # Test case 2: Second video with score 4
         video_id_2 = "test_video_id_2"
         video_matches[video_id_2] = [True]  # Add to video_matches
-        result["videos"][video_id_2] = {"details": {"bitcastVideoId": video_id_2}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_2] = {"details": {"bitcastVideoId": video_id_2}, "analytics": {"scorable_proportion": 0.5}}  # Initialize video data
         mock_calculate.return_value = {"score": 4, "daily_analytics": {}}
-        update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result)
-        assert result["scores"]["test_brief"] == 6, "Score should be sum of 2 and 4"
+        update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result, 0.5)
+        assert result["scores"]["test_brief"] == 4, "Score should be 4 (2 + 4*0.5)"
         
         # Test case 3: Third video with score 2
         video_id_3 = "test_video_id_3"
         video_matches[video_id_3] = [True]  # Add to video_matches
-        result["videos"][video_id_3] = {"details": {"bitcastVideoId": video_id_3}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_3] = {"details": {"bitcastVideoId": video_id_3}, "analytics": {"scorable_proportion": 0.0}}  # Initialize video data
         mock_calculate.return_value = {"score": 2, "daily_analytics": {}}
-        update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result)
-        assert result["scores"]["test_brief"] == 8, "Score should be sum of 2, 4, and 2"
+        update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result, 0.0)
+        assert result["scores"]["test_brief"] == 4, "Score should remain 4 (2 + 4*0.5 + 2*0.0)"
         
         # Test case 4: Fourth video with score 0
         video_id_4 = "test_video_id_4"
         video_matches[video_id_4] = [True]  # Add to video_matches
-        result["videos"][video_id_4] = {"details": {"bitcastVideoId": video_id_4}, "analytics": {}}  # Initialize video data
+        result["videos"][video_id_4] = {"details": {"bitcastVideoId": video_id_4}, "analytics": {"scorable_proportion": 1.0}}  # Initialize video data
         mock_calculate.return_value = {"score": 0, "daily_analytics": {}}
-        update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result)
-        assert result["scores"]["test_brief"] == 8, "Score should remain 8 (sum of 2, 4, 2, and 0)"
+        update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result, 1.0)
+        assert result["scores"]["test_brief"] == 4, "Score should remain 4 (2 + 4*0.5 + 2*0.0 + 0*1.0)"
 
 def test_check_video_brief_matches():
     # Setup

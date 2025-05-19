@@ -17,7 +17,8 @@ from bitcast.validator.utils.config import (
     YT_REWARD_DELAY, 
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
-    YT_LOOKBACK
+    YT_LOOKBACK,
+    ECO_MODE
 )
 from bitcast.validator.utils.config import (
     RAPID_API_KEY
@@ -41,6 +42,10 @@ def eval_youtube(creds, briefs):
     # Vet the channel and store the result
     channel_vet_result = vet_channel(channel_data, channel_analytics)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
+
+    if not channel_vet_result and ECO_MODE:
+        bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")
+        return result
 
     briefs = channel_briefs_filter(briefs, channel_analytics)
     
@@ -141,9 +146,12 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         "decision_details": video_decision_details.get(video_id, {})
     }
     
-    # Calculate and store the score if the video matches a brief
-    if matches_any_brief:
-        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result)
+    # Check the overall vetting result
+    video_vet_result = video_decision_details.get(video_id, {}).get("video_vet_result", False)
+    
+    # Calculate and store the score if the video passes vetting and matches a brief
+    if video_vet_result and matches_any_brief:
+        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, video_analytics.get("scorable_proportion", 0))
     else:
         result["videos"][video_id]["score"] = 0
 
@@ -159,20 +167,26 @@ def check_video_brief_matches(video_id, video_matches, briefs):
     
     return matches_any_brief, matching_brief_ids
 
-def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result):
+def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, scorable_proportion):
     """Calculate and update the score for a video that matches a brief."""
     video_score_result = calculate_video_score(video_id, youtube_analytics_client)
     video_score = video_score_result["score"]
+    bt.logging.info(f"Raw video_score from calculate_video_score: {video_score}")
     
-    result["videos"][video_id]["score"] = video_score
+    # Scale the score by the scorable proportion
+    scaled_score = video_score * scorable_proportion
+    bt.logging.info(f"Scaled score (video_score * scorable_proportion): {scaled_score}")
+    
+    result["videos"][video_id]["raw_score"] = video_score
+    result["videos"][video_id]["score"] = scaled_score
     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
     
     # Update the score for the matching brief
     for i, match in enumerate(video_matches.get(video_id, [])):
         if match:
             brief_id = briefs[i]["id"]
-            result["scores"][brief_id] += video_score
-            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}")
+            result["scores"][brief_id] += scaled_score
+            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {scaled_score}")
 
 def check_subscriber_range(sub_count, subs_range):
     """

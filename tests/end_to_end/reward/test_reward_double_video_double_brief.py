@@ -34,13 +34,11 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         get_video_data,
         get_video_analytics,
         get_all_uploads,
-        youtube_cache,
         reset_scored_videos
     )
     from bitcast.validator.reward import reward
     from google.oauth2.credentials import Credentials
     from bitcast.validator.utils.config import (
-        DISABLE_YOUTUBE_CACHING,
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
@@ -233,17 +231,6 @@ def mock_credentials():
     )
 
 @pytest.fixture(autouse=True)
-def disable_youtube_caching():
-    with patch('bitcast.validator.utils.config.DISABLE_YOUTUBE_CACHING', True):
-        yield
-
-@pytest.fixture(autouse=True)
-def mock_youtube_cache():
-    with patch('bitcast.validator.socials.youtube.youtube_utils.youtube_cache') as mock_cache:
-        mock_cache.get_video_cache.return_value = None
-        yield mock_cache
-
-@pytest.fixture(autouse=True)
 def reset_scored_videos():
     from bitcast.validator.socials.youtube.youtube_utils import reset_scored_videos as reset_func
     reset_func()
@@ -258,7 +245,6 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
-@patch('bitcast.validator.utils.config.DISABLE_YOUTUBE_CACHING', True)
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 def test_reward_function(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
@@ -347,11 +333,13 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             video_metrics = {
                 "test_video_1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 1000
+                    "estimatedMinutesWatched": 1000,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
                 },
                 "test_video_2": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 1200
+                    "estimatedMinutesWatched": 1200,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 700, "EXT_URL": 500}
                 }
             }
             return video_metrics[video_id]

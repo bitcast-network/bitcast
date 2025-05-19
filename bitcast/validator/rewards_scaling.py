@@ -30,10 +30,18 @@ def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dic
                     # Handle case where videos is a dictionary
                     for video_id, video_data in videos.items():
                         if isinstance(video_data, dict):
+                            
+                            # Only include videos that passed individual vetting
+                            decision_details = video_data.get("decision_details", {})
+                            if not decision_details.get("video_vet_result", False):
+                                continue
+
                             minutes = float(video_data.get("analytics", {}).get("estimatedMinutesWatched", 0))
+                            scorable_proportion = float(video_data.get("analytics", {}).get("scorable_proportion", 0))
+                            
                             matching_briefs = video_data.get("matching_brief_ids", [])
                             for brief_id in matching_briefs:
-                                brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + minutes
+                                brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + (minutes * scorable_proportion)
         except Exception as e:
             bt.logging.warning(f"Error processing stats: {e}")
             continue
