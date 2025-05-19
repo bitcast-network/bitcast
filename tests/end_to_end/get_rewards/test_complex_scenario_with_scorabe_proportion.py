@@ -245,11 +245,12 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
+@patch('bitcast.validator.socials.youtube.youtube_utils.get_additional_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
-                        mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
+                        mock_get_additional_video_analytics, mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
                         mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
     """Test the get_rewards function end-to-end with a single miner and UID 0"""
     
@@ -488,43 +489,35 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                 "test_video_1_uid1": {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 900,  # 600 * 1.5
-                    "trafficSourceMinutes": {"YT_CHANNEL": 400, "EXT_URL": 500}
                 },
                 "test_video_2_uid1": {
                     "averageViewPercentage": 55,
                     "estimatedMinutesWatched": 375,  # 250 * 1.5
-                    "trafficSourceMinutes": {"YT_CHANNEL": 175, "EXT_URL": 200}
                 },
                 "test_video_3_uid1": {
                     "averageViewPercentage": 45,
                     "estimatedMinutesWatched": 150,  # 100 * 1.5
-                    "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 100}
                 },
                 "test_video_4_uid1": {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 450,  # 300 * 1.5
-                    "trafficSourceMinutes": {"YT_CHANNEL": 250, "EXT_URL": 200}
                 },
                 # UID 2's videos (original watch time)
                 "test_video_1_uid2": {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 600,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 300, "ADVERTISING": 300}
                 },
                 "test_video_2_uid2": {
                     "averageViewPercentage": 55,
                     "estimatedMinutesWatched": 250,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 100, "ADVERTISING": 150}
                 },
                 "test_video_3_uid2": {
                     "averageViewPercentage": 45,
                     "estimatedMinutesWatched": 100,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 40, "ADVERTISING": 60}
                 },
                 "test_video_4_uid2": {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 300,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 150, "ADVERTISING": 150}
                 }
             }
             result = video_metrics[video_id]
@@ -532,6 +525,43 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
             return result
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect
+    
+    def mock_get_additional_video_analytics_side_effect(client, video_id, start_date=None, end_date=None):
+        logger.info(f"get_additional_video_analytics called with video_id: {video_id}")
+        # For additional metrics, return the traffic source data
+        video_metrics = {
+            # UID 1's videos (50% more watch time)
+            "test_video_1_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 400, "EXT_URL": 500}
+            },
+            "test_video_2_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 175, "EXT_URL": 200}
+            },
+            "test_video_3_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 100}
+            },
+            "test_video_4_uid1": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 250, "EXT_URL": 200}
+            },
+            # UID 2's videos (original watch time)
+            "test_video_1_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 300, "ADVERTISING": 300}
+            },
+            "test_video_2_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 100, "ADVERTISING": 150}
+            },
+            "test_video_3_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 40, "ADVERTISING": 60}
+            },
+            "test_video_4_uid2": {
+                "trafficSourceMinutes": {"YT_CHANNEL": 150, "ADVERTISING": 150}
+            }
+        }
+        result = video_metrics[video_id]
+        logger.info(f"Returning additional metrics for {video_id}: {result}")
+        return result
+    
+    mock_get_additional_video_analytics.side_effect = mock_get_additional_video_analytics_side_effect
     
     mock_get_transcript.return_value = "This is a test transcript"
     
