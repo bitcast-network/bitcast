@@ -429,12 +429,57 @@ def get_additional_video_analytics(youtube_analytics_client, video_id, start_dat
 
     # Get traffic source data for minutes watched
     traffic_source_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "insightTrafficSourceType")
+    
     # Get country data for minutes watched
     country_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "country")
+    
+    # Get minutes watched by creator content type
+    creator_content_type_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "creatorContentType")
+    
+    # Get minutes watched by playback location type
+    playback_location_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "insightPlaybackLocationType")
+    
+    # Get average view percentage by traffic source type
+    avg_view_percentage_by_traffic_source = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "averageViewPercentage", "insightTrafficSourceType")
+    
+    # # Get minutes watched by live or on-demand
+    # live_or_on_demand_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "liveOrOnDemand")
+
+    # # Fetch estimated minutes watched by YouTube product
+    # youtube_product_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "youtubeProduct")
+    
+    # # # Get minutes watched by insight traffic source detail  // may need to filter insightTrafficSourceType==EXT_URL
+    # # bt.logging.info("Fetching minutes watched by insight traffic source detail")
+    # # traffic_source_detail_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "views", "insightTrafficSourceDetail")
+
+    # # Fetch estimated minutes watched by device type
+    # device_type_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "deviceType")
+    
+    # # Fetch estimated minutes watched by operating system
+    # operating_system_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "operatingSystem")
+    
+    # # Fetch viewer percentage by age group and gender
+    # age_group_viewer_percentage = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "viewerPercentage", "ageGroup,gender")
+    
+    # # Fetch shares by sharing service
+    # sharing_service_shares = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "shares", "sharingService")
+    
+    # # Fetch audience watch ratio by elapsed video time ratio
+    # elapsed_video_time_ratio_audience_watch_ratio = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "audienceWatchRatio", "elapsedVideoTimeRatio")
 
     return {
         "trafficSourceMinutes": traffic_source_minutes,
-        "countryMinutes": country_minutes
+        "countryMinutes": country_minutes,
+        "creatorContentTypeMinutes": creator_content_type_minutes,
+        "playbackLocationMinutes": playback_location_minutes,
+        "avgViewPercentageByTrafficSource": avg_view_percentage_by_traffic_source,
+        # "liveOrOnDemandMinutes": live_or_on_demand_minutes,
+        # "youtubeProductMinutes": youtube_product_minutes,
+        # "sharingServiceShares": sharing_service_shares,
+        # "deviceTypeMinutes": device_type_minutes,
+        # "operatingSystemMinutes": operating_system_minutes,
+        # "ageGroupViewerPercentage": age_group_viewer_percentage,
+        # "elapsedVideoTimeRatioAudienceWatchRatio": elapsed_video_time_ratio_audience_watch_ratio
     }
 
 @retry(**YT_API_RETRY_CONFIG)
