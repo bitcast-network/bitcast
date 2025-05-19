@@ -188,13 +188,7 @@ def initialize_decision_details():
         "promptInjectionCheck": None,
         "contentAgainstBriefCheck": [],
         "publicVideo": None,
-        "publishDateCheck": None,
-<<<<<<< HEAD
-        "cache_used": False
-=======
-        "anyBriefMatched": False,
-        "video_vet_result": True  # Initialize as True, will be set to False if any check fails
->>>>>>> f1cef20 (remove youtube cache)
+        "publishDateCheck": None
     }
 
 def check_video_privacy(video_data, decision_details, briefs):
