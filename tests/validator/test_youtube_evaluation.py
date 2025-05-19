@@ -472,4 +472,59 @@ def test_vet_videos_cache_storage():
                 assert cache_args[1]["results"] == test_results[video_id]
                 assert cache_args[1]["video_data"] == test_video_data[video_id]
                 assert cache_args[1]["video_analytics"] == test_analytics[video_id]
-                assert cache_args[1]["decision_details"] == test_details[video_id] 
+                assert cache_args[1]["decision_details"] == test_details[video_id]
+
+def test_calculate_scorable_proportion():
+    """Test the calculation of scorable proportion of video analytics."""
+    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_scorable_proportion
+    
+    # Test case 1: All traffic sources are non-advertising
+    video_analytics = {
+        "trafficSourceMinutes": {
+            "SUGGESTED_VIDEO": 100,
+            "BROWSE": 50,
+            "SEARCH": 30,
+            "CHANNEL": 20
+        }
+    }
+    assert calculate_scorable_proportion(video_analytics) == 1.0
+    
+    # Test case 2: Mix of advertising and non-advertising traffic
+    video_analytics = {
+        "trafficSourceMinutes": {
+            "SUGGESTED_VIDEO": 100,
+            "BROWSE": 50,
+            "ADVERTISING": 50,
+            "SEARCH": 30,
+            "CHANNEL": 20
+        }
+    }
+    # Expected: (100 + 50 + 30 + 20) / (100 + 50 + 50 + 30 + 20) = 200 / 250 = 0.8
+    assert calculate_scorable_proportion(video_analytics) == 0.8
+    
+    # Test case 3: All traffic is from advertising
+    video_analytics = {
+        "trafficSourceMinutes": {
+            "ADVERTISING": 100
+        }
+    }
+    assert calculate_scorable_proportion(video_analytics) == 0.0
+    
+    # Test case 4: No traffic sources data
+    video_analytics = {
+        "trafficSourceMinutes": {}
+    }
+    assert calculate_scorable_proportion(video_analytics) == 0.0
+    
+    # Test case 5: No trafficSourceMinutes field
+    video_analytics = {}
+    assert calculate_scorable_proportion(video_analytics) == 0.0
+    
+    # Test case 6: Unusual but possible - zero total minutes
+    video_analytics = {
+        "trafficSourceMinutes": {
+            "SUGGESTED_VIDEO": 0,
+            "BROWSE": 0
+        }
+    }
+    assert calculate_scorable_proportion(video_analytics) == 0.0 

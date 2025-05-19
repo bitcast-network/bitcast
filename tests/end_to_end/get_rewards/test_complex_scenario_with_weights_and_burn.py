@@ -501,36 +501,44 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                 # UID 1's videos (different ratios for different briefs)
                 "test_video_1_uid1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 1200  # 2x better for Brief 1
+                    "estimatedMinutesWatched": 1200,  # 2x better for Brief 1
+                    "trafficSourceMinutes": {"YT_CHANNEL": 600, "EXT_URL": 600}
                 },
                 "test_video_2_uid1": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 300   # 1.2x better for both briefs
+                    "estimatedMinutesWatched": 300,   # 1.2x better for both briefs
+                    "trafficSourceMinutes": {"YT_CHANNEL": 150, "EXT_URL": 150}
                 },
                 "test_video_3_uid1": {
                     "averageViewPercentage": 45,
-                    "estimatedMinutesWatched": 150   # 1.5x better but matches neither brief
+                    "estimatedMinutesWatched": 150,   # 1.5x better but matches neither brief
+                    "trafficSourceMinutes": {"YT_CHANNEL": 75, "EXT_URL": 75}
                 },
                 "test_video_4_uid1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 400   # 1.33x better for Brief 2
+                    "estimatedMinutesWatched": 400,   # 1.33x better for Brief 2
+                    "trafficSourceMinutes": {"YT_CHANNEL": 200, "EXT_URL": 200}
                 },
                 # UID 2's videos (original watch time)
                 "test_video_1_uid2": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 600
+                    "estimatedMinutesWatched": 600,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 300, "EXT_URL": 300}
                 },
                 "test_video_2_uid2": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 250
+                    "estimatedMinutesWatched": 250,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 125, "EXT_URL": 125}
                 },
                 "test_video_3_uid2": {
                     "averageViewPercentage": 45,
-                    "estimatedMinutesWatched": 100
+                    "estimatedMinutesWatched": 100,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 50}
                 },
                 "test_video_4_uid2": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 300
+                    "estimatedMinutesWatched": 300,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 150, "EXT_URL": 150}
                 }
             }
             result = video_metrics[video_id]

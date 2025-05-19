@@ -130,12 +130,30 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
 
     return results, video_data_dict, video_analytics_dict, video_decision_details
 
+def calculate_scorable_proportion(video_analytics):
+    
+    traffic_source_minutes = video_analytics.get('trafficSourceMinutes', {})
+    if not traffic_source_minutes:
+        return 0  # If no data, assume all traffic is non scorable
+        
+    total_minutes = sum(traffic_source_minutes.values())
+    if total_minutes == 0:
+        return 0  # If no traffic, assume all traffic is non scorable
+        
+    advertising_minutes = traffic_source_minutes.get('ADVERTISING', 0)
+    non_advertising_minutes = total_minutes - advertising_minutes
+    
+    return non_advertising_minutes / total_minutes
+
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
                          results, video_data_dict, video_analytics_dict, video_decision_details):
     """Process the vetting of a single video."""
     # Get video data and analytics
     video_data = youtube_utils.get_video_data(youtube_data_client, video_id, DISCRETE_MODE)
     video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id)
+    
+    # Calculate scorable proportion and add it to video analytics
+    video_analytics['scorable_proportion'] = calculate_scorable_proportion(video_analytics)
     
     # Store video data and analytics regardless of vetting result
     video_data_dict[video_id] = video_data

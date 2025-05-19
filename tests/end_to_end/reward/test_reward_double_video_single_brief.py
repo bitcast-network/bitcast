@@ -321,7 +321,8 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
         else:
             return {
                 "averageViewPercentage": 50,
-                "estimatedMinutesWatched": 1000
+                "estimatedMinutesWatched": 1000,
+                "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500},
             }
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect

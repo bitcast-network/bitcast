@@ -347,11 +347,13 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             video_metrics = {
                 "test_video_1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 1000
+                    "estimatedMinutesWatched": 1000,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
                 },
                 "test_video_2": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 1200
+                    "estimatedMinutesWatched": 1200,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 700, "EXT_URL": 500}
                 }
             }
             return video_metrics[video_id]
