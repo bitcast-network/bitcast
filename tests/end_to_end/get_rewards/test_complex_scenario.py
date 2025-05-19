@@ -36,13 +36,11 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         get_video_data,
         get_video_analytics,
         get_all_uploads,
-        youtube_cache,
         reset_scored_videos
     )
     from bitcast.validator.reward import reward, get_rewards
     from google.oauth2.credentials import Credentials
     from bitcast.validator.utils.config import (
-        DISABLE_YOUTUBE_CACHING,
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
@@ -235,17 +233,6 @@ def mock_credentials():
     )
 
 @pytest.fixture(autouse=True)
-def disable_youtube_caching():
-    with patch('bitcast.validator.utils.config.DISABLE_YOUTUBE_CACHING', True):
-        yield
-
-@pytest.fixture(autouse=True)
-def mock_youtube_cache():
-    with patch('bitcast.validator.socials.youtube.youtube_utils.youtube_cache') as mock_cache:
-        mock_cache.get_video_cache.return_value = None
-        yield mock_cache
-
-@pytest.fixture(autouse=True)
 def reset_scored_videos():
     from bitcast.validator.socials.youtube.youtube_utils import reset_scored_videos as reset_func
     reset_func()
@@ -260,7 +247,6 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
-@patch('bitcast.validator.utils.config.DISABLE_YOUTUBE_CACHING', True)
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
@@ -501,36 +487,44 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                 # UID 1's videos (50% more watch time)
                 "test_video_1_uid1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 900  # 600 * 1.5
+                    "estimatedMinutesWatched": 900,  # 600 * 1.5
+                    "trafficSourceMinutes": {"YT_CHANNEL": 400, "EXT_URL": 500}
                 },
                 "test_video_2_uid1": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 375  # 250 * 1.5
+                    "estimatedMinutesWatched": 375,  # 250 * 1.5
+                    "trafficSourceMinutes": {"YT_CHANNEL": 175, "EXT_URL": 200}
                 },
                 "test_video_3_uid1": {
                     "averageViewPercentage": 45,
-                    "estimatedMinutesWatched": 150  # 100 * 1.5
+                    "estimatedMinutesWatched": 150,  # 100 * 1.5
+                    "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 100}
                 },
                 "test_video_4_uid1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 450  # 300 * 1.5
+                    "estimatedMinutesWatched": 450,  # 300 * 1.5
+                    "trafficSourceMinutes": {"YT_CHANNEL": 250, "EXT_URL": 200}
                 },
                 # UID 2's videos (original watch time)
                 "test_video_1_uid2": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 600
+                    "estimatedMinutesWatched": 600,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 300, "EXT_URL": 300}
                 },
                 "test_video_2_uid2": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 250
+                    "estimatedMinutesWatched": 250,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 100, "EXT_URL": 150}
                 },
                 "test_video_3_uid2": {
                     "averageViewPercentage": 45,
-                    "estimatedMinutesWatched": 100
+                    "estimatedMinutesWatched": 100,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 40, "EXT_URL": 60}
                 },
                 "test_video_4_uid2": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 300
+                    "estimatedMinutesWatched": 300,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 150, "EXT_URL": 150}
                 }
             }
             result = video_metrics[video_id]

@@ -24,40 +24,6 @@ session.mount("https://", adapter)
 # Create a thread pool with a limited number of workers
 thread_pool = ThreadPoolExecutor(max_workers=5, thread_name_prefix="log_publisher")
 
-def calculate_total_minutes(yt_stats_list: List[dict]) -> dict:
-    """
-    Calculate total minutes watched per brief across all miners.
-    Only counts stats from vetted channels (where channel_vet_result is True).
-    
-    Args:
-        yt_stats_list (List[dict]): List of YouTube statistics from all miners
-        
-    Returns:
-        dict: Dictionary mapping brief IDs to their total minutes watched
-    """
-    brief_total_minutes = {}
-    for stats in yt_stats_list:
-        try:
-            # Only process stats from vetted channels
-            if not isinstance(stats, dict) or not stats.get("yt_account", {}).get("channel_vet_result", False):
-                continue
-                
-            if "videos" in stats:
-                videos = stats["videos"]
-                if isinstance(videos, dict):
-                    # Handle case where videos is a dictionary
-                    for video_id, video_data in videos.items():
-                        if isinstance(video_data, dict):
-                            minutes = float(video_data.get("analytics", {}).get("estimatedMinutesWatched", 0))
-                            matching_briefs = video_data.get("matching_brief_ids", [])
-                            for brief_id in matching_briefs:
-                                brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + minutes
-        except Exception as e:
-            bt.logging.warning(f"Error processing stats for total minutes: {e}")
-            continue
-    
-    return brief_total_minutes
-
 def publish_stats_payload(json_payload):
     def _publish():
         try:
@@ -163,15 +129,11 @@ def publish_stats(wallet: bt.wallet, json_payloads: List[Dict[str, Any]], uids: 
         cleaned_payload = clean_video_data(converted_payload)
         combined_payload.append(cleaned_payload)
     
-    # Calculate total minutes per brief across all miners
-    total_minutes = calculate_total_minutes(json_payloads)
-    
     timestamp = datetime.utcnow().isoformat()
     final_payload = {
         "vali_hotkey": vali_hotkey, 
         "time": timestamp, 
-        "stats": combined_payload,
-        "total_minutes_per_brief": total_minutes  # Add total minutes to the payload
+        "stats": combined_payload
     }
     
     # Create a message to sign (format: hotkey:timestamp:payload)

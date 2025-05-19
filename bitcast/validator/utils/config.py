@@ -10,13 +10,12 @@ load_dotenv(dotenv_path=env_path)
 # Cache Configuration
 CACHE_ROOT = Path(__file__).resolve().parents[2] / "cache"
 CACHE_DIRS = {
-    "youtube": os.path.join(CACHE_ROOT, "youtube"),
     "openai": os.path.join(CACHE_ROOT, "openai"),
     "briefs": os.path.join(CACHE_ROOT, "briefs"),
     "blacklist": os.path.join(CACHE_ROOT, "blacklist")
 }
 
-__version__ = "1.2.3"
+__version__ = "1.4.0"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -30,9 +29,11 @@ WANDB_PROJECT = os.getenv('WANDB_PROJECT', 'bitcast_vali_logs')
 
 # optional
 DISABLE_LLM_CACHING = os.getenv('DISABLE_LLM_CACHING', 'False').lower() == 'true'
-DISABLE_YOUTUBE_CACHING = os.getenv('DISABLE_YOUTUBE_CACHING', 'False').lower() == 'true'
 LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY')
 LANGCHAIN_TRACING_V2 = os.getenv('LANGCHAIN_TRACING_V2')
+
+# Only run LLM checks on videos that pass all other checks
+ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
 
 # youtube scoring
 YT_LOOKBACK = 90
@@ -62,8 +63,8 @@ DISCRETE_MODE = True
 bt.logging.info(f"BITCAST_BRIEFS_ENDPOINT: {BITCAST_BRIEFS_ENDPOINT}")
 bt.logging.info(f"BITCAST_STATS_ENDPOINT: {BITCAST_STATS_ENDPOINT}")
 bt.logging.info(f"DISABLE_LLM_CACHING: {DISABLE_LLM_CACHING}")
-bt.logging.info(f"DISABLE_YOUTUBE_CACHING: {DISABLE_YOUTUBE_CACHING}")
 bt.logging.info(f"LANGCHAIN_TRACING_V2: {LANGCHAIN_TRACING_V2}")
+bt.logging.info(f"ECO_MODE: {ECO_MODE}")
 bt.logging.info(f"YT_MIN_SUBS: {YT_MIN_SUBS}")
 bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")
 bt.logging.info(f"YT_MIN_MINS_WATCHED: {YT_MIN_MINS_WATCHED}")
