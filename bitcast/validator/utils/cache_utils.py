@@ -3,7 +3,6 @@ import shutil
 import bittensor as bt
 from diskcache import Cache
 from bitcast.validator.utils.config import CACHE_DIRS, CACHE_ROOT
-from bitcast.validator.socials.youtube.youtube_utils import youtube_cache
 from bitcast.validator.clients.OpenaiClient import OpenaiClient
 from bitcast.validator.utils.briefs import BriefsCache
 from bitcast.validator.utils.blacklist import BlacklistCache
@@ -12,7 +11,6 @@ def clear_all_caches():
     """Clear all cache directories and instances."""
     bt.logging.info("Clearing all caches")
     try:
-        clear_youtube_cache()
         clear_openai_cache()
         clear_briefs_cache()
         clear_blacklist_cache()
@@ -32,23 +30,12 @@ def clear_expired_caches():
     """Clear expired entries from all caches."""
     bt.logging.info("Clearing expired cache entries")
     try:
-        clear_expired_youtube_cache()
         clear_expired_openai_cache()
         clear_expired_briefs_cache()
         clear_expired_blacklist_cache()
         bt.logging.info("Successfully cleared expired cache entries")
     except Exception as e:
         bt.logging.error(f"Error clearing expired cache entries: {str(e)}")
-        raise
-
-def clear_youtube_cache():
-    """Clear YouTube cache."""
-    bt.logging.info("Clearing YouTube cache")
-    try:
-        youtube_cache.clear_all()
-        bt.logging.info("Successfully cleared YouTube cache")
-    except Exception as e:
-        bt.logging.error(f"Error clearing YouTube cache: {str(e)}")
         raise
 
 def clear_openai_cache():
@@ -88,16 +75,6 @@ def clear_blacklist_cache():
             bt.logging.warning("Blacklist cache not initialized")
     except Exception as e:
         bt.logging.error(f"Error clearing Blacklist cache: {str(e)}")
-        raise
-
-def clear_expired_youtube_cache():
-    """Clear expired YouTube cache entries."""
-    bt.logging.info("Clearing expired YouTube cache entries")
-    try:
-        youtube_cache.clear_expired()
-        bt.logging.info("Successfully cleared expired YouTube cache entries")
-    except Exception as e:
-        bt.logging.error(f"Error clearing expired YouTube cache entries: {str(e)}")
         raise
 
 def clear_expired_openai_cache():

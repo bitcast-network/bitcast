@@ -13,7 +13,10 @@ def test_calculate_brief_emissions_scalar():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -40,7 +43,10 @@ def test_calculate_brief_emissions_scalar_zero_minutes():
                 "analytics": {
                     "estimatedMinutesWatched": 0
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -66,7 +72,10 @@ def test_calculate_brief_emissions_scalar_high_minutes():
                 "analytics": {
                     "estimatedMinutesWatched": 1000
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -91,7 +100,10 @@ def test_calculate_brief_emissions_scalar_multiple_briefs():
                 "analytics": {
                     "estimatedMinutesWatched": 50
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -125,13 +137,19 @@ def test_calculate_brief_emissions_scalar_multiple_videos():
                 "analytics": {
                     "estimatedMinutesWatched": 30
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             },
             "video2": {
                 "analytics": {
                     "estimatedMinutesWatched": 20
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -178,7 +196,10 @@ def test_calculate_brief_emissions_scalar_burn_decay_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -202,7 +223,10 @@ def test_calculate_brief_emissions_scalar_max_burn_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -232,13 +256,19 @@ def test_scale_rewards_basic():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1"]
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             },
             "video2": {
                 "analytics": {
                     "estimatedMinutesWatched": 50
                 },
-                "matching_brief_ids": ["brief2"]
+                "matching_brief_ids": ["brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -280,7 +310,10 @@ def test_scale_rewards_invalid_sum():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -315,7 +348,10 @@ def test_scale_rewards_nonzero_first_row():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -350,7 +386,10 @@ def test_scale_rewards_zero_scalars():
                 "analytics": {
                     "estimatedMinutesWatched": 0
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -385,7 +424,10 @@ def test_scale_rewards_max_burn_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -419,7 +461,10 @@ def test_scale_rewards_burn_decay_zero():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -456,7 +501,10 @@ def test_scale_rewards_all_zeros():
                 "analytics": {
                     "estimatedMinutesWatched": 100
                 },
-                "matching_brief_ids": ["brief1", "brief2"]
+                "matching_brief_ids": ["brief1", "brief2"],
+                "decision_details": {
+                    "video_vet_result": True
+                }
             }
         }
     }]
@@ -478,3 +526,46 @@ def test_scale_rewards_all_zeros():
     assert np.allclose(result_np[0, :], 0.5)  # Equal split between columns
     assert np.allclose(result_np[1:, :], 0.0)
     assert np.allclose(np.sum(result_np), 1.0)
+
+def test_calculate_brief_emissions_scalar_video_vet_result_false():
+    # Test that videos with video_vet_result=False are skipped
+    yt_stats_list = [{
+        "yt_account": {
+            "channel_vet_result": True
+        },
+        "videos": {
+            "video1": {
+                "analytics": {
+                    "estimatedMinutesWatched": 100
+                },
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": False  # This video should be skipped
+                }
+            },
+            "video2": {
+                "analytics": {
+                    "estimatedMinutesWatched": 50
+                },
+                "matching_brief_ids": ["brief1"],
+                "decision_details": {
+                    "video_vet_result": True  # This video should be counted
+                }
+            }
+        }
+    }]
+    briefs = [{
+        "id": "brief1",
+        "max_burn": 0.5,
+        "burn_decay": 0.01
+    }]
+    
+    result = calculate_brief_emissions_scalar(yt_stats_list, briefs)
+    
+    # Only video2 should be counted (50 minutes), not video1 (100 minutes)
+    expected = 1 - 0.5 + 0.5 * (1 - np.exp(-0.01 * 50))
+    assert np.isclose(result["brief1"], expected)
+    
+    # For comparison, if both videos were counted (150 minutes)
+    wrong_expected = 1 - 0.5 + 0.5 * (1 - np.exp(-0.01 * 150))
+    assert not np.isclose(result["brief1"], wrong_expected)
