@@ -314,7 +314,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
 
 def calculate_video_score(video_id, youtube_analytics_client):
     """Calculate the score for a video based on analytics data."""
-    start_date = (datetime.now() - timedelta(days=max(30, YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1))).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1)).strftime('%Y-%m-%d')
     end_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY)).strftime('%Y-%m-%d')
     today = datetime.now().strftime('%Y-%m-%d')
 
