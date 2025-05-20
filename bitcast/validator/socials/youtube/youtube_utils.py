@@ -35,7 +35,7 @@ def reset_scored_videos():
 def is_video_already_scored(video_id):
     """Check if a video has already been scored by another hotkey."""
     if video_id in scored_video_ids:
-        bt.logging.info(f"Video {video_id} already scored by another hotkey")
+        bt.logging.info(f"Video already scored by another hotkey")
         return True
     return False
 
@@ -346,7 +346,7 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
     ).execute()
 
     if not video_response["items"]:
-        raise Exception(f"No video found with ID: {video_id}")
+        raise Exception(f"No video found with matching ID")
 
     if discrete_mode:
         bitcast_video_id = "bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]
