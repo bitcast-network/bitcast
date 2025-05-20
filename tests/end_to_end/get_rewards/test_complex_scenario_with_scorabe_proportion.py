@@ -526,35 +526,43 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect
     
-    def mock_get_additional_video_analytics_side_effect(client, video_id, start_date=None, end_date=None):
+    def mock_get_additional_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, ECO_MODE=False):
         logger.info(f"get_additional_video_analytics called with video_id: {video_id}")
         # For additional metrics, return the traffic source data
         video_metrics = {
             # UID 1's videos (50% more watch time)
             "test_video_1_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 400, "EXT_URL": 500}
+                "trafficSourceMinutes": {"YT_CHANNEL": 400, "EXT_URL": 500},
+                "scorable_proportion": 1.0
             },
             "test_video_2_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 175, "EXT_URL": 200}
+                "trafficSourceMinutes": {"YT_CHANNEL": 175, "EXT_URL": 200},
+                "scorable_proportion": 1.0
             },
             "test_video_3_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 100}
+                "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 100},
+                "scorable_proportion": 1.0
             },
             "test_video_4_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 250, "EXT_URL": 200}
+                "trafficSourceMinutes": {"YT_CHANNEL": 250, "EXT_URL": 200},
+                "scorable_proportion": 1.0
             },
             # UID 2's videos (original watch time)
             "test_video_1_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 300, "ADVERTISING": 300}
+                "trafficSourceMinutes": {"YT_CHANNEL": 300, "ADVERTISING": 300},
+                "scorable_proportion": 1.0
             },
             "test_video_2_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 100, "ADVERTISING": 150}
+                "trafficSourceMinutes": {"YT_CHANNEL": 100, "ADVERTISING": 150},
+                "scorable_proportion": 1.0
             },
             "test_video_3_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 40, "ADVERTISING": 60}
+                "trafficSourceMinutes": {"YT_CHANNEL": 40, "ADVERTISING": 60},
+                "scorable_proportion": 1.0
             },
             "test_video_4_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 150, "ADVERTISING": 150}
+                "trafficSourceMinutes": {"YT_CHANNEL": 150, "ADVERTISING": 150},
+                "scorable_proportion": 1.0
             }
         }
         result = video_metrics[video_id]
