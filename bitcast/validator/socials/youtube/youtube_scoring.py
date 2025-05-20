@@ -90,7 +90,7 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
         channel_analytics = youtube_utils.get_channel_analytics(youtube_analytics_client, start_date=start_date, end_date=end_date)
         return channel_data, channel_analytics
     except Exception as e:
-        bt.logging.warning(f"An error occurred while retrieving YouTube data: {e}")
+        bt.logging.warning(f"An error occurred while retrieving YouTube data: {youtube_utils._format_error(e)}")
         return None, None
 
 def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
@@ -122,7 +122,7 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
             result["scores"] = {brief["id"]: 0 for brief in briefs}
             
     except Exception as e:
-        bt.logging.error(f"Error during video evaluation: {e}")
+        bt.logging.error(f"Error during video evaluation: {youtube_utils._format_error(e)}")
     
     return result
 

@@ -100,7 +100,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
             youtube_utils.mark_video_as_scored(video_id)
             
         except Exception as e:
-            bt.logging.error(f"Error evaluating video {e}")
+            bt.logging.error(f"Error evaluating video {youtube_utils._format_error(e)}")
             # Mark this video as not matching any briefs
             results[video_id] = [False] * len(briefs)
             # Don't mark the video as scored if there was an error
@@ -129,10 +129,9 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     video_data = youtube_utils.get_video_data(youtube_data_client, video_id, DISCRETE_MODE)
     video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id)
     
-    if not ECO_MODE:
-        # Get additional analytics data
-        additional_analytics = youtube_utils.get_additional_video_analytics(youtube_analytics_client, video_id)
-        video_analytics.update(additional_analytics)
+    # Get additional analytics data
+    additional_analytics = youtube_utils.get_additional_video_analytics(youtube_analytics_client, video_id, ECO_MODE=ECO_MODE)
+    video_analytics.update(additional_analytics)
     
     # Calculate scorable proportion and add it to video analytics
     video_analytics['scorable_proportion'] = calculate_scorable_proportion(video_analytics)
@@ -301,7 +300,7 @@ def get_video_transcript(video_id, video_data):
         try:
             transcript = youtube_utils.get_video_transcript(video_id, RAPID_API_KEY)
         except Exception as e:
-            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {e}")
+            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {youtube_utils._format_error(e)}")
             transcript = None
 
     if transcript is None:
@@ -331,7 +330,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
             if match:
                 met_brief_ids.append(brief["id"])
         except Exception as e:
-            bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {e}")
+            bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {youtube_utils._format_error(e)}")
             decision_details["contentAgainstBriefCheck"].append(False)
             
     return met_brief_ids

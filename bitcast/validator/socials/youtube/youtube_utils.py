@@ -35,7 +35,7 @@ def reset_scored_videos():
 def is_video_already_scored(video_id):
     """Check if a video has already been scored by another hotkey."""
     if video_id in scored_video_ids:
-        bt.logging.info(f"Video {video_id} already scored by another hotkey")
+        bt.logging.info(f"Video already scored by another hotkey")
         return True
     return False
 
@@ -346,7 +346,7 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
     ).execute()
 
     if not video_response["items"]:
-        raise Exception(f"No video found with ID: {video_id}")
+        raise Exception(f"No video found with matching ID")
 
     if discrete_mode:
         bitcast_video_id = "bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]
@@ -419,7 +419,7 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     return analytics_info
 
 @retry(**YT_API_RETRY_CONFIG)
-def get_additional_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None):
+def get_additional_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, ECO_MODE=False):
     """Get additional video analytics including traffic sources and country data."""
     if end_date is None:
         end_date = datetime.today().strftime('%Y-%m-%d')
@@ -430,6 +430,11 @@ def get_additional_video_analytics(youtube_analytics_client, video_id, start_dat
     # Get traffic source data for minutes watched
     traffic_source_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "insightTrafficSourceType")
     
+    if ECO_MODE:
+        return {
+            "trafficSourceMinutes": traffic_source_minutes
+        }
+
     # Get country data for minutes watched
     country_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "country")
     
