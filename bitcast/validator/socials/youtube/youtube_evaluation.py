@@ -129,10 +129,9 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     video_data = youtube_utils.get_video_data(youtube_data_client, video_id, DISCRETE_MODE)
     video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id)
     
-    if not ECO_MODE:
-        # Get additional analytics data
-        additional_analytics = youtube_utils.get_additional_video_analytics(youtube_analytics_client, video_id)
-        video_analytics.update(additional_analytics)
+    # Get additional analytics data
+    additional_analytics = youtube_utils.get_additional_video_analytics(youtube_analytics_client, video_id, ECO_MODE=ECO_MODE)
+    video_analytics.update(additional_analytics)
     
     # Calculate scorable proportion and add it to video analytics
     video_analytics['scorable_proportion'] = calculate_scorable_proportion(video_analytics)

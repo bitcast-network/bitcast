@@ -419,7 +419,7 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     return analytics_info
 
 @retry(**YT_API_RETRY_CONFIG)
-def get_additional_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None):
+def get_additional_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, ECO_MODE=False):
     """Get additional video analytics including traffic sources and country data."""
     if end_date is None:
         end_date = datetime.today().strftime('%Y-%m-%d')
@@ -430,6 +430,11 @@ def get_additional_video_analytics(youtube_analytics_client, video_id, start_dat
     # Get traffic source data for minutes watched
     traffic_source_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "insightTrafficSourceType")
     
+    if ECO_MODE:
+        return {
+            "trafficSourceMinutes": traffic_source_minutes
+        }
+
     # Get country data for minutes watched
     country_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "country")
     
