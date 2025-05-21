@@ -36,7 +36,7 @@ def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dic
                             if not decision_details.get("video_vet_result", False):
                                 continue
 
-                            minutes = float(video_data.get("minutes_watched_w_lag", 0))
+                            minutes = float(video_data.get("analytics", {}).get("minutes_watched_w_lag", 0))
                             scorable_proportion = float(video_data.get("analytics", {}).get("scorable_proportion", 0))
                             
                             matching_briefs = video_data.get("matching_brief_ids", [])

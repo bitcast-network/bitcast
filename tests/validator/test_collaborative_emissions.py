@@ -10,8 +10,8 @@ def test_calculate_brief_emissions_scalar():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
@@ -39,8 +39,8 @@ def test_calculate_brief_emissions_scalar_zero_minutes():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 0,
                 "analytics": {
+                    "minutes_watched_w_lag": 0,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
@@ -67,8 +67,8 @@ def test_calculate_brief_emissions_scalar_high_minutes():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 1000,
                 "analytics": {
+                    "minutes_watched_w_lag": 1000,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
@@ -94,8 +94,8 @@ def test_calculate_brief_emissions_scalar_multiple_briefs():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 50,
                 "analytics": {
+                    "minutes_watched_w_lag": 50,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
@@ -130,16 +130,16 @@ def test_calculate_brief_emissions_scalar_multiple_videos():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 30,
                 "analytics": {
+                    "minutes_watched_w_lag": 30,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
             },
             "video2": {
-                "minutes_watched_w_lag": 20,
                 "analytics": {
+                    "minutes_watched_w_lag": 20,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
@@ -187,8 +187,8 @@ def test_calculate_brief_emissions_scalar_burn_decay_zero():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
@@ -213,8 +213,8 @@ def test_calculate_brief_emissions_scalar_max_burn_zero():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
@@ -245,8 +245,8 @@ def test_scale_rewards_basic():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1"],
@@ -297,8 +297,8 @@ def test_scale_rewards_invalid_sum():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
@@ -334,8 +334,8 @@ def test_scale_rewards_nonzero_first_row():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
@@ -371,9 +371,9 @@ def test_scale_rewards_zero_scalars():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 0,
                 "analytics": {
-                    "scorable_proportion": 1.0
+                    "scorable_proportion": 1.0,
+                    "minutes_watched_w_lag": 0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -408,8 +408,8 @@ def test_scale_rewards_max_burn_zero():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
@@ -444,8 +444,8 @@ def test_scale_rewards_burn_decay_zero():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
@@ -483,8 +483,8 @@ def test_scale_rewards_all_zeros():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
@@ -519,8 +519,8 @@ def test_calculate_brief_emissions_scalar_partial_scorable():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 100,
                 "analytics": {
+                    "minutes_watched_w_lag": 100,
                     "scorable_proportion": 0.5  # Only 50% is scorable
                 },
                 "matching_brief_ids": ["brief1"],
@@ -548,16 +548,16 @@ def test_calculate_brief_emissions_scalar_mixed_scorable():
         },
         "videos": {
             "video1": {
-                "minutes_watched_w_lag": 60,
                 "analytics": {
+                    "minutes_watched_w_lag": 60,
                     "scorable_proportion": 0.75  # 75% scorable
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
             },
             "video2": {
-                "minutes_watched_w_lag": 80,
                 "analytics": {
+                    "minutes_watched_w_lag": 80,
                     "scorable_proportion": 0.25  # 25% scorable
                 },
                 "matching_brief_ids": ["brief1"],

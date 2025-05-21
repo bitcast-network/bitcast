@@ -25,10 +25,10 @@ def test_get_rewards():
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 15, "brief2": 15, "brief3": 15}, "videos": {
-            "video1": {"minutes_watched_w_lag": 20, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 20, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }}
     ]
 
@@ -77,13 +77,13 @@ def test_get_rewards_identical_responses():
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},  # Scores for response 1
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},  # Scores for response 2
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }}   # Scores for response 3
     ]
 
@@ -128,13 +128,13 @@ def test_get_rewards_with_zeros():
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},  # Scores for response 1
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 0, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief3"], "decision_details": {"video_vet_result": True}}
         }},  # Scores for response 2
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 0}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
         }}   # Scores for response 3
     ]
 
@@ -179,13 +179,13 @@ def test_get_rewards_all_zeros_in_first_position():
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},  # Scores for response 1
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},  # Scores for response 2
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }}   # Scores for response 3
     ]
 
@@ -328,10 +328,10 @@ def test_normalise_scores():
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}},
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 90, "brief2": 70, "brief3": 2}, "videos": {
-            "video1": {"minutes_watched_w_lag": 20, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 20, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }}
     ]
     
@@ -347,7 +347,7 @@ def test_normalise_scores():
     # Test with single row
     scores_matrix = np.array([[10, 30, 2]])
     mock_yt_stats = [{"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
-        "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+        "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
     }}]
     final_scores = normalise_scores(scores_matrix, mock_yt_stats, MOCK_TEST_BRIEFS)
     assert np.allclose(final_scores, [1.0])
@@ -356,10 +356,10 @@ def test_normalise_scores():
     scores_matrix = np.array([[0, 0], [0, 0]])
     mock_yt_stats = [
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 0}, "videos": {
-            "video1": {"minutes_watched_w_lag": 0, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 0, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
         }},
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 0}, "videos": {
-            "video1": {"minutes_watched_w_lag": 0, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 0, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
         }}
     ]
     mock_briefs = [{"id": "brief1", "max_burn": 0.0, "burn_decay": 0.01},
@@ -390,10 +390,10 @@ def test_get_rewards_with_brief_weights():
     mock_yt_stats = [
         {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }},  # Scores for response 1
         {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"minutes_watched_w_lag": 10, "analytics": {"scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            "video1": {"analytics": {"minutes_watched_w_lag": 10, "scorable_proportion": 1.0}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
         }}   # Scores for response 2
     ]
 
