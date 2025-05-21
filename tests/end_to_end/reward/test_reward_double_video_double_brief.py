@@ -42,7 +42,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED
+        YT_MIN_MINS_WATCHED,
+        YT_REWARD_DELAY,
+        YT_ROLLING_WINDOW
     )
 
 # Set up logging
@@ -318,6 +320,11 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     mock_get_video_data.side_effect = mock_get_video_data_side_effect
     
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, metric_dims=None, dimensions=None):
+        # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+        today = datetime.now()
+        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
+        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+        
         # Handle the new metric_dims parameter
         if metric_dims:
             # Check if this is a daily metrics request
@@ -326,14 +333,14 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             if has_day_dimension:
                 # Create day_metrics structure
                 day_metrics = {
-                    "2023-01-15": {
-                        "day": "2023-01-15",
+                    day1: {
+                        "day": day1,
                         "estimatedMinutesWatched": 500,
                         "views": 250,
                         "averageViewPercentage": 50
                     },
-                    "2023-01-16": {
-                        "day": "2023-01-16",
+                    day2: {
+                        "day": day2,
                         "estimatedMinutesWatched": 500,
                         "views": 250,
                         "averageViewPercentage": 50
@@ -360,18 +367,18 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                         if metric == "estimatedMinutesWatched":
                             if video_id == "test_video_1":
                                 result[key] = {
-                                    "2023-01-15": 500,
-                                    "2023-01-16": 500
+                                    day1: 500,
+                                    day2: 500
                                 }
                             else:  # test_video_2
                                 result[key] = {
-                                    "2023-01-15": 600,
-                                    "2023-01-16": 600
+                                    day1: 600,
+                                    day2: 600
                                 }
                         else:
                             result[key] = {
-                                "2023-01-15": 250,
-                                "2023-01-16": 250
+                                day1: 250,
+                                day2: 250
                             }
                 
                 # Add the day_metrics structure
@@ -406,11 +413,11 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
         if dimensions == 'day':
             return [
                 {
-                    "day": "2023-01-15",
+                    "day": day1,
                     "estimatedMinutesWatched": 500
                 },
                 {
-                    "day": "2023-01-16",
+                    "day": day2,
                     "estimatedMinutesWatched": 500
                 }
             ]

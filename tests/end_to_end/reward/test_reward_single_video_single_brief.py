@@ -38,7 +38,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED
+        YT_MIN_MINS_WATCHED,
+        YT_REWARD_DELAY,
+        YT_ROLLING_WINDOW
     )
 
 # Set up logging
@@ -295,6 +297,11 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     
     # Note: The hardcoded dates (2023-01-15, 2023-01-16) in the mock data are not significant.
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, metric_dims=None, dimensions=None):
+        # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+        today = datetime.now()
+        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
+        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+        
         # Handle the new metric_dims parameter
         if metric_dims:
             # Check if this is a daily metrics request
@@ -303,8 +310,8 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             if has_day_dimension:
                 # Create a day_metrics structure
                 day_metrics = {
-                    "2023-01-15": {
-                        "day": "2023-01-15",
+                    day1: {
+                        "day": day1,
                         "estimatedMinutesWatched": 500,
                         "views": 250,
                         "likes": 100,
@@ -313,8 +320,8 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                         "averageViewDuration": 180,
                         "averageViewPercentage": 50
                     },
-                    "2023-01-16": {
-                        "day": "2023-01-16",
+                    day2: {
+                        "day": day2,
                         "estimatedMinutesWatched": 500,
                         "views": 250,
                         "likes": 100,
@@ -336,8 +343,8 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 for key, (metric, dims) in metric_dims.items():
                     if dims == "day":
                         result[key] = {
-                            "2023-01-15": 500 if metric == "estimatedMinutesWatched" else 250,
-                            "2023-01-16": 500 if metric == "estimatedMinutesWatched" else 250
+                            day1: 500 if metric == "estimatedMinutesWatched" else 250,
+                            day2: 500 if metric == "estimatedMinutesWatched" else 250
                         }
                 
                 # Add complex day metrics (like deviceType)
@@ -346,17 +353,17 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                         # For complex metrics like deviceTypeMinutes
                         if key == "deviceTypeMinutes":
                             result[key] = {
-                                "DESKTOP|2023-01-15": 400,
-                                "MOBILE|2023-01-15": 100,
-                                "DESKTOP|2023-01-16": 400,
-                                "MOBILE|2023-01-16": 100
+                                f"DESKTOP|{day1}": 400,
+                                f"MOBILE|{day1}": 100,
+                                f"DESKTOP|{day2}": 400,
+                                f"MOBILE|{day2}": 100
                             }
                         elif key == "operatingSystemMinutes":
                             result[key] = {
-                                "WINDOWS|2023-01-15": 300,
-                                "ANDROID|2023-01-15": 200,
-                                "WINDOWS|2023-01-16": 300,
-                                "ANDROID|2023-01-16": 200
+                                f"WINDOWS|{day1}": 300,
+                                f"ANDROID|{day1}": 200,
+                                f"WINDOWS|{day2}": 300,
+                                f"ANDROID|{day2}": 200
                             }
                 
                 # Add the day_metrics structure
@@ -380,11 +387,11 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
         if dimensions == 'day':
             return [
                 {
-                    "day": "2023-01-15",
+                    "day": day1,
                     "estimatedMinutesWatched": 500
                 },
                 {
-                    "day": "2023-01-16",
+                    "day": day2,
                     "estimatedMinutesWatched": 500
                 }
             ]

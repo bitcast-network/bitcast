@@ -43,7 +43,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED
+        YT_MIN_MINS_WATCHED,
+        YT_REWARD_DELAY,
+        YT_ROLLING_WINDOW
     )
 
 # Set up logging
@@ -337,6 +339,11 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     mock_get_video_data.side_effect = mock_get_video_data_side_effect
     
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None, metric_dims=None):
+        # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+        today = datetime.now()
+        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
+        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+        
         # Handle the new metric_dims parameter
         if metric_dims:
             # Check if this is a daily metrics request
@@ -345,14 +352,14 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             if has_day_dimension:
                 # Create day_metrics structure
                 day_metrics = {
-                    "2023-01-15": {
-                        "day": "2023-01-15",
+                    day1: {
+                        "day": day1,
                         "estimatedMinutesWatched": 0,
                         "views": 0,
                         "averageViewPercentage": 0
                     },
-                    "2023-01-16": {
-                        "day": "2023-01-16",
+                    day2: {
+                        "day": day2,
                         "estimatedMinutesWatched": 0,
                         "views": 0,
                         "averageViewPercentage": 0
@@ -369,10 +376,10 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 total_minutes = video_total_minutes[video_id]
                 
                 # Update day_metrics with appropriate values
-                day_metrics["2023-01-15"]["estimatedMinutesWatched"] = total_minutes // 2
-                day_metrics["2023-01-16"]["estimatedMinutesWatched"] = total_minutes // 2
-                day_metrics["2023-01-15"]["views"] = total_minutes // 2
-                day_metrics["2023-01-16"]["views"] = total_minutes // 2
+                day_metrics[day1]["estimatedMinutesWatched"] = total_minutes // 2
+                day_metrics[day2]["estimatedMinutesWatched"] = total_minutes // 2
+                day_metrics[day1]["views"] = total_minutes // 2
+                day_metrics[day2]["views"] = total_minutes // 2
                 
                 # Create result with averageViewPercentage at top level for vetting
                 result = {
@@ -390,13 +397,13 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                     if dims == "day":
                         if metric == "estimatedMinutesWatched":
                             result[key] = {
-                                "2023-01-15": total_minutes // 2,
-                                "2023-01-16": total_minutes // 2
+                                day1: total_minutes // 2,
+                                day2: total_minutes // 2
                             }
                         else:
                             result[key] = {
-                                "2023-01-15": total_minutes // 4,
-                                "2023-01-16": total_minutes // 4
+                                day1: total_minutes // 4,
+                                day2: total_minutes // 4
                             }
                 
                 # Add traffic source data
@@ -446,11 +453,11 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             total_minutes = video_day_metrics[video_id]
             return [
                 {
-                    "day": "2023-01-15",
+                    "day": day1,
                     "estimatedMinutesWatched": total_minutes // 2
                 },
                 {
-                    "day": "2023-01-16",
+                    "day": day2,
                     "estimatedMinutesWatched": total_minutes // 2
                 }
             ]

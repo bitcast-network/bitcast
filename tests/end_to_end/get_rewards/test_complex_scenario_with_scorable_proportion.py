@@ -52,7 +52,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED
+        YT_MIN_MINS_WATCHED,
+        YT_REWARD_DELAY,
+        YT_ROLLING_WINDOW
     )
 
 # Set up logging
@@ -463,6 +465,11 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None, metric_dims=None):
         logger.info(f"get_video_analytics called with video_id: {video_id}, dimensions: {dimensions}, metric_dims: {metric_dims}")
         
+        # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+        today = datetime.now()
+        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
+        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+        
         # Determine video watch time based on video ID
         video_day_metrics = {
             # UID 1's videos (50% more watch time)
@@ -485,16 +492,16 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         # For UID 2, include advertising in the day metrics (30% advertising, 70% organic)
         if "uid2" in video_id:
             day_metrics = {
-                "2023-01-15": {
-                    "day": "2023-01-15",
+                day1: {
+                    "day": day1,
                     "estimatedMinutesWatched": half_minutes,
                     "trafficSourceMinutes": {
                         "YT_CHANNEL": half_minutes * 0.7,
                         "ADVERTISING": half_minutes * 0.3
                     }
                 },
-                "2023-01-16": {
-                    "day": "2023-01-16",
+                day2: {
+                    "day": day2,
                     "estimatedMinutesWatched": half_minutes,
                     "trafficSourceMinutes": {
                         "YT_CHANNEL": half_minutes * 0.7,
@@ -505,12 +512,12 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         else:
             # UID 1 has 100% organic traffic
             day_metrics = {
-                "2023-01-15": {
-                    "day": "2023-01-15",
+                day1: {
+                    "day": day1,
                     "estimatedMinutesWatched": half_minutes,
                 },
-                "2023-01-16": {
-                    "day": "2023-01-16",
+                day2: {
+                    "day": day2,
                     "estimatedMinutesWatched": half_minutes,
                 }
             }
@@ -523,6 +530,20 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                 "estimatedMinutesWatched": total_minutes,
                 "day_metrics": day_metrics
             }
+            
+            # Add metrics for each requested metric
+            for key, (metric, dims) in metric_dims.items():
+                if dims == "day":
+                    if metric == "estimatedMinutesWatched":
+                        result[key] = {
+                            day1: half_minutes,
+                            day2: half_minutes
+                        }
+                    else:
+                        result[key] = {
+                            day1: half_minutes / 2,
+                            day2: half_minutes / 2
+                        }
             
             # Add trafficSourceMinutes with appropriate distribution
             if "uid2" in video_id:
@@ -538,20 +559,6 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                     "EXT_URL": total_minutes / 2
                 }
             
-            # Add metrics for each requested metric
-            for key, (metric, dims) in metric_dims.items():
-                if dims == "day":
-                    if metric == "estimatedMinutesWatched":
-                        result[key] = {
-                            "2023-01-15": half_minutes,
-                            "2023-01-16": half_minutes
-                        }
-                    else:
-                        result[key] = {
-                            "2023-01-15": half_minutes / 2,
-                            "2023-01-16": half_minutes / 2
-                        }
-            
             logger.info(f"Returning day metrics structure for {video_id}: {result}")
             return result
         
@@ -564,7 +571,7 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                 
                 return [
                     {
-                        "day": "2023-01-15",
+                        "day": day1,
                         "estimatedMinutesWatched": half_minutes,
                         "trafficSourceMinutes": {
                             "YT_CHANNEL": yt_channel_minutes,
@@ -572,7 +579,7 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                         }
                     },
                     {
-                        "day": "2023-01-16",
+                        "day": day2,
                         "estimatedMinutesWatched": half_minutes,
                         "trafficSourceMinutes": {
                             "YT_CHANNEL": yt_channel_minutes,
@@ -584,11 +591,11 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                 # Original format for UID 1
                 return [
                     {
-                        "day": "2023-01-15",
+                        "day": day1,
                         "estimatedMinutesWatched": half_minutes
                     },
                     {
-                        "day": "2023-01-16",
+                        "day": day2,
                         "estimatedMinutesWatched": half_minutes
                     }
                 ]
