@@ -355,21 +355,21 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
 def _fetch_transcript(video_id, rapid_api_key):
     """Internal function to fetch video transcript with retry logic."""
     url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
-    headers = {
-        "x-rapidapi-key": rapid_api_key,
-        "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com"
-    }
-    resp = requests.get(url, headers=headers, params={"video_id": video_id}, timeout=10)
-    resp.raise_for_status()
-    data = resp.json()
-    if isinstance(data, list) and data:
+    headers = {"x-rapidapi-key": rapid_api_key, "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com"}
+    querystring = {"video_id": video_id}
+    response = requests.get(url, headers=headers, params=querystring, timeout=10)
+    response.raise_for_status()
+    transcript_data = response.json()
+
+    if isinstance(transcript_data, list) and transcript_data:
         bt.logging.info("Transcript fetched successfully")
-        return data[0].get("transcription", [])
-    if isinstance(data, dict) and data.get("error") == "This video has no subtitles.":
+        return transcript_data[0].get("transcription", [])
+    elif isinstance(transcript_data, dict) and transcript_data.get("error") == "This video has no subtitles.":
         bt.logging.warning("No subtitles available for video")
         raise Exception("No subtitles available")
-    bt.logging.warning(f"Error retrieving transcript: {data}")
-    raise Exception("Error retrieving transcript")
+    else:
+        bt.logging.warning(f"Error retrieving transcript: {transcript_data}")
+        raise Exception("Error retrieving transcript")
 
 def get_video_transcript(video_id, rapid_api_key):
     """Get video transcript with error handling."""
