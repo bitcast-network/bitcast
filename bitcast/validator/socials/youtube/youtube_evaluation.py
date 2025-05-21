@@ -16,6 +16,7 @@ from bitcast.validator.utils.config import (
     YT_VIDEO_RELEASE_BUFFER,
     ECO_MODE
 )
+from bitcast.validator.socials.youtube.config import get_youtube_metrics
 from bitcast.validator.utils.blacklist import is_blacklisted
 
 def vet_channel(channel_data, channel_analytics):
@@ -127,11 +128,12 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     """Process the vetting of a single video."""
     # Get video data and analytics
     video_data = youtube_utils.get_video_data(youtube_data_client, video_id, DISCRETE_MODE)
-    video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id)
     
-    # Get additional analytics data
-    additional_analytics = youtube_utils.get_additional_video_analytics(youtube_analytics_client, video_id, ECO_MODE=ECO_MODE)
-    video_analytics.update(additional_analytics)
+    # Get all metrics from config using the helper function
+    all_metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=False)
+    
+    # Get all analytics in a single call
+    video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
     
     # Calculate scorable proportion and add it to video analytics
     video_analytics['scorable_proportion'] = calculate_scorable_proportion(video_analytics)
@@ -341,9 +343,23 @@ def calculate_video_score(video_id, youtube_analytics_client):
     end_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY)).strftime('%Y-%m-%d')
     today = datetime.now().strftime('%Y-%m-%d')
 
-    # Get all analytics data from start_date to today
-    daily_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, start_date, today, dimensions='day')
-
+    # Get daily metrics from config
+    metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=True)    
+    # Get analytics with the new day_metrics structure
+    analytics_result = youtube_utils.get_video_analytics(
+        youtube_analytics_client, 
+        video_id, 
+        start_date, 
+        today, 
+        metric_dims=metric_dims
+    )
+    
+    # Extract the daily metrics list
+    daily_analytics = list(analytics_result.get("day_metrics", {}).values())
+    
+    # Sort by date
+    daily_analytics = sorted(daily_analytics, key=lambda x: x.get("day", ""))
+    
     # Calculate score using only the data between start_date and end_date
     scoreable_days = [item for item in daily_analytics if item.get('day', '') <= end_date]
     total_minutes_watched = sum(item.get('estimatedMinutesWatched', 0) for item in scoreable_days)

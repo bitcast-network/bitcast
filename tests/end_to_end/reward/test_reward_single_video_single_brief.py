@@ -294,7 +294,89 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     mock_get_video_data.side_effect = mock_get_video_data_side_effect
     
     # Note: The hardcoded dates (2023-01-15, 2023-01-16) in the mock data are not significant.
-    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None):
+    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, metric_dims=None, dimensions=None):
+        # Handle the new metric_dims parameter
+        if metric_dims:
+            # Check if this is a daily metrics request
+            has_day_dimension = any('day' in dims for _, dims in metric_dims.values() if dims)
+            
+            if has_day_dimension:
+                # Create a day_metrics structure
+                day_metrics = {
+                    "2023-01-15": {
+                        "day": "2023-01-15",
+                        "estimatedMinutesWatched": 500,
+                        "views": 250,
+                        "likes": 100,
+                        "comments": 20,
+                        "shares": 10,
+                        "averageViewDuration": 180,
+                        "averageViewPercentage": 50
+                    },
+                    "2023-01-16": {
+                        "day": "2023-01-16",
+                        "estimatedMinutesWatched": 500,
+                        "views": 250,
+                        "likes": 100,
+                        "comments": 20,
+                        "shares": 10,
+                        "averageViewDuration": 180,
+                        "averageViewPercentage": 50
+                    }
+                }
+                
+                result = {
+                    # Make sure averageViewPercentage is included at the top level for vetting
+                    "averageViewPercentage": 50,
+                    "estimatedMinutesWatched": 1000,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                }
+                
+                # Add basic day metrics
+                for key, (metric, dims) in metric_dims.items():
+                    if dims == "day":
+                        result[key] = {
+                            "2023-01-15": 500 if metric == "estimatedMinutesWatched" else 250,
+                            "2023-01-16": 500 if metric == "estimatedMinutesWatched" else 250
+                        }
+                
+                # Add complex day metrics (like deviceType)
+                for key, (metric, dims) in metric_dims.items():
+                    if dims and "," in dims and "day" in dims:
+                        # For complex metrics like deviceTypeMinutes
+                        if key == "deviceTypeMinutes":
+                            result[key] = {
+                                "DESKTOP|2023-01-15": 400,
+                                "MOBILE|2023-01-15": 100,
+                                "DESKTOP|2023-01-16": 400,
+                                "MOBILE|2023-01-16": 100
+                            }
+                        elif key == "operatingSystemMinutes":
+                            result[key] = {
+                                "WINDOWS|2023-01-15": 300,
+                                "ANDROID|2023-01-15": 200,
+                                "WINDOWS|2023-01-16": 300,
+                                "ANDROID|2023-01-16": 200
+                            }
+                
+                # Add the day_metrics structure
+                result["day_metrics"] = day_metrics
+                return result
+            else:
+                # Return general analytics
+                return {
+                    "views": 500,
+                    "comments": 40,
+                    "likes": 200, 
+                    "dislikes": 10,
+                    "shares": 20,
+                    "averageViewDuration": 180,
+                    "averageViewPercentage": 50,
+                    "estimatedMinutesWatched": 1000,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                }
+        
+        # Legacy format support for backward compatibility
         if dimensions == 'day':
             return [
                 {
@@ -309,8 +391,7 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
         else:
             return {
                 "averageViewPercentage": 50,
-                "estimatedMinutesWatched": 1000,
-                "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500},
+                "estimatedMinutesWatched": 1000
             }
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect

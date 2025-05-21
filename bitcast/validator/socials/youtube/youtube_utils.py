@@ -228,75 +228,124 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
         "privacyStatus": info["status"]["privacyStatus"]
     }
 
-@retry(**YT_API_RETRY_CONFIG)
-def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, dimensions=""):
-    """Get comprehensive video analytics including traffic sources."""
+def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, metric_dims=None):
+    """Get video analytics based on specified metric-dimension combinations.
+    
+    Args:
+        youtube_analytics_client: The YouTube Analytics API client
+        video_id: The YouTube video ID
+        start_date: Start date for analytics (defaults to 1 year ago)
+        end_date: End date for analytics (defaults to today)
+        metric_dims: Dictionary of {output_key: (metric, dimensions)} to fetch
+                    If None, raises ValueError
+    
+    Returns:
+        Dictionary of analytics results keyed by the provided output_keys
+    """
+    if metric_dims is None:
+        raise ValueError("metric_dims parameter is required")
+        
     end = end_date or datetime.today().strftime('%Y-%m-%d')
     start = start_date or (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
-    metrics = ",".join([
-        "views","comments","likes","dislikes","shares",
-        "averageViewDuration","averageViewPercentage","estimatedMinutesWatched"
-    ])
-    resp = youtube_analytics_client.reports().query(
-        ids="channel==MINE",
-        startDate=start,
-        endDate=end,
-        dimensions=dimensions,
-        metrics=metrics,
-        filters=f"video=={video_id}"
-    ).execute()
-    rows = resp.get("rows")
-    if not rows:
-        bt.logging.warning("No analytics data found for video")
-        return [] if dimensions else {}
-    names = metrics.split(",")
-    if dimensions:
-        results = []
-        dims_keys = dimensions.split(",")
-        for r in rows:
-            dims, vals = r[:len(dims_keys)], r[len(dims_keys):]
-            d = dict(zip(names, vals))
-            for i, dkey in enumerate(dims_keys):
-                d[dkey] = dims[i]
-            results.append(d)
-        return results
-    return dict(zip(names, rows[0]))
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_additional_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, ECO_MODE=False):
-    """Get additional video analytics including traffic sources and country data."""
-    end = end_date or datetime.today().strftime('%Y-%m-%d')
-    start = start_date or (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
-    out = {
-        "trafficSourceMinutes": _query(
-            youtube_analytics_client, start, end,
-            "estimatedMinutesWatched", "insightTrafficSourceType,day",
-            filters=f"video=={video_id}"
-        )
-    }
-    if ECO_MODE:
-        return out
-
-    metric_dims = {
-        "countryMinutes":                   ("estimatedMinutesWatched", "country"),
-        "creatorContentTypeMinutes":        ("estimatedMinutesWatched", "creatorContentType"),
-        "playbackLocationMinutes":          ("estimatedMinutesWatched", "insightPlaybackLocationType"),
-        "avgViewPercentageByTrafficSource": ("averageViewPercentage", "insightTrafficSourceType"),
-        "liveOrOnDemandMinutes":            ("estimatedMinutesWatched", "liveOrOnDemand"),
-        "youtubeProductMinutes":            ("estimatedMinutesWatched", "youtubeProduct"),
-        "deviceTypeMinutes":                ("estimatedMinutesWatched", "deviceType"),
-        "operatingSystemMinutes":           ("estimatedMinutesWatched", "operatingSystem"),
-        "ageGroupViewerPercentage":         ("viewerPercentage", "ageGroup,gender"),
-        "elapsedVideoTimeRatioAudienceWatchRatio": ("audienceWatchRatio", "elapsedVideoTimeRatio"),
-        "sharingServiceShares":             ("shares", "sharingService")
-    }
-    for key, (metric, dims) in metric_dims.items():
-        out[key] = _query(
-            youtube_analytics_client, start, end,
-            metric, dims,
-            filters=f"video=={video_id}"
-        )
-    return out
+    
+    results = {}
+    day_structured_data = {}
+    
+    # Track all metrics with simple "day" dimension
+    day_metrics = {}
+    has_day_dimension = False
+    
+    for key, (metric, dims) in metric_dims.items():  
+        
+        try:
+            query_result = _query(
+                youtube_analytics_client, start, end,
+                metric, dims,
+                filters=f"video=={video_id}"
+            )
+            
+            # Handle scalar values for metrics with no dimensions
+            if not dims and isinstance(query_result, list) and query_result:
+                results[key] = query_result[0]
+            # Handle simple day dimension (just "day")
+            elif dims == "day":
+                has_day_dimension = True
+                # Store the daily data for later use
+                day_metrics[key] = query_result
+                results[key] = query_result
+            # Handle multi-dimensional data that includes day
+            elif dims and "day" in dims and "," in dims:
+                has_day_dimension = True
+                # This is a complex field with day and another dimension
+                other_dim = dims.replace("day", "").replace(",", "")
+                
+                # Skip empty results
+                if not query_result or not isinstance(query_result, dict):
+                    results[key] = {}
+                    continue
+                    
+                # Create a nested structure where data is organized by day first
+                day_data = {}
+                for combined_key, value in query_result.items():
+                    # Split the combined key (e.g., "DESKTOP|2025-05-12")
+                    parts = combined_key.split('|')
+                    if len(parts) == 2:
+                        dimension_value = parts[0]
+                        day = parts[1]
+                        
+                        # Initialize nested dictionaries
+                        if day not in day_data:
+                            day_data[day] = {}
+                        
+                        # Add data
+                        day_data[day][dimension_value] = value
+                
+                # Store the day-structured data for later merge
+                day_structured_data[key] = day_data
+                
+                # Also store the original data
+                results[key] = query_result
+            else:
+                # Standard result
+                results[key] = query_result
+        except Exception as e:
+            bt.logging.warning(f"Failed to retrieve {key} analytics: {_format_error(e)}")
+            results[key] = None
+    
+    # Consolidate day-structured data if there are any day dimensions
+    if has_day_dimension:
+        # Create a day_metrics entry for uniform access
+        results["day_metrics"] = {}
+        
+        # Collect all days from both simple and complex day metrics
+        all_days = set()
+        
+        # Add days from day_metrics (simple "day" dimension)
+        for metric_data in day_metrics.values():
+            if isinstance(metric_data, dict):
+                all_days.update(metric_data.keys())
+        
+        # Add days from day_structured_data (complex dimensions with "day")
+        for day_dict in day_structured_data.values():
+            all_days.update(day_dict.keys())
+        
+        # Create entries for each day
+        for day in sorted(all_days):
+            day_entry = {"day": day}
+            
+            # Add simple metrics with day dimension
+            for key, data in day_metrics.items():
+                if isinstance(data, dict):
+                    day_entry[key] = data.get(day, 0)
+            
+            # Add complex metrics
+            for key, day_data in day_structured_data.items():
+                if day in day_data:
+                    day_entry[key] = day_data[day]
+            
+            results["day_metrics"][day] = day_entry
+    
+    return results
 
 # ============================================================================
 # Transcript Functions

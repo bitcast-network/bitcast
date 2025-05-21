@@ -317,7 +317,92 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     
     mock_get_video_data.side_effect = mock_get_video_data_side_effect
     
-    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None):
+    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, metric_dims=None, dimensions=None):
+        # Handle the new metric_dims parameter
+        if metric_dims:
+            # Check if this is a daily metrics request
+            has_day_dimension = any('day' in dims for _, dims in metric_dims.values() if dims)
+            
+            if has_day_dimension:
+                # Create day_metrics structure
+                day_metrics = {
+                    "2023-01-15": {
+                        "day": "2023-01-15",
+                        "estimatedMinutesWatched": 500,
+                        "views": 250,
+                        "averageViewPercentage": 50
+                    },
+                    "2023-01-16": {
+                        "day": "2023-01-16",
+                        "estimatedMinutesWatched": 500,
+                        "views": 250,
+                        "averageViewPercentage": 50
+                    }
+                }
+                
+                # Different metrics for each video
+                if video_id == "test_video_1":
+                    result = {
+                        "averageViewPercentage": 50,
+                        "estimatedMinutesWatched": 1000,
+                        "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                    }
+                else:  # test_video_2
+                    result = {
+                        "averageViewPercentage": 55,
+                        "estimatedMinutesWatched": 1200,
+                        "trafficSourceMinutes": {"YT_CHANNEL": 700, "EXT_URL": 500}
+                    }
+                
+                # Add basic day metrics
+                for key, (metric, dims) in metric_dims.items():
+                    if dims == "day":
+                        if metric == "estimatedMinutesWatched":
+                            if video_id == "test_video_1":
+                                result[key] = {
+                                    "2023-01-15": 500,
+                                    "2023-01-16": 500
+                                }
+                            else:  # test_video_2
+                                result[key] = {
+                                    "2023-01-15": 600,
+                                    "2023-01-16": 600
+                                }
+                        else:
+                            result[key] = {
+                                "2023-01-15": 250,
+                                "2023-01-16": 250
+                            }
+                
+                # Add the day_metrics structure
+                result["day_metrics"] = day_metrics
+                return result
+            else:
+                # Return general analytics
+                if video_id == "test_video_1":
+                    return {
+                        "views": 500,
+                        "comments": 40,
+                        "likes": 200, 
+                        "shares": 20,
+                        "averageViewDuration": 180,
+                        "averageViewPercentage": 50,
+                        "estimatedMinutesWatched": 1000,
+                        "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                    }
+                else:  # test_video_2
+                    return {
+                        "views": 600,
+                        "comments": 50,
+                        "likes": 250, 
+                        "shares": 30,
+                        "averageViewDuration": 200,
+                        "averageViewPercentage": 55,
+                        "estimatedMinutesWatched": 1200,
+                        "trafficSourceMinutes": {"YT_CHANNEL": 700, "EXT_URL": 500}
+                    }
+        
+        # Legacy format support for backward compatibility
         if dimensions == 'day':
             return [
                 {
@@ -333,13 +418,11 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             video_metrics = {
                 "test_video_1": {
                     "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 1000,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                    "estimatedMinutesWatched": 1000
                 },
                 "test_video_2": {
                     "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 1200,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 700, "EXT_URL": 500}
+                    "estimatedMinutesWatched": 1200
                 }
             }
             return video_metrics[video_id]
