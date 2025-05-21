@@ -62,15 +62,17 @@ def _query(client, start_date, end_date, metric, dimensions=None, filters=None):
     resp = client.reports().query(**params).execute()
     rows = resp.get("rows") or []
     if not rows:
-        return {}
+        return {} if dimensions else []
+    
+    if not dimensions:
+        # Return the row directly for non-dimensional queries
+        return rows[0]
+        
+    # For dimensional queries, create a dictionary
     data = {}
     for row in rows:
-        if dimensions:
-            dims, val = row[:-1], row[-1]
-            key = "|".join(dims) if len(dims) > 1 else dims[0]
-        else:
-            val = row
-            key = None
+        dims, val = row[:-1], row[-1]
+        key = "|".join(str(d) for d in dims) if len(dims) > 1 else str(dims[0])
         data[key] = val
     return data
 
@@ -246,7 +248,7 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     rows = resp.get("rows")
     if not rows:
         bt.logging.warning("No analytics data found for video")
-        return {} if not dimensions else []
+        return [] if dimensions else {}
     names = metrics.split(",")
     if dimensions:
         results = []
