@@ -82,7 +82,7 @@ def _make_openai_request(client, **kwargs):
 def evaluate_content_against_brief(brief, duration, description, transcript):
     """
     Evaluate the transcript against the brief using OpenAI GPT-4 to determine if the content meets the brief.
-    Returns True if the content meets the brief, otherwise False.
+    Returns a tuple of (bool, str) where bool indicates if the content meets the brief, and str is the reasoning.
     """
     prompt_content = (
         "///// BRIEF /////\n"
@@ -103,10 +103,12 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
     try:
         cache = None if DISABLE_LLM_CACHING else OpenaiClient.get_cache()
         if cache is not None and prompt_content in cache:
-            meets_brief = cache[prompt_content]
+            cached_result = cache[prompt_content]
+            meets_brief = cached_result["meets_brief"]
+            reasoning = cached_result["reasoning"]
             emoji = "✅" if meets_brief else "❌"
             bt.logging.info(f"Meets brief '{brief['id']}': {meets_brief} {emoji} (cache)")
-            return meets_brief
+            return meets_brief, reasoning
 
         # Define response format
         class DecisionResponse(BaseModel):
@@ -124,21 +126,22 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
         )
         
         meets_brief = response.choices[0].message.parsed.meets_brief
+        reasoning = response.choices[0].message.parsed.reasoning
 
         if cache is not None:
             with OpenaiClient._cache_lock:
-                cache.set(prompt_content, meets_brief, expire=86400)  # 1 day cache
+                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=86400)  # 1 day cache
 
         emoji = "✅" if meets_brief else "❌"
         bt.logging.info(f"Brief {brief['id']} met: {meets_brief} {emoji}")
-        return meets_brief
+        return meets_brief, reasoning
 
     except APIError as e:
         bt.logging.error(f"OpenAI API error: {e}")
-        return False
+        return False, f"Error during evaluation: {str(e)}"
     except Exception as e:
         bt.logging.error(f"Unexpected error during brief evaluation: {e}")
-        return False
+        return False, f"Unexpected error: {str(e)}"
 
 def check_for_prompt_injection(description, transcript):
     """

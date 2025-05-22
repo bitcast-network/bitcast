@@ -38,7 +38,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED
+        YT_MIN_MINS_WATCHED,
+        YT_REWARD_DELAY,
+        YT_ROLLING_WINDOW
     )
 
 # Set up logging
@@ -292,23 +294,81 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     
     mock_get_video_data.side_effect = mock_get_video_data_side_effect
     
-    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None):
+    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, metric_dims=None, dimensions=None):
+        # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+        today = datetime.now()
+        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
+        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+        
+        # Handle the new metric_dims parameter
+        if metric_dims:
+            # Check if this is a daily metrics request
+            has_day_dimension = any('day' in dims for _, dims in metric_dims.values() if dims)
+            
+            if has_day_dimension:
+                # Create day_metrics structure
+                day_metrics = {
+                    day1: {
+                        "day": day1,
+                        "estimatedMinutesWatched": 500,
+                        "views": 250,
+                        "averageViewPercentage": 50
+                    },
+                    day2: {
+                        "day": day2,
+                        "estimatedMinutesWatched": 500,
+                        "views": 250,
+                        "averageViewPercentage": 50
+                    }
+                }
+                
+                result = {
+                    # Include averageViewPercentage at top level for vetting
+                    "averageViewPercentage": 50,
+                    "estimatedMinutesWatched": 1000,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                }
+                
+                # Add basic day metrics
+                for key, (metric, dims) in metric_dims.items():
+                    if dims == "day":
+                        result[key] = {
+                            day1: 500 if metric == "estimatedMinutesWatched" else 250,
+                            day2: 500 if metric == "estimatedMinutesWatched" else 250
+                        }
+                
+                # Add the day_metrics structure
+                result["day_metrics"] = day_metrics
+                return result
+            else:
+                # Return general analytics
+                return {
+                    "views": 500,
+                    "comments": 40,
+                    "likes": 200, 
+                    "shares": 20,
+                    "averageViewDuration": 180,
+                    "averageViewPercentage": 50,
+                    "estimatedMinutesWatched": 1000,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                }
+        
+        # Legacy format support for backward compatibility
         if dimensions == 'day':
             return [
                 {
-                    "day": "2023-01-15",
+                    "day": day1,
                     "estimatedMinutesWatched": 500
                 },
                 {
-                    "day": "2023-01-16",
+                    "day": day2,
                     "estimatedMinutesWatched": 500
                 }
             ]
         else:
             return {
                 "averageViewPercentage": 50,
-                "estimatedMinutesWatched": 1000,
-                "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500},
+                "estimatedMinutesWatched": 1000
             }
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect

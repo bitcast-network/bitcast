@@ -12,9 +12,17 @@ Technical Scoring Details:
   * Video 2: 250 minutes watched, matches both Briefs
   * Video 3: 100 minutes watched, matches neither Brief
   * Video 4: 300 minutes watched, matches Brief 2
+
+- UID 1 has videos with organic traffic (100% scorable_proportion)
+- UID 2 has videos with 30% advertising traffic (70% scorable_proportion)
+
 - Final scores:
-  * Brief 1: 850 minutes (600 + 250)
-  * Brief 2: 550 minutes (250 + 300)
+  * Brief 1: 
+    - UID 1: 1275 minutes (900 + 375, 100% scorable)
+    - UID 2: 595 minutes (850 minutes × 70% scorable_proportion)
+  * Brief 2: 
+    - UID 1: 825 minutes (375 + 450, 100% scorable)
+    - UID 2: 385 minutes (550 minutes × 70% scorable_proportion)
 """
 
 import pytest
@@ -44,7 +52,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         YT_MIN_SUBS,
         YT_MIN_CHANNEL_AGE,
         YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED
+        YT_MIN_MINS_WATCHED,
+        YT_REWARD_DELAY,
+        YT_ROLLING_WINDOW
     )
 
 # Set up logging
@@ -245,12 +255,11 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_additional_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
-                        mock_get_additional_video_analytics, mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
+                        mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
                         mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
     """Test the get_rewards function end-to-end with a single miner and UID 0"""
     
@@ -453,123 +462,167 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
     
     mock_get_video_data.side_effect = mock_get_video_data_side_effect
     
-    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None):
-        logger.info(f"get_video_analytics called with video_id: {video_id}, dimensions: {dimensions}")
-        if dimensions == 'day':
-            # For day-based analytics, split the total watch time across days
-            video_day_metrics = {
-                # UID 1's videos (50% more watch time)
-                "test_video_1_uid1": 900,  # 600 * 1.5
-                "test_video_2_uid1": 375,  # 250 * 1.5
-                "test_video_3_uid1": 150,  # 100 * 1.5
-                "test_video_4_uid1": 450,  # 300 * 1.5
-                # UID 2's videos (original watch time)
-                "test_video_1_uid2": 600,
-                "test_video_2_uid2": 250,
-                "test_video_3_uid2": 100,
-                "test_video_4_uid2": 300
-            }
-            total_minutes = video_day_metrics[video_id]
-            logger.info(f"Returning day metrics for {video_id}: {total_minutes} minutes")
-            half_minutes = total_minutes / 2
-            return [
-                {
-                    "day": "2023-01-15",
-                    "estimatedMinutesWatched": half_minutes
+    def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None, metric_dims=None):
+        logger.info(f"get_video_analytics called with video_id: {video_id}, dimensions: {dimensions}, metric_dims: {metric_dims}")
+        
+        # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+        today = datetime.now()
+        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
+        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+        
+        # Determine video watch time based on video ID
+        video_day_metrics = {
+            # UID 1's videos (50% more watch time)
+            "test_video_1_uid1": 900,  # 600 * 1.5
+            "test_video_2_uid1": 375,  # 250 * 1.5
+            "test_video_3_uid1": 150,  # 100 * 1.5
+            "test_video_4_uid1": 450,  # 300 * 1.5
+            # UID 2's videos (original watch time)
+            "test_video_1_uid2": 600,
+            "test_video_2_uid2": 250,
+            "test_video_3_uid2": 100,
+            "test_video_4_uid2": 300
+        }
+        total_minutes = video_day_metrics.get(video_id, 0)
+        half_minutes = total_minutes / 2
+        
+        # Create appropriate day_metrics structure based on UID
+        day_metrics = {}
+        
+        # For UID 2, include advertising in the day metrics (30% advertising, 70% organic)
+        if "uid2" in video_id:
+            day_metrics = {
+                day1: {
+                    "day": day1,
+                    "estimatedMinutesWatched": half_minutes,
+                    "trafficSourceMinutes": {
+                        "YT_CHANNEL": half_minutes * 0.7,
+                        "ADVERTISING": half_minutes * 0.3
+                    }
                 },
-                {
-                    "day": "2023-01-16",
-                    "estimatedMinutesWatched": half_minutes
+                day2: {
+                    "day": day2,
+                    "estimatedMinutesWatched": half_minutes,
+                    "trafficSourceMinutes": {
+                        "YT_CHANNEL": half_minutes * 0.7,
+                        "ADVERTISING": half_minutes * 0.3
+                    }
                 }
-            ]
+            }
         else:
-            # For overall metrics, return the total watch time
-            video_metrics = {
-                # UID 1's videos (50% more watch time)
-                "test_video_1_uid1": {
-                    "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 900,  # 600 * 1.5
+            # UID 1 has 100% organic traffic
+            day_metrics = {
+                day1: {
+                    "day": day1,
+                    "estimatedMinutesWatched": half_minutes,
                 },
-                "test_video_2_uid1": {
-                    "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 375,  # 250 * 1.5
-                },
-                "test_video_3_uid1": {
-                    "averageViewPercentage": 45,
-                    "estimatedMinutesWatched": 150,  # 100 * 1.5
-                },
-                "test_video_4_uid1": {
-                    "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 450,  # 300 * 1.5
-                },
-                # UID 2's videos (original watch time)
-                "test_video_1_uid2": {
-                    "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 600,
-                },
-                "test_video_2_uid2": {
-                    "averageViewPercentage": 55,
-                    "estimatedMinutesWatched": 250,
-                },
-                "test_video_3_uid2": {
-                    "averageViewPercentage": 45,
-                    "estimatedMinutesWatched": 100,
-                },
-                "test_video_4_uid2": {
-                    "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 300,
+                day2: {
+                    "day": day2,
+                    "estimatedMinutesWatched": half_minutes,
                 }
             }
-            result = video_metrics[video_id]
+        
+        # Handle metric_dims parameter (modern approach)
+        if metric_dims:
+            # Create result with top-level metrics for vetting
+            result = {
+                "averageViewPercentage": 50,
+                "estimatedMinutesWatched": total_minutes,
+                "day_metrics": day_metrics
+            }
+            
+            # Add metrics for each requested metric
+            for key, (metric, dims) in metric_dims.items():
+                if dims == "day":
+                    if metric == "estimatedMinutesWatched":
+                        result[key] = {
+                            day1: half_minutes,
+                            day2: half_minutes
+                        }
+                    else:
+                        result[key] = {
+                            day1: half_minutes / 2,
+                            day2: half_minutes / 2
+                        }
+            
+            # Add trafficSourceMinutes with appropriate distribution
+            if "uid2" in video_id:
+                # 30% advertising for UID 2
+                result["trafficSourceMinutes"] = {
+                    "YT_CHANNEL": total_minutes * 0.7,
+                    "ADVERTISING": total_minutes * 0.3
+                }
+            else:
+                # No advertising for UID 1
+                result["trafficSourceMinutes"] = {
+                    "YT_CHANNEL": total_minutes / 2,
+                    "EXT_URL": total_minutes / 2
+                }
+            
+            logger.info(f"Returning day metrics structure for {video_id}: {result}")
+            return result
+        
+        # Legacy format support for backward compatibility (dimensions parameter)
+        elif dimensions == 'day':
+            # For day-based analytics, we need day-level traffic source data
+            if "uid2" in video_id:
+                yt_channel_minutes = half_minutes * 0.7
+                advertising_minutes = half_minutes * 0.3
+                
+                return [
+                    {
+                        "day": day1,
+                        "estimatedMinutesWatched": half_minutes,
+                        "trafficSourceMinutes": {
+                            "YT_CHANNEL": yt_channel_minutes,
+                            "ADVERTISING": advertising_minutes
+                        }
+                    },
+                    {
+                        "day": day2,
+                        "estimatedMinutesWatched": half_minutes,
+                        "trafficSourceMinutes": {
+                            "YT_CHANNEL": yt_channel_minutes,
+                            "ADVERTISING": advertising_minutes
+                        }
+                    }
+                ]
+            else:
+                # Original format for UID 1
+                return [
+                    {
+                        "day": day1,
+                        "estimatedMinutesWatched": half_minutes
+                    },
+                    {
+                        "day": day2,
+                        "estimatedMinutesWatched": half_minutes
+                    }
+                ]
+        else:
+            # For non-daily metrics, return the regular metrics
+            if "uid2" in video_id:
+                result = {
+                    "averageViewPercentage": 50,
+                    "estimatedMinutesWatched": total_minutes,
+                    "trafficSourceMinutes": {
+                        "YT_CHANNEL": total_minutes * 0.7,
+                        "ADVERTISING": total_minutes * 0.3
+                    }
+                }
+            else:
+                result = {
+                    "averageViewPercentage": 50,
+                    "estimatedMinutesWatched": total_minutes,
+                    "trafficSourceMinutes": {
+                        "YT_CHANNEL": total_minutes / 2,
+                        "EXT_URL": total_minutes / 2
+                    }
+                }
             logger.info(f"Returning overall metrics for {video_id}: {result}")
             return result
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect
-    
-    def mock_get_additional_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, ECO_MODE=False):
-        logger.info(f"get_additional_video_analytics called with video_id: {video_id}")
-        # For additional metrics, return the traffic source data
-        video_metrics = {
-            # UID 1's videos (50% more watch time)
-            "test_video_1_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 400, "EXT_URL": 500},
-                "scorable_proportion": 1.0
-            },
-            "test_video_2_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 175, "EXT_URL": 200},
-                "scorable_proportion": 1.0
-            },
-            "test_video_3_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 50, "EXT_URL": 100},
-                "scorable_proportion": 1.0
-            },
-            "test_video_4_uid1": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 250, "EXT_URL": 200},
-                "scorable_proportion": 1.0
-            },
-            # UID 2's videos (original watch time)
-            "test_video_1_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 300, "ADVERTISING": 300},
-                "scorable_proportion": 1.0
-            },
-            "test_video_2_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 100, "ADVERTISING": 150},
-                "scorable_proportion": 1.0
-            },
-            "test_video_3_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 40, "ADVERTISING": 60},
-                "scorable_proportion": 1.0
-            },
-            "test_video_4_uid2": {
-                "trafficSourceMinutes": {"YT_CHANNEL": 150, "ADVERTISING": 150},
-                "scorable_proportion": 1.0
-            }
-        }
-        result = video_metrics[video_id]
-        logger.info(f"Returning additional metrics for {video_id}: {result}")
-        return result
-    
-    mock_get_additional_video_analytics.side_effect = mock_get_additional_video_analytics_side_effect
     
     mock_get_transcript.return_value = "This is a test transcript"
     
@@ -644,16 +697,18 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
             # Call get_rewards
             result, yt_stats_list = get_rewards(mock_self, uids, responses)
         
-        # Verify the result is a numpy array
+        # Verify that the result is a numpy array
         assert isinstance(result, np.ndarray)
         
         # Since we have three miners and two briefs, and the briefs have max_burn=0:
         # 1. reward() gives UID 0 scores of 0
         # 2. scale_rewards() gives UID 0 0 reward when max_burn=0
-        # 3. UIDs 1 and 2 get rewards split based on watch time, with UID 2's advertising traffic discounted
-        expected_result = np.array([0.0, 0.764, 0.236])
+        # 3. UID 1 gets more reward due to UID 2 having 30% advertising traffic
+        # Calculation: UID 1 gets 1275 + 825 = 2100 minutes, UID 2 gets (850 + 550) * 0.7 = 980 minutes
+        # Proportional split: UID 1 gets 2100/(2100+980) = 0.68, UID 2 gets 980/(2100+980) = 0.32
+        expected_result = np.array([0.0, 0.68, 0.32])
         
-        # Check that the result matches the expected values (with higher tolerance for floating point)
+        # Check that the result matches the expected values (with some tolerance for floating point)
         np.testing.assert_allclose(result, expected_result, rtol=1e-2)
         
         # Verify that get_briefs was called
@@ -671,17 +726,16 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         assert yt_stats_list[0]["scores"]["brief1"] == 0
         assert yt_stats_list[0]["scores"]["brief2"] == 0
         
-        # UID 1 should have 50% more watch time than UID 2
+        # UID 1 should have 100% scorable traffic
         assert "scores" in yt_stats_list[1]
         assert "brief1" in yt_stats_list[1]["scores"]
         assert "brief2" in yt_stats_list[1]["scores"]
         assert yt_stats_list[1]["scores"]["brief1"] == 1275  # 900 + 375 minutes watched
         assert yt_stats_list[1]["scores"]["brief2"] == 825  # 375 + 450 minutes watched
         
-        # UID 2 should have scores based on non-advertising traffic
+        # UID 2 should have scores reduced by scorable_proportion of 0.7
         assert "scores" in yt_stats_list[2]
         assert "brief1" in yt_stats_list[2]["scores"]
         assert "brief2" in yt_stats_list[2]["scores"]
-        # Scores are calculated based on specific scorable proportions per video
-        assert yt_stats_list[2]["scores"]["brief1"] == 400  # 300 (video 1) + 100 (video 2)
-        assert yt_stats_list[2]["scores"]["brief2"] == 250  # 100 (video 2) + 150 (video 4)
+        assert yt_stats_list[2]["scores"]["brief1"] == 595  # (600 + 250) * 0.7 minutes watched
+        assert yt_stats_list[2]["scores"]["brief2"] == 385  # (250 + 300) * 0.7 minutes watched

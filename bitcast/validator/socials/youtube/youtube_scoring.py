@@ -179,6 +179,7 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
     
     result["videos"][video_id]["raw_score"] = video_score
     result["videos"][video_id]["score"] = scaled_score
+    result["videos"][video_id]["analytics"]["minutes_watched_w_lag"] = video_score_result["minutes_watched_w_lag"]
     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
     
     # Update the score for the matching brief

@@ -228,7 +228,7 @@ def test_eco_mode_disabled_full_pipeline():
          patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection', 
                return_value=True) as mock_prompt_injection, \
          patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs', 
-               return_value=["brief1"]) as mock_evaluate:
+               return_value=(["brief1"], ["Test reasoning"])) as mock_evaluate:
         
         result = vet_video(video_id, briefs, video_data, video_analytics)
         
@@ -244,6 +244,7 @@ def test_eco_mode_disabled_full_pipeline():
         # Verify successful result
         assert result["met_brief_ids"] == ["brief1"]
         assert result["decision_details"]["video_vet_result"] == True
+        assert result["brief_reasonings"] == ["Test reasoning"]
 
 
 # Test that the early_return flag is properly set when checks fail
@@ -267,7 +268,8 @@ def test_early_return_flag():
          patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript', 
                return_value="Mock transcript"), \
          patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection') as mock_prompt_injection, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs'):
+         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs',
+               return_value=([], [])) as mock_evaluate:
         
         # Set up mock to capture early_return value by storing it
         def side_effect(video_id, video_data, transcript, decision_details):
@@ -281,6 +283,8 @@ def test_early_return_flag():
         
         # Verify prompt injection check was called (indicating early_return was False)
         assert hasattr(mock_prompt_injection, "was_called")
+        # Verify the mock was called with the correct return value
+        mock_evaluate.assert_called_once()
 
 
 # Test for multiple failures in different checks with ECO_MODE
