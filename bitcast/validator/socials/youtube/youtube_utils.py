@@ -30,12 +30,12 @@ def reset_scored_videos():
     """
     global scored_video_ids
     scored_video_ids = []
-    bt.logging.info(f"Reset scored_video_ids list")
+    bt.logging.info("Reset scored_video_ids")
 
 def is_video_already_scored(video_id):
     """Check if a video has already been scored by another hotkey."""
     if video_id in scored_video_ids:
-        bt.logging.info(f"Video already scored by another hotkey")
+        bt.logging.info("Video already scored")
         return True
     return False
 
@@ -48,234 +48,179 @@ def mark_video_as_scored(video_id):
 # ============================================================================
 
 @retry(**YT_API_RETRY_CONFIG)
+def _query(client, start_date, end_date, metric, dimensions=None, filters=None):
+    params = {
+        'ids': 'channel==MINE',
+        'startDate': start_date,
+        'endDate': end_date,
+        'metrics': metric
+    }
+    if dimensions:
+        params['dimensions'] = dimensions
+    if filters:
+        params['filters'] = filters
+    resp = client.reports().query(**params).execute()
+    rows = resp.get("rows") or []
+    if not rows:
+        return {} if dimensions else []
+    
+    if not dimensions:
+        # Return the row directly for non-dimensional queries
+        return rows[0]
+        
+    # For dimensional queries, create a dictionary
+    data = {}
+    for row in rows:
+        dims, val = row[:-1], row[-1]
+        key = "|".join(str(d) for d in dims) if len(dims) > 1 else str(dims[0])
+        data[key] = val
+    return data
+
+@retry(**YT_API_RETRY_CONFIG)
+def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensions=None, filters=None):
+    """Query multiple metrics in a single API call and return split results.
+    
+    Args:
+        client: YouTube Analytics client
+        start_date: Start date for query
+        end_date: End date for query
+        metrics_list: List of metric names to fetch
+        dimensions: Dimensions for the query
+        filters: Filters for the query
+        
+    Returns:
+        Dictionary with metric names as keys and their respective results as values
+    """
+    metrics_str = ",".join(metrics_list)
+    params = {
+        'ids': 'channel==MINE',
+        'startDate': start_date,
+        'endDate': end_date,
+        'metrics': metrics_str
+    }
+    if dimensions:
+        params['dimensions'] = dimensions
+    if filters:
+        params['filters'] = filters
+    
+    resp = client.reports().query(**params).execute()
+    rows = resp.get("rows") or []
+    if not rows:
+        return {metric: ({} if dimensions else []) for metric in metrics_list}
+    
+    results = {}
+    
+    if not dimensions:
+        # For non-dimensional queries, return values by index
+        for i, metric in enumerate(metrics_list):
+            results[metric] = rows[0][i] if i < len(rows[0]) else 0
+    else:
+        # For dimensional queries, create dictionaries for each metric
+        for metric in metrics_list:
+            results[metric] = {}
+        
+        for row in rows:
+            # Split dimensions and metric values
+            num_dims = len(dimensions.split(",")) if dimensions else 0
+            dims, vals = row[:num_dims], row[num_dims:]
+            
+            # Create dimension key
+            key = "|".join(str(d) for d in dims) if len(dims) > 1 else str(dims[0])
+            
+            # Assign each metric value
+            for i, metric in enumerate(metrics_list):
+                if i < len(vals):
+                    results[metric][key] = vals[i]
+    
+    return results
+
+@retry(**YT_API_RETRY_CONFIG)
 def get_channel_data(youtube_data_client, discrete_mode=False):
     """Get basic channel information."""
-    account_info = youtube_data_client.channels().list(
+    resp = youtube_data_client.channels().list(
         part="snippet,contentDetails,statistics",
         mine=True
     ).execute()
-
-    channel_id = account_info['items'][0]['id']
-    if discrete_mode:
-        bitcast_channel_id = "bitcast_" + hashlib.sha256(channel_id.encode()).hexdigest()[:8]
-    else:
-        bitcast_channel_id = channel_id
-
-    channel_info = {
-        "title": account_info['items'][0]['snippet']['title'],
-        "id": channel_id,
-        "bitcastChannelId": bitcast_channel_id,
-        "channel_start": account_info['items'][0]['snippet']['publishedAt'],
-        "viewCount": account_info['items'][0]['statistics']['viewCount'],
-        "subCount": account_info['items'][0]['statistics']['subscriberCount'],
-        "videoCount": account_info['items'][0]['statistics']['videoCount'],
-        "url": f"https://www.youtube.com/channel/{channel_id}"
+    item = resp['items'][0]
+    cid = item['id']
+    bcid = ("bitcast_" + hashlib.sha256(cid.encode()).hexdigest()[:8]) if discrete_mode else cid
+    return {
+        "title": item['snippet']['title'],
+        "id": cid,
+        "bitcastChannelId": bcid,
+        "channel_start": item['snippet']['publishedAt'],
+        "viewCount": item['statistics']['viewCount'],
+        "subCount": item['statistics']['subscriberCount'],
+        "videoCount": item['statistics']['videoCount'],
+        "url": f"https://www.youtube.com/channel/{cid}"
     }
-
-    return channel_info
 
 @retry(**YT_API_RETRY_CONFIG)
 def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, dimensions=""):
     """Get comprehensive channel analytics including traffic sources."""
-    if end_date is None:
-        end_date = datetime.today().strftime('%Y-%m-%d')
-        
-    # Define metrics in a consistent order
-    metrics_list = "views,comments,likes,dislikes,shares,averageViewDuration,averageViewPercentage,subscribersGained,subscribersLost,estimatedMinutesWatched"
-    
-    analytics_response = youtube_analytics_client.reports().query(
+    end = end_date or datetime.today().strftime('%Y-%m-%d')
+    metrics = ",".join([
+        "views","comments","likes","dislikes","shares",
+        "averageViewDuration","averageViewPercentage",
+        "subscribersGained","subscribersLost","estimatedMinutesWatched"
+    ])
+    resp = youtube_analytics_client.reports().query(
         ids="channel==MINE",
         startDate=start_date,
-        endDate=end_date,
+        endDate=end,
         dimensions=dimensions,
-        metrics=metrics_list
-        ).execute()
-
-    if not analytics_response.get("rows"):
+        metrics=metrics
+    ).execute()
+    rows = resp.get("rows")
+    if not rows:
         raise Exception("No channel analytics data found.")
-
-    # Define metric names in the same order as the metrics_list
-    metric_names = [
-        "views", "comments", "likes", "dislikes", "shares", 
-        "averageViewDuration", "averageViewPercentage", 
-        "subscribersGained", "subscribersLost", "estimatedMinutesWatched"
-    ]
-
+    names = metrics.split(",")
     if dimensions:
-        # Handle the case where dimensions are present
-        analytics_info = []
-        for row in analytics_response.get("rows", []):
-            dimension_values = row[:len(dimensions.split(','))]
-            metrics = dict(zip(metric_names, row[len(dimension_values):]))
-            for i, dimension in enumerate(dimensions.split(',')):
-                metrics[dimension] = dimension_values[i]
-            analytics_info.append(metrics)
+        info = []
+        dims_keys = dimensions.split(",")
+        for row in rows:
+            dims, vals = row[:len(dims_keys)], row[len(dims_keys):]
+            entry = dict(zip(names, vals))
+            for i, d in enumerate(dims_keys):
+                entry[d] = dims[i]
+            info.append(entry)
     else:
-        # Handle the case where no dimensions are present
-        analytics_data = analytics_response["rows"][0]
-        analytics_info = dict(zip(metric_names, analytics_data))
+        info = dict(zip(names, rows[0]))
 
-    # Get traffic source data for views
-    traffic_source_views = get_traffic_source_views_analytics(youtube_analytics_client, start_date, end_date)
-    # Get traffic source data for minutes watched
-    traffic_source_minutes = get_traffic_source_minutes_analytics(youtube_analytics_client, start_date, end_date)
-    # Get country data for views
-    country_views = get_country_views_analytics(youtube_analytics_client, start_date, end_date)
-    # Get country data for minutes watched
-    country_minutes = get_country_minutes_analytics(youtube_analytics_client, start_date, end_date)
+    # Consolidate API calls for traffic source data
+    traffic_data = _query_multiple_metrics(
+        youtube_analytics_client, start_date, end, 
+        ["views", "estimatedMinutesWatched"], 
+        "insightTrafficSourceType"
+    )
     
-    # Get subscribers gained including 30 days prior if dimensions is "day"
-    if dimensions == "day":
-        past_date = (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-    else:
-        past_date = start_date
-    subscribers_gained = get_subscribers_gained_analytics(youtube_analytics_client, past_date, end_date)
+    # Consolidate API calls for country data
+    country_data = _query_multiple_metrics(
+        youtube_analytics_client, start_date, end,
+        ["views", "estimatedMinutesWatched"],
+        "country"
+    )
     
-    if isinstance(analytics_info, dict):
-        analytics_info["trafficSourceViews"] = traffic_source_views
-        analytics_info["trafficSourceMinutes"] = traffic_source_minutes
-        analytics_info["countryViews"] = country_views
-        analytics_info["countryMinutes"] = country_minutes
-        analytics_info["subscribersGained"] = subscribers_gained
+    # Keep subscriber data separate due to different date range
+    past = (
+        (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
+        if dimensions == "day" else start_date
+    )
+    subs = _query(youtube_analytics_client, past, end, "subscribersGained", "day")
+
+    extras = {
+        "trafficSourceViews":   traffic_data["views"],
+        "trafficSourceMinutes": traffic_data["estimatedMinutesWatched"],
+        "countryViews":         country_data["views"],
+        "countryMinutes":       country_data["estimatedMinutesWatched"],
+        "subscribersGained":    subs
+    }
+    if isinstance(info, dict):
+        info.update(extras)
     else:
-        for entry in analytics_info:
-            entry["trafficSourceViews"] = traffic_source_views
-            entry["trafficSourceMinutes"] = traffic_source_minutes
-            entry["countryViews"] = country_views
-            entry["countryMinutes"] = country_minutes
-            entry["subscribersGained"] = subscribers_gained
-
-    return analytics_info
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_traffic_source_views_analytics(youtube_analytics_client, start_date, end_date):
-    """Get traffic source analytics for views."""
-    try:
-        traffic_response = youtube_analytics_client.reports().query(
-            ids="channel==MINE",
-            startDate=start_date,
-            endDate=end_date,
-            dimensions="insightTrafficSourceType",
-            metrics="views"
-        ).execute()
-
-        if not traffic_response.get("rows"):
-            return {}
-
-        traffic_sources = {}
-        for row in traffic_response.get("rows", []):
-            source_type = row[0]
-            views = row[1]
-            traffic_sources[source_type] = views
-
-        return traffic_sources
-    except Exception as e:
-        bt.logging.warning(f"Error getting traffic source views analytics: {_format_error(e)}")
-        return {}
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_traffic_source_minutes_analytics(youtube_analytics_client, start_date, end_date):
-    """Get traffic source analytics for minutes watched."""
-    try:
-        traffic_response = youtube_analytics_client.reports().query(
-            ids="channel==MINE",
-            startDate=start_date,
-            endDate=end_date,
-            dimensions="insightTrafficSourceType",
-            metrics="estimatedMinutesWatched"
-        ).execute()
-
-        if not traffic_response.get("rows"):
-            return {}
-
-        traffic_sources = {}
-        for row in traffic_response.get("rows", []):
-            source_type = row[0]
-            minutes = row[1]
-            traffic_sources[source_type] = minutes
-
-        return traffic_sources
-    except Exception as e:
-        bt.logging.warning(f"Error getting traffic source minutes analytics: {_format_error(e)}")
-        return {}
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_country_views_analytics(youtube_analytics_client, start_date, end_date):
-    """Get views analytics by country."""
-    try:
-        country_response = youtube_analytics_client.reports().query(
-            ids="channel==MINE",
-            startDate=start_date,
-            endDate=end_date,
-            dimensions="country",
-            metrics="views"
-        ).execute()
-
-        if not country_response.get("rows"):
-            return {}
-
-        country_data = {}
-        for row in country_response.get("rows", []):
-            country_code = row[0]
-            views = row[1]
-            country_data[country_code] = views
-
-        return country_data
-    except Exception as e:
-        bt.logging.warning(f"Error getting country views analytics: {_format_error(e)}")
-        return {}
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_country_minutes_analytics(youtube_analytics_client, start_date, end_date):
-    """Get minutes watched analytics by country."""
-    try:
-        country_response = youtube_analytics_client.reports().query(
-            ids="channel==MINE",
-            startDate=start_date,
-            endDate=end_date,
-            dimensions="country",
-            metrics="estimatedMinutesWatched"
-        ).execute()
-
-        if not country_response.get("rows"):
-            return {}
-
-        country_data = {}
-        for row in country_response.get("rows", []):
-            country_code = row[0]
-            minutes = row[1]
-            country_data[country_code] = minutes
-
-        return country_data
-    except Exception as e:
-        bt.logging.warning(f"Error getting country minutes analytics: {_format_error(e)}")
-        return {}
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_subscribers_gained_analytics(youtube_analytics_client, start_date, end_date):
-    """Get subscribers gained analytics by day."""
-    try:
-        subscribers_response = youtube_analytics_client.reports().query(
-            ids="channel==MINE",
-            startDate=start_date,
-            endDate=end_date,
-            dimensions="day",
-            metrics="subscribersGained"
-        ).execute()
-
-        if not subscribers_response.get("rows"):
-            return {}
-
-        subscribers_data = {}
-        for row in subscribers_response.get("rows", []):
-            date = row[0]
-            subscribers = row[1]
-            subscribers_data[date] = subscribers
-
-        return subscribers_data
-    except Exception as e:
-        bt.logging.warning(f"Error getting subscribers gained analytics: {_format_error(e)}")
-        return {}
+        for entry in info:
+            entry.update(extras)
+    return info
 
 # ============================================================================
 # Video Playlist and List Management
@@ -284,54 +229,42 @@ def get_subscribers_gained_analytics(youtube_analytics_client, start_date, end_d
 @retry(**YT_API_RETRY_CONFIG)
 def get_uploads_playlist_id(youtube):
     """Retrieve the channel's uploads playlist id."""
-    channels_response = youtube.channels().list(
-        mine=True,
-        part="contentDetails"
-    ).execute()
-
-    if not channels_response["items"]:
+    resp = youtube.channels().list(mine=True, part="contentDetails").execute()
+    items = resp.get("items") or []
+    if not items:
         raise Exception("No channel found for the authenticated user.")
-        
-    uploads_playlist_id = channels_response["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-    return uploads_playlist_id
+    return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
 @retry(**YT_API_RETRY_CONFIG)
 def list_all_videos(youtube, uploads_playlist_id):
     """List all videos in the uploads playlist."""
-    videos = []
-    nextPageToken = None
-
+    all_items, token = [], None
     while True:
-        playlist_response = youtube.playlistItems().list(
+        resp = youtube.playlistItems().list(
             playlistId=uploads_playlist_id,
             part="snippet",
             maxResults=50,
-            pageToken=nextPageToken
+            pageToken=token
         ).execute()
-        videos.extend(playlist_response.get("items", []))
-        nextPageToken = playlist_response.get("nextPageToken")
-        if not nextPageToken:
+        all_items.extend(resp.get("items", []))
+        token = resp.get("nextPageToken")
+        if not token:
             break
-    return videos
+    return all_items
 
 @retry(**YT_API_RETRY_CONFIG)
 def get_all_uploads(youtube_data_client, max_age_days=365):
     """Get all video IDs uploaded within the specified time period."""
-    uploads_playlist_id = get_uploads_playlist_id(youtube_data_client)
-    videos = list_all_videos(youtube_data_client, uploads_playlist_id)
-
-    cutoff_date = datetime.utcnow() - timedelta(days=max_age_days)
-    video_ids = []
-    for video in videos:
-        snippet = video["snippet"]
-        published_at = datetime.strptime(
-            snippet["publishedAt"], "%Y-%m-%dT%H:%M:%SZ"
-        )
-        if published_at >= cutoff_date:
-            video_ids.append(snippet["resourceId"]["videoId"])
-
-    bt.logging.info(f"Found {len(video_ids)} videos uploaded in the last {max_age_days} days")
-    return video_ids
+    pid = get_uploads_playlist_id(youtube_data_client)
+    videos = list_all_videos(youtube_data_client, pid)
+    cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+    vids = []
+    for v in videos:
+        pub = datetime.strptime(v["snippet"]["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
+        if pub >= cutoff:
+            vids.append(v["snippet"]["resourceId"]["videoId"])
+    bt.logging.info(f"Found {len(vids)} videos uploaded in the last {max_age_days} days")
+    return vids
 
 # ============================================================================
 # Video Analytics Functions
@@ -340,243 +273,172 @@ def get_all_uploads(youtube_data_client, max_age_days=365):
 @retry(**YT_API_RETRY_CONFIG)
 def get_video_data(youtube_data_client, video_id, discrete_mode=False):
     """Get basic video information."""
-    video_response = youtube_data_client.videos().list(
+    resp = youtube_data_client.videos().list(
         part="snippet,statistics,contentDetails,status",
         id=video_id
     ).execute()
-
-    if not video_response["items"]:
-        raise Exception(f"No video found with matching ID")
-
-    if discrete_mode:
-        bitcast_video_id = "bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]
-    else:
-        bitcast_video_id = video_id
-
-    video_info = video_response["items"][0]
-    stats = {
-        "videoId": video_id,
-        "bitcastVideoId": bitcast_video_id,
-        "title": video_info["snippet"]["title"],
-        "description": video_info["snippet"]["description"],
-        "publishedAt": video_info["snippet"]["publishedAt"],
-        "viewCount": video_info["statistics"].get("viewCount", 0),
-        "likeCount": video_info["statistics"].get("likeCount", 0),
-        "commentCount": video_info["statistics"].get("commentCount", 0),
-        "duration": video_info["contentDetails"]["duration"],
-        "caption": video_info["contentDetails"]["caption"].lower() == "true",
-        "privacyStatus": video_info["status"]["privacyStatus"]
-    }
-
-    return stats
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, dimensions=""):
-    """Get comprehensive video analytics including traffic sources."""
-    if end_date is None:
-        end_date = datetime.today().strftime('%Y-%m-%d')
-
-    if start_date is None:
-        start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
-
-    # Define metrics in a consistent order
-    metrics_list = "views,comments,likes,dislikes,shares,averageViewDuration,averageViewPercentage,estimatedMinutesWatched"
-
-    analytics_response = youtube_analytics_client.reports().query(
-        ids="channel==MINE",
-        startDate=start_date,
-        endDate=end_date,
-        dimensions=dimensions,
-        metrics=metrics_list,
-        filters=f"video=={video_id}"
-    ).execute()
-
-    if not analytics_response.get("rows"):
-        bt.logging.warning("No analytics data found for video")
-        return []
-
-    # Define metric names in the same order as the metrics_list
-    metric_names = [
-        "views", "comments", "likes", "dislikes", "shares", 
-        "averageViewDuration", "averageViewPercentage", 
-        "estimatedMinutesWatched"
-    ]
-
-    if dimensions:
-        # Handle the case where dimensions are present
-        analytics_info = []
-        for row in analytics_response.get("rows", []):
-            dimension_values = row[:len(dimensions.split(','))]
-            metrics = dict(zip(metric_names, row[len(dimension_values):]))
-            for i, dimension in enumerate(dimensions.split(',')):
-                metrics[dimension] = dimension_values[i]
-            analytics_info.append(metrics)
-    else:
-        # Handle the case where no dimensions are present
-        analytics_data = analytics_response.get("rows", [])[0]
-        analytics_info = dict(zip(metric_names, analytics_data))
-
-    return analytics_info
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_additional_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, ECO_MODE=False):
-    """Get additional video analytics including traffic sources and country data."""
-    if end_date is None:
-        end_date = datetime.today().strftime('%Y-%m-%d')
-
-    if start_date is None:
-        start_date = (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
-
-    # Get traffic source data for minutes watched
-    traffic_source_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "insightTrafficSourceType")
-    
-    if ECO_MODE:
-        return {
-            "trafficSourceMinutes": traffic_source_minutes
-        }
-
-    # Get country data for minutes watched
-    country_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "country")
-    
-    # Get minutes watched by creator content type
-    creator_content_type_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "creatorContentType")
-    
-    # Get minutes watched by playback location type
-    playback_location_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "insightPlaybackLocationType")
-    
-    # Get average view percentage by traffic source type
-    avg_view_percentage_by_traffic_source = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "averageViewPercentage", "insightTrafficSourceType")
-    
-    # Get minutes watched by live or on-demand
-    live_or_on_demand_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "liveOrOnDemand")
-
-    # Fetch estimated minutes watched by YouTube product
-    youtube_product_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "youtubeProduct")
-    
-    # # Get minutes watched by insight traffic source detail  // may need to filter insightTrafficSourceType==EXT_URL
-    # bt.logging.info("Fetching minutes watched by insight traffic source detail")
-    # traffic_source_detail_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "views", "insightTrafficSourceDetail")
-
-    # Fetch estimated minutes watched by device type
-    device_type_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "deviceType")
-    
-    # Fetch estimated minutes watched by operating system
-    operating_system_minutes = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "estimatedMinutesWatched", "operatingSystem")
-    
-    # Fetch viewer percentage by age group and gender
-    age_group_viewer_percentage = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "viewerPercentage", "ageGroup,gender")
-    
-    # Fetch shares by sharing service
-    sharing_service_shares = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "shares", "sharingService")
-    
-    # Fetch audience watch ratio by elapsed video time ratio
-    elapsed_video_time_ratio_audience_watch_ratio = get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, "audienceWatchRatio", "elapsedVideoTimeRatio")
-
+    items = resp.get("items") or []
+    if not items:
+        raise Exception("No video found with matching ID")
+    info = items[0]
+    bcid = ("bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]) if discrete_mode else video_id
     return {
-        "trafficSourceMinutes": traffic_source_minutes,
-        "countryMinutes": country_minutes,
-        "creatorContentTypeMinutes": creator_content_type_minutes,
-        "playbackLocationMinutes": playback_location_minutes,
-        "avgViewPercentageByTrafficSource": avg_view_percentage_by_traffic_source,
-        "liveOrOnDemandMinutes": live_or_on_demand_minutes,
-        "youtubeProductMinutes": youtube_product_minutes,
-        "sharingServiceShares": sharing_service_shares,
-        "deviceTypeMinutes": device_type_minutes,
-        "operatingSystemMinutes": operating_system_minutes,
-        "ageGroupViewerPercentage": age_group_viewer_percentage,
-        "elapsedVideoTimeRatioAudienceWatchRatio": elapsed_video_time_ratio_audience_watch_ratio
+        "videoId": video_id,
+        "bitcastVideoId": bcid,
+        "title": info["snippet"]["title"],
+        "description": info["snippet"]["description"],
+        "publishedAt": info["snippet"]["publishedAt"],
+        "viewCount": info["statistics"].get("viewCount", 0),
+        "likeCount": info["statistics"].get("likeCount", 0),
+        "commentCount": info["statistics"].get("commentCount", 0),
+        "duration": info["contentDetails"]["duration"],
+        "caption": info["contentDetails"]["caption"].lower() == "true",
+        "privacyStatus": info["status"]["privacyStatus"]
     }
 
-@retry(**YT_API_RETRY_CONFIG)
-def get_video_analytics_by_dimension(youtube_analytics_client, video_id, start_date, end_date, metric, dimensions):
-    """Get video analytics grouped by specified dimensions.
+def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, metric_dims=None):
+    """Get video analytics based on specified metric-dimension combinations.
     
     Args:
         youtube_analytics_client: The YouTube Analytics API client
-        video_id: The ID of the video to get analytics for
-        start_date: Start date for analytics in YYYY-MM-DD format
-        end_date: End date for analytics in YYYY-MM-DD format
-        metric: The metric to retrieve (e.g., "views", "estimatedMinutesWatched")
-        dimensions: Comma-separated list of dimensions to group by
+        video_id: The YouTube video ID
+        start_date: Start date for analytics (defaults to 1 year ago)
+        end_date: End date for analytics (defaults to today)
+        metric_dims: Dictionary of {output_key: (metric, dimensions)} to fetch
+                    If None, raises ValueError
+    
+    Returns:
+        Dictionary of analytics results keyed by the provided output_keys
     """
-    try:
-        response = youtube_analytics_client.reports().query(
-            ids="channel==MINE",
-            startDate=start_date,
-            endDate=end_date,
-            dimensions=dimensions,
-            metrics=metric,
-            filters=f"video=={video_id}"
-        ).execute()
-
-        if not response.get("rows"):
-            return {}
-
-        analytics_data = {}
-        for row in response.get("rows", []):
-            dimension_values = row[:-1]  # All but last element are dimension values
-            metric_value = row[-1]  # Last element is the metric value
+    if metric_dims is None:
+        raise ValueError("metric_dims parameter is required")
+        
+    end = end_date or datetime.today().strftime('%Y-%m-%d')
+    start = start_date or (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
+    
+    # Group metrics by dimensions to consolidate API calls
+    dimension_groups = {}
+    key_to_metric_dim = {}
+    
+    for key, (metric, dims) in metric_dims.items():
+        key_to_metric_dim[key] = (metric, dims)
+        dims_key = dims or ""  # Use empty string for no dimensions
+        
+        if dims_key not in dimension_groups:
+            dimension_groups[dims_key] = []
+        dimension_groups[dims_key].append((key, metric))
+    
+    results = {}
+    day_structured_data = {}
+    day_metrics = {}
+    has_day_dimension = False
+    
+    # Make consolidated API calls for each dimension group
+    for dims_key, metrics_list in dimension_groups.items():
+        if not metrics_list:
+            continue
             
-            # Convert tuple keys to string keys for JSON compatibility
-            if len(dimension_values) > 1:
-                key = "|".join(str(v) for v in dimension_values)
-            else:
-                key = str(dimension_values[0])
+        # Extract just the metric names for the API call
+        metric_names = [metric for _, metric in metrics_list]
+        key_names = [key for key, _ in metrics_list]
+        
+        try:
+            # Make consolidated API call
+            consolidated_results = _query_multiple_metrics(
+                youtube_analytics_client, start, end,
+                metric_names, dims_key if dims_key else None,
+                filters=f"video=={video_id}"
+            )
+            
+            # Distribute results back to individual keys
+            for i, (key, metric) in enumerate(metrics_list):
+                dims = key_to_metric_dim[key][1]
+                query_result = consolidated_results.get(metric, {} if dims else [])
                 
-            analytics_data[key] = metric_value
-
-        return analytics_data
-    except Exception as e:
-        bt.logging.warning(f"Error getting analytics: {_format_error(e)}")
-        return {}
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_video_traffic_source_views_analytics(youtube_analytics_client, video_id, start_date, end_date, dimensions="insightTrafficSourceType"):
-    """Get traffic source analytics for views for a specific video."""
-    return get_video_analytics_by_dimension(
-        youtube_analytics_client, 
-        video_id, 
-        start_date, 
-        end_date, 
-        "views", 
-        dimensions
-    )
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_video_traffic_source_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date, dimensions="insightTrafficSourceType"):
-    """Get traffic source analytics for minutes watched for a specific video."""
-    return get_video_analytics_by_dimension(
-        youtube_analytics_client, 
-        video_id, 
-        start_date, 
-        end_date, 
-        "estimatedMinutesWatched", 
-        dimensions
-    )
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_video_country_views_analytics(youtube_analytics_client, video_id, start_date, end_date, dimensions="country"):
-    """Get views analytics by country for a specific video."""
-    return get_video_analytics_by_dimension(
-        youtube_analytics_client, 
-        video_id, 
-        start_date, 
-        end_date, 
-        "views", 
-        dimensions
-    )
-
-@retry(**YT_API_RETRY_CONFIG)
-def get_video_country_minutes_analytics(youtube_analytics_client, video_id, start_date, end_date, dimensions="country"):
-    """Get minutes watched analytics by country for a specific video."""
-    return get_video_analytics_by_dimension(
-        youtube_analytics_client, 
-        video_id, 
-        start_date, 
-        end_date, 
-        "estimatedMinutesWatched", 
-        dimensions
-    )
+                # Handle scalar values for metrics with no dimensions
+                if not dims and isinstance(query_result, (int, float)):
+                    results[key] = query_result
+                elif not dims and isinstance(query_result, list) and query_result:
+                    results[key] = query_result[0] if query_result else 0
+                # Handle simple day dimension (just "day")
+                elif dims == "day":
+                    has_day_dimension = True
+                    day_metrics[key] = query_result
+                    results[key] = query_result
+                # Handle multi-dimensional data that includes day
+                elif dims and "day" in dims and "," in dims:
+                    has_day_dimension = True
+                    
+                    # Skip empty results
+                    if not query_result or not isinstance(query_result, dict):
+                        results[key] = {}
+                        continue
+                        
+                    # Create a nested structure where data is organized by day first
+                    day_data = {}
+                    for combined_key, value in query_result.items():
+                        # Split the combined key (e.g., "DESKTOP|2025-05-12")
+                        parts = combined_key.split('|')
+                        if len(parts) == 2:
+                            dimension_value = parts[0]
+                            day = parts[1]
+                            
+                            # Initialize nested dictionaries
+                            if day not in day_data:
+                                day_data[day] = {}
+                            
+                            # Add data
+                            day_data[day][dimension_value] = value
+                    
+                    # Store the day-structured data for later merge
+                    day_structured_data[key] = day_data
+                    
+                    # Also store the original data
+                    results[key] = query_result
+                else:
+                    # Standard result
+                    results[key] = query_result
+                    
+        except Exception as e:
+            bt.logging.warning(f"Failed to retrieve analytics for dimension '{dims_key}': {_format_error(e)}")
+            # Set individual results to None for this dimension group
+            for key, _ in metrics_list:
+                results[key] = None
+    
+    # Consolidate day-structured data if there are any day dimensions
+    if has_day_dimension:
+        # Create a day_metrics entry for uniform access
+        results["day_metrics"] = {}
+        
+        # Collect all days from both simple and complex day metrics
+        all_days = set()
+        
+        # Add days from day_metrics (simple "day" dimension)
+        for metric_data in day_metrics.values():
+            if isinstance(metric_data, dict):
+                all_days.update(metric_data.keys())
+        
+        # Add days from day_structured_data (complex dimensions with "day")
+        for day_dict in day_structured_data.values():
+            all_days.update(day_dict.keys())
+        
+        # Create entries for each day
+        for day in sorted(all_days):
+            day_entry = {"day": day}
+            
+            # Add simple metrics with day dimension
+            for key, data in day_metrics.items():
+                if isinstance(data, dict):
+                    day_entry[key] = data.get(day, 0)
+            
+            # Add complex metrics
+            for key, day_data in day_structured_data.items():
+                if day in day_data:
+                    day_entry[key] = day_data[day]
+            
+            results["day_metrics"][day] = day_entry
+    
+    return results
 
 # ============================================================================
 # Transcript Functions
@@ -611,22 +473,11 @@ def get_video_transcript(video_id, rapid_api_key):
 
 def _format_error(e):
     """Format error message to include only error type and brief summary."""
-    error_type = type(e).__name__
-    
-    # For HTTP errors, try to extract status code and error message
+    et = type(e).__name__
     if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
-        return f"{error_type} ({e.response.status_code})"
-    
-    # For API errors, try to extract error code and message
+        return f"{et} ({e.response.status_code})"
     if hasattr(e, 'error') and isinstance(e.error, dict):
-        error_details = e.error.get('details', [{}])[0]
-        error_message = error_details.get('message', 'unknown error')
-        return f"{error_type} ({error_message})"
-    
-    # For other errors, return type and first line of message, excluding URLs
-    error_msg = str(e)
-    # Remove URLs from error message
-    error_msg = re.sub(r'https?://\S+', '', error_msg)
-    # Get first line and clean up
-    error_msg = error_msg.split('\n')[0].strip()
-    return f"{error_type} ({error_msg})"
+        details = e.error.get('details', [{}])[0].get('message', 'unknown error')
+        return f"{et} ({details})"
+    msg = re.sub(r'https?://\S+', '', str(e)).split('\n')[0].strip()
+    return f"{et} ({msg})"
