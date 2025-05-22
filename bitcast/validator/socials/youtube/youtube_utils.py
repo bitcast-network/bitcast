@@ -77,6 +77,64 @@ def _query(client, start_date, end_date, metric, dimensions=None, filters=None):
     return data
 
 @retry(**YT_API_RETRY_CONFIG)
+def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensions=None, filters=None):
+    """Query multiple metrics in a single API call and return split results.
+    
+    Args:
+        client: YouTube Analytics client
+        start_date: Start date for query
+        end_date: End date for query
+        metrics_list: List of metric names to fetch
+        dimensions: Dimensions for the query
+        filters: Filters for the query
+        
+    Returns:
+        Dictionary with metric names as keys and their respective results as values
+    """
+    metrics_str = ",".join(metrics_list)
+    params = {
+        'ids': 'channel==MINE',
+        'startDate': start_date,
+        'endDate': end_date,
+        'metrics': metrics_str
+    }
+    if dimensions:
+        params['dimensions'] = dimensions
+    if filters:
+        params['filters'] = filters
+    
+    resp = client.reports().query(**params).execute()
+    rows = resp.get("rows") or []
+    if not rows:
+        return {metric: ({} if dimensions else []) for metric in metrics_list}
+    
+    results = {}
+    
+    if not dimensions:
+        # For non-dimensional queries, return values by index
+        for i, metric in enumerate(metrics_list):
+            results[metric] = rows[0][i] if i < len(rows[0]) else 0
+    else:
+        # For dimensional queries, create dictionaries for each metric
+        for metric in metrics_list:
+            results[metric] = {}
+        
+        for row in rows:
+            # Split dimensions and metric values
+            num_dims = len(dimensions.split(",")) if dimensions else 0
+            dims, vals = row[:num_dims], row[num_dims:]
+            
+            # Create dimension key
+            key = "|".join(str(d) for d in dims) if len(dims) > 1 else str(dims[0])
+            
+            # Assign each metric value
+            for i, metric in enumerate(metrics_list):
+                if i < len(vals):
+                    results[metric][key] = vals[i]
+    
+    return results
+
+@retry(**YT_API_RETRY_CONFIG)
 def get_channel_data(youtube_data_client, discrete_mode=False):
     """Get basic channel information."""
     resp = youtube_data_client.channels().list(
@@ -129,11 +187,21 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     else:
         info = dict(zip(names, rows[0]))
 
-    # extras
-    traffic_views   = _query(youtube_analytics_client, start_date, end, "views", "insightTrafficSourceType")
-    traffic_minutes = _query(youtube_analytics_client, start_date, end, "estimatedMinutesWatched", "insightTrafficSourceType")
-    country_views   = _query(youtube_analytics_client, start_date, end, "views", "country")
-    country_minutes = _query(youtube_analytics_client, start_date, end, "estimatedMinutesWatched", "country")
+    # Consolidate API calls for traffic source data
+    traffic_data = _query_multiple_metrics(
+        youtube_analytics_client, start_date, end, 
+        ["views", "estimatedMinutesWatched"], 
+        "insightTrafficSourceType"
+    )
+    
+    # Consolidate API calls for country data
+    country_data = _query_multiple_metrics(
+        youtube_analytics_client, start_date, end,
+        ["views", "estimatedMinutesWatched"],
+        "country"
+    )
+    
+    # Keep subscriber data separate due to different date range
     past = (
         (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
         if dimensions == "day" else start_date
@@ -141,10 +209,10 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     subs = _query(youtube_analytics_client, past, end, "subscribersGained", "day")
 
     extras = {
-        "trafficSourceViews":   traffic_views,
-        "trafficSourceMinutes": traffic_minutes,
-        "countryViews":         country_views,
-        "countryMinutes":       country_minutes,
+        "trafficSourceViews":   traffic_data["views"],
+        "trafficSourceMinutes": traffic_data["estimatedMinutesWatched"],
+        "countryViews":         country_data["views"],
+        "countryMinutes":       country_data["estimatedMinutesWatched"],
         "subscribersGained":    subs
     }
     if isinstance(info, dict):
@@ -248,69 +316,94 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     end = end_date or datetime.today().strftime('%Y-%m-%d')
     start = start_date or (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
     
+    # Group metrics by dimensions to consolidate API calls
+    dimension_groups = {}
+    key_to_metric_dim = {}
+    
+    for key, (metric, dims) in metric_dims.items():
+        key_to_metric_dim[key] = (metric, dims)
+        dims_key = dims or ""  # Use empty string for no dimensions
+        
+        if dims_key not in dimension_groups:
+            dimension_groups[dims_key] = []
+        dimension_groups[dims_key].append((key, metric))
+    
     results = {}
     day_structured_data = {}
-    
-    # Track all metrics with simple "day" dimension
     day_metrics = {}
     has_day_dimension = False
     
-    for key, (metric, dims) in metric_dims.items():  
+    # Make consolidated API calls for each dimension group
+    for dims_key, metrics_list in dimension_groups.items():
+        if not metrics_list:
+            continue
+            
+        # Extract just the metric names for the API call
+        metric_names = [metric for _, metric in metrics_list]
+        key_names = [key for key, _ in metrics_list]
         
         try:
-            query_result = _query(
+            # Make consolidated API call
+            consolidated_results = _query_multiple_metrics(
                 youtube_analytics_client, start, end,
-                metric, dims,
+                metric_names, dims_key if dims_key else None,
                 filters=f"video=={video_id}"
             )
             
-            # Handle scalar values for metrics with no dimensions
-            if not dims and isinstance(query_result, list) and query_result:
-                results[key] = query_result[0]
-            # Handle simple day dimension (just "day")
-            elif dims == "day":
-                has_day_dimension = True
-                # Store the daily data for later use
-                day_metrics[key] = query_result
-                results[key] = query_result
-            # Handle multi-dimensional data that includes day
-            elif dims and "day" in dims and "," in dims:
-                has_day_dimension = True
-                # This is a complex field with day and another dimension
-                other_dim = dims.replace("day", "").replace(",", "")
+            # Distribute results back to individual keys
+            for i, (key, metric) in enumerate(metrics_list):
+                dims = key_to_metric_dim[key][1]
+                query_result = consolidated_results.get(metric, {} if dims else [])
                 
-                # Skip empty results
-                if not query_result or not isinstance(query_result, dict):
-                    results[key] = {}
-                    continue
+                # Handle scalar values for metrics with no dimensions
+                if not dims and isinstance(query_result, (int, float)):
+                    results[key] = query_result
+                elif not dims and isinstance(query_result, list) and query_result:
+                    results[key] = query_result[0] if query_result else 0
+                # Handle simple day dimension (just "day")
+                elif dims == "day":
+                    has_day_dimension = True
+                    day_metrics[key] = query_result
+                    results[key] = query_result
+                # Handle multi-dimensional data that includes day
+                elif dims and "day" in dims and "," in dims:
+                    has_day_dimension = True
                     
-                # Create a nested structure where data is organized by day first
-                day_data = {}
-                for combined_key, value in query_result.items():
-                    # Split the combined key (e.g., "DESKTOP|2025-05-12")
-                    parts = combined_key.split('|')
-                    if len(parts) == 2:
-                        dimension_value = parts[0]
-                        day = parts[1]
+                    # Skip empty results
+                    if not query_result or not isinstance(query_result, dict):
+                        results[key] = {}
+                        continue
                         
-                        # Initialize nested dictionaries
-                        if day not in day_data:
-                            day_data[day] = {}
-                        
-                        # Add data
-                        day_data[day][dimension_value] = value
-                
-                # Store the day-structured data for later merge
-                day_structured_data[key] = day_data
-                
-                # Also store the original data
-                results[key] = query_result
-            else:
-                # Standard result
-                results[key] = query_result
+                    # Create a nested structure where data is organized by day first
+                    day_data = {}
+                    for combined_key, value in query_result.items():
+                        # Split the combined key (e.g., "DESKTOP|2025-05-12")
+                        parts = combined_key.split('|')
+                        if len(parts) == 2:
+                            dimension_value = parts[0]
+                            day = parts[1]
+                            
+                            # Initialize nested dictionaries
+                            if day not in day_data:
+                                day_data[day] = {}
+                            
+                            # Add data
+                            day_data[day][dimension_value] = value
+                    
+                    # Store the day-structured data for later merge
+                    day_structured_data[key] = day_data
+                    
+                    # Also store the original data
+                    results[key] = query_result
+                else:
+                    # Standard result
+                    results[key] = query_result
+                    
         except Exception as e:
-            bt.logging.warning(f"Failed to retrieve {key} analytics: {_format_error(e)}")
-            results[key] = None
+            bt.logging.warning(f"Failed to retrieve analytics for dimension '{dims_key}': {_format_error(e)}")
+            # Set individual results to None for this dimension group
+            for key, _ in metrics_list:
+                results[key] = None
     
     # Consolidate day-structured data if there are any day dimensions
     if has_day_dimension:
