@@ -30,7 +30,11 @@ async def vet_video_endpoint(request: VideoRequest):
             video_data=request.video_data,
             video_analytics=request.video_analytics
         )
-        return result
+        # Return both the decision details and brief reasonings
+        return {
+            "met_brief_ids": result["met_brief_ids"],
+            "brief_reasonings": result["brief_reasonings"]
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

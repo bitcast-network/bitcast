@@ -174,51 +174,53 @@ def vet_video(video_id, briefs, video_data, video_analytics):
     # Check if the video is public
     if not check_video_privacy(video_data, decision_details):
         if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details}
+            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
     # Check if video was published after brief start date
     if not check_video_publish_date(video_data, briefs, decision_details):
         if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details}
+            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
     # Check video retention
     if not check_video_retention(video_data, video_analytics, decision_details):
         if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details}
+            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
     # Check for manual captions
     if not check_manual_captions(video_id, video_data, decision_details):
         if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details}
+            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
     # Get transcript
     transcript = get_video_transcript(video_id, video_data)
     if transcript is None:
         if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details}
+            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
     # Check for prompt injection
     if transcript is not None and not check_prompt_injection(video_id, video_data, transcript, decision_details):
         if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details}
+            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     elif transcript is None:
         # If transcript is None, set prompt injection check to False
         decision_details["promptInjectionCheck"] = False
     
     # Evaluate content against briefs if all checks passed
     met_brief_ids = []
+    brief_reasonings = []
     if all_checks_passed and transcript is not None:
         # Only now set contentAgainstBriefCheck
-        met_brief_ids = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+        met_brief_ids, brief_reasonings = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
     else:
         # If any check failed, set all briefs to false
         decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
+        brief_reasonings = ["Video failed initial checks"] * len(briefs)
     
     # Set anyBriefMatched based on whether any brief matched
     decision_details["anyBriefMatched"] = any(decision_details["contentAgainstBriefCheck"])
     
     # Return the final result
-    return {"met_brief_ids": met_brief_ids, "decision_details": decision_details}
+    return {"met_brief_ids": met_brief_ids, "decision_details": decision_details, "brief_reasonings": brief_reasonings}
 
 def initialize_decision_details():
     """Initialize the decision details structure."""
@@ -324,18 +326,21 @@ def check_prompt_injection(video_id, video_data, transcript, decision_details):
 def evaluate_content_against_briefs(briefs, video_data, transcript, decision_details):
     """Evaluate the video content against each brief."""
     met_brief_ids = []
+    reasonings = []  # Store reasonings separately
 
     for brief in briefs:
         try:
-            match = evaluate_content_against_brief(brief, video_data['duration'], video_data['description'], transcript)
+            match, reasoning = evaluate_content_against_brief(brief, video_data['duration'], video_data['description'], transcript)
             decision_details["contentAgainstBriefCheck"].append(match)
+            reasonings.append(reasoning)  # Store reasoning in separate list
             if match:
                 met_brief_ids.append(brief["id"])
         except Exception as e:
             bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {youtube_utils._format_error(e)}")
             decision_details["contentAgainstBriefCheck"].append(False)
+            reasonings.append(f"Error during evaluation: {str(e)}")  # Store error as reasoning
             
-    return met_brief_ids
+    return met_brief_ids, reasonings
 
 def calculate_video_score(video_id, youtube_analytics_client):
     """Calculate the score for a video based on analytics data."""
