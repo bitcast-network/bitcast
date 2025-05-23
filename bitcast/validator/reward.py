@@ -25,6 +25,7 @@ from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.socials.youtube.youtube_scoring import eval_youtube
 from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.rewards_scaling import scale_rewards
+from bitcast.protocol import AccessTokenSynapse
 
 def reward(uid, briefs, response) -> dict:
     """
@@ -62,10 +63,34 @@ def reward(uid, briefs, response) -> dict:
 
     return yt_stats
 
-def get_rewards(
+async def query_miner(self, uid):
+
+    bt.logging.info(f"Querying UID {uid}")
+    
+    try:
+        # Query individual miner
+        response = await self.dendrite(
+            # Send the query to the specific miner axon
+            axons=[self.metagraph.axons[uid]],
+            # Request an access token from the miner
+            synapse=AccessTokenSynapse(),
+            # Don't deserialize the responses to get the AccessTokenSynapse objects directly
+            deserialize=False,
+        )
+        
+        # Extract the single response from the list
+        miner_response = response[0] if response else None
+        
+        bt.logging.info(f"Received response from UID {uid}")
+        return miner_response
+        
+    except Exception as e:
+        bt.logging.error(f"Error querying miner UID {uid}: {e}")
+        return None
+
+async def get_rewards(
     self,
     uids,
-    responses: List[str],
 ) -> np.ndarray:
     """
     Returns:
@@ -81,7 +106,16 @@ def get_rewards(
 
     bt.logging.info(f"List of UIDs: {uids}")
 
-    yt_stats_list = [reward(uid, briefs, response) for uid, response in zip(uids, responses)]
+    yt_stats_list = []
+    
+    # Query miners one at a time and process their responses immediately
+    for uid in uids:
+        # Query the individual miner
+        miner_response = await query_miner(self, uid)
+        
+        # Process the response immediately
+        yt_stats = reward(uid, briefs, miner_response)
+        yt_stats_list.append(yt_stats)
     
     # Convert dictionary scores to matrix format for normalization
     scores_matrix = []
