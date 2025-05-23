@@ -13,37 +13,49 @@ def test_update_video_score():
     
     # Mock calculate_video_score to return different scores
     with patch('bitcast.validator.socials.youtube.youtube_scoring.calculate_video_score') as mock_calculate:
-        # Test case 1: First video with score 2
+        # Test case 1: First video with score 2, no advertising traffic (equivalent to scorable_proportion: 1.0)
         video_id_1 = "test_video_id_1"
         video_matches[video_id_1] = [True]  # Add to video_matches
-        result["videos"][video_id_1] = {"details": {"bitcastVideoId": video_id_1}, "analytics": {"scorable_proportion": 1.0}}  # Initialize video data
-        mock_calculate.return_value = {"score": 2, "daily_analytics": {}, "minutes_watched_w_lag": 120}
-        update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result, 1.0)
+        result["videos"][video_id_1] = {
+            "details": {"bitcastVideoId": video_id_1}, 
+            "analytics": {"trafficSourceMinutes": {"SEARCH": 100, "SUGGESTED": 50}}  # No ADVERTISING
+        }
+        mock_calculate.return_value = {"score": 2, "daily_analytics": {}, "scorableHistoryMins": 120}
+        update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result)
         assert result["scores"]["test_brief"] == 2, "First score should be 2"
         
-        # Test case 2: Second video with score 4
+        # Test case 2: Second video with score 2 (after excluding advertising), half advertising traffic (equivalent to scorable_proportion: 0.5)
         video_id_2 = "test_video_id_2"
         video_matches[video_id_2] = [True]  # Add to video_matches
-        result["videos"][video_id_2] = {"details": {"bitcastVideoId": video_id_2}, "analytics": {"scorable_proportion": 0.5}}  # Initialize video data
-        mock_calculate.return_value = {"score": 4, "daily_analytics": {}, "minutes_watched_w_lag": 240}
-        update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result, 0.5)
-        assert result["scores"]["test_brief"] == 4, "Score should be 4 (2 + 4*0.5)"
+        result["videos"][video_id_2] = {
+            "details": {"bitcastVideoId": video_id_2}, 
+            "analytics": {"trafficSourceMinutes": {"SEARCH": 50, "ADVERTISING": 50}}  # 50% ADVERTISING
+        }
+        mock_calculate.return_value = {"score": 2, "daily_analytics": {}, "scorableHistoryMins": 240}  # Returns 2 after excluding advertising
+        update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result)
+        assert result["scores"]["test_brief"] == 4, "Score should be 4 (2 + 2)"
         
-        # Test case 3: Third video with score 2
+        # Test case 3: Third video with score 0 (all traffic is advertising), all advertising traffic (equivalent to scorable_proportion: 0.0)
         video_id_3 = "test_video_id_3"
         video_matches[video_id_3] = [True]  # Add to video_matches
-        result["videos"][video_id_3] = {"details": {"bitcastVideoId": video_id_3}, "analytics": {"scorable_proportion": 0.0}}  # Initialize video data
-        mock_calculate.return_value = {"score": 2, "daily_analytics": {}, "minutes_watched_w_lag": 120}
-        update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result, 0.0)
-        assert result["scores"]["test_brief"] == 4, "Score should remain 4 (2 + 4*0.5 + 2*0.0)"
+        result["videos"][video_id_3] = {
+            "details": {"bitcastVideoId": video_id_3}, 
+            "analytics": {"trafficSourceMinutes": {"ADVERTISING": 100}}  # All ADVERTISING
+        }
+        mock_calculate.return_value = {"score": 0, "daily_analytics": {}, "scorableHistoryMins": 120}  # Returns 0 since all traffic is advertising
+        update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result)
+        assert result["scores"]["test_brief"] == 4, "Score should remain 4 (2 + 2 + 0)"
         
-        # Test case 4: Fourth video with score 0
+        # Test case 4: Fourth video with score 0, no advertising traffic (equivalent to scorable_proportion: 1.0)
         video_id_4 = "test_video_id_4"
         video_matches[video_id_4] = [True]  # Add to video_matches
-        result["videos"][video_id_4] = {"details": {"bitcastVideoId": video_id_4}, "analytics": {"scorable_proportion": 1.0}}  # Initialize video data
-        mock_calculate.return_value = {"score": 0, "daily_analytics": {}, "minutes_watched_w_lag": 0}
-        update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result, 1.0)
-        assert result["scores"]["test_brief"] == 4, "Score should remain 4 (2 + 4*0.5 + 2*0.0 + 0*1.0)"
+        result["videos"][video_id_4] = {
+            "details": {"bitcastVideoId": video_id_4}, 
+            "analytics": {"trafficSourceMinutes": {"SEARCH": 80, "SUGGESTED": 20}}  # No ADVERTISING
+        }
+        mock_calculate.return_value = {"score": 0, "daily_analytics": {}, "scorableHistoryMins": 0}
+        update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result)
+        assert result["scores"]["test_brief"] == 4, "Score should remain 4 (2 + 2 + 0 + 0)"
 
 def test_check_video_brief_matches():
     # Setup
