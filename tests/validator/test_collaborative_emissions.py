@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from unittest.mock import patch, MagicMock
 from bitcast.validator.rewards_scaling import calculate_brief_emissions_scalar, scale_rewards
@@ -11,8 +12,7 @@ def test_calculate_brief_emissions_scalar():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -21,14 +21,14 @@ def test_calculate_brief_emissions_scalar():
     }]
     briefs = [{
         "id": "brief1",
-        "max_burn": 0.5,  # 50% max burn
-        "burn_decay": 0.01  # Slow decay
+        "max_burn": 0.4,
+        "burn_decay": 0.02
     }]
     
     result = calculate_brief_emissions_scalar(yt_stats_list, briefs)
-    expected = 1 - 0.5 + 0.5 * (1 - np.exp(-0.01 * 100))
-    print(f"result: {result}")
-    print(f"expected: {expected}")
+    
+    # Formula: (1-max_burn) + max_burn*(1-exp(-burn_decay * x))
+    expected = 1 - 0.4 + 0.4 * (1 - np.exp(-0.02 * 100))
     assert np.isclose(result["brief1"], expected)
 
 def test_calculate_brief_emissions_scalar_zero_minutes():
@@ -40,8 +40,7 @@ def test_calculate_brief_emissions_scalar_zero_minutes():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 0,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 0
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -68,8 +67,7 @@ def test_calculate_brief_emissions_scalar_high_minutes():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 1000,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 1000
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -95,8 +93,7 @@ def test_calculate_brief_emissions_scalar_multiple_briefs():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 50,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 50
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -131,16 +128,14 @@ def test_calculate_brief_emissions_scalar_multiple_videos():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 30,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 30
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
             },
             "video2": {
                 "analytics": {
-                    "minutes_watched_w_lag": 20,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 20
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -188,8 +183,7 @@ def test_calculate_brief_emissions_scalar_burn_decay_zero():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -214,8 +208,7 @@ def test_calculate_brief_emissions_scalar_max_burn_zero():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -246,16 +239,14 @@ def test_scale_rewards_basic():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
             },
             "video2": {
-                "minutes_watched_w_lag": 50,
+                "scorableHistoryMins": 50,
                 "analytics": {
-                    "scorable_proportion": 1.0
                 },
                 "matching_brief_ids": ["brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -298,8 +289,7 @@ def test_scale_rewards_invalid_sum():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -335,8 +325,7 @@ def test_scale_rewards_nonzero_first_row():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -372,8 +361,7 @@ def test_scale_rewards_zero_scalars():
         "videos": {
             "video1": {
                 "analytics": {
-                    "scorable_proportion": 1.0,
-                    "minutes_watched_w_lag": 0
+                    "scorableHistoryMins": 0
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -409,8 +397,7 @@ def test_scale_rewards_max_burn_zero():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -445,8 +432,7 @@ def test_scale_rewards_burn_decay_zero():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -484,8 +470,7 @@ def test_scale_rewards_all_zeros():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 1.0
+                    "scorableHistoryMins": 100
                 },
                 "matching_brief_ids": ["brief1", "brief2"],
                 "decision_details": {"video_vet_result": True}
@@ -512,7 +497,7 @@ def test_scale_rewards_all_zeros():
     assert np.allclose(np.sum(result_np), 1.0)
 
 def test_calculate_brief_emissions_scalar_partial_scorable():
-    # Test case: Partial scorable_proportion
+    # Test case: Minutes watched already exclude advertising traffic (no scorable_proportion needed)
     yt_stats_list = [{
         "yt_account": {
             "channel_vet_result": True
@@ -520,8 +505,7 @@ def test_calculate_brief_emissions_scalar_partial_scorable():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 100,
-                    "scorable_proportion": 0.5  # Only 50% is scorable
+                    "scorableHistoryMins": 50  # Already filtered to exclude advertising traffic
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -536,12 +520,12 @@ def test_calculate_brief_emissions_scalar_partial_scorable():
     
     result = calculate_brief_emissions_scalar(yt_stats_list, briefs)
     
-    # With 50% scorable, we should only count 50 minutes
+    # Now using 50 minutes directly (no scorable_proportion multiplication needed)
     expected = 1 - 0.4 + 0.4 * (1 - np.exp(-0.02 * 50))
     assert np.isclose(result["brief1"], expected)
 
 def test_calculate_brief_emissions_scalar_mixed_scorable():
-    # Test case: Multiple videos with different scorable_proportion values
+    # Test case: Multiple videos with minutes already filtered to exclude advertising traffic
     yt_stats_list = [{
         "yt_account": {
             "channel_vet_result": True
@@ -549,16 +533,14 @@ def test_calculate_brief_emissions_scalar_mixed_scorable():
         "videos": {
             "video1": {
                 "analytics": {
-                    "minutes_watched_w_lag": 60,
-                    "scorable_proportion": 0.75  # 75% scorable
+                    "scorableHistoryMins": 45  # Already filtered (was 60 * 0.75)
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
             },
             "video2": {
                 "analytics": {
-                    "minutes_watched_w_lag": 80,
-                    "scorable_proportion": 0.25  # 25% scorable
+                    "scorableHistoryMins": 20  # Already filtered (was 80 * 0.25)
                 },
                 "matching_brief_ids": ["brief1"],
                 "decision_details": {"video_vet_result": True}
@@ -573,6 +555,6 @@ def test_calculate_brief_emissions_scalar_mixed_scorable():
     
     result = calculate_brief_emissions_scalar(yt_stats_list, briefs)
     
-    # Expected minutes: (60 * 0.75) + (80 * 0.25) = 45 + 20 = 65
+    # Total minutes: 45 + 20 = 65 (already filtered)
     expected = 1 - 0.6 + 0.6 * (1 - np.exp(-0.03 * 65))
     assert np.isclose(result["brief1"], expected)

@@ -29,6 +29,7 @@ ADDITIONAL_METRICS = {
 # Core daily metrics - all metrics with day dimension
 CORE_DAILY_METRICS = {
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "day"),
+    "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType,day"),
 }
 
 # Additional daily metrics for ECO_MODE
@@ -39,7 +40,6 @@ ADDITIONAL_DAILY_METRICS = {
     "shares": ("shares", "day"),
     "averageViewDuration": ("averageViewDuration", "day"),
     "AverageViewPercentage": ("averageViewPercentage", "day"),
-    "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType,day"),
     "deviceTypeMinutes": ("estimatedMinutesWatched", "deviceType,day"),
     "operatingSystemMinutes": ("estimatedMinutesWatched", "operatingSystem,day"),
     "creatorContentTypeMinutes": ("estimatedMinutesWatched", "creatorContentType,day"),

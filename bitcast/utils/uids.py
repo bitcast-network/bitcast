@@ -27,21 +27,18 @@ def check_uid_availability(
 
 
 def get_all_uids(self, exclude: List[int] = None) -> np.ndarray:
-    """Returns all available uids from the metagraph.
+    """Returns all uids from the metagraph, excluding specified ones.
     Args:
         exclude (List[int]): List of uids to exclude from the result.
     Returns:
-        uids (np.ndarray): All available uids.
+        uids (np.ndarray): All uids excluding specified ones.
     """
     avail_uids = []
 
     for uid in range(self.metagraph.n.item()):
-        uid_is_available = check_uid_availability(
-            self.metagraph, uid, self.config.neuron.vpermit_tao_limit
-        )
         uid_is_not_excluded = exclude is None or uid not in exclude
 
-        if uid_is_available and uid_is_not_excluded:
+        if uid_is_not_excluded:
             avail_uids.append(uid)
 
     # Ensure uid 0 is always included at the start of the list

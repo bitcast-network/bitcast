@@ -450,7 +450,7 @@ def _fetch_transcript(video_id, rapid_api_key):
     url = "https://youtube-transcriptor.p.rapidapi.com/transcript"
     headers = {"x-rapidapi-key": rapid_api_key, "x-rapidapi-host": "youtube-transcriptor.p.rapidapi.com"}
     querystring = {"video_id": video_id}
-    response = requests.get(url, headers=headers, params=querystring, timeout=10)
+    response = requests.get(url, headers=headers, params=querystring, timeout=5)
     response.raise_for_status()
     transcript_data = response.json()
 

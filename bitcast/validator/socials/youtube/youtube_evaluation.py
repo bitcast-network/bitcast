@@ -108,21 +108,6 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
 
     return results, video_data_dict, video_analytics_dict, video_decision_details
 
-def calculate_scorable_proportion(video_analytics):
-    
-    traffic_source_minutes = video_analytics.get('trafficSourceMinutes', {})
-    if not traffic_source_minutes:
-        return 0  # If no data, assume all traffic is non scorable
-        
-    total_minutes = sum(traffic_source_minutes.values())
-    if total_minutes == 0:
-        return 0  # If no traffic, assume all traffic is non scorable
-        
-    advertising_minutes = traffic_source_minutes.get('ADVERTISING', 0)
-    non_advertising_minutes = total_minutes - advertising_minutes
-    
-    return non_advertising_minutes / total_minutes
-
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
                          results, video_data_dict, video_analytics_dict, video_decision_details):
     """Process the vetting of a single video."""
@@ -134,9 +119,6 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     
     # Get all analytics in a single call
     video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
-    
-    # Calculate scorable proportion and add it to video analytics
-    video_analytics['scorable_proportion'] = calculate_scorable_proportion(video_analytics)
     
     # Store video data and analytics regardless of vetting result
     video_data_dict[video_id] = video_data
@@ -366,16 +348,29 @@ def calculate_video_score(video_id, youtube_analytics_client):
     # Sort by date
     daily_analytics = sorted(daily_analytics, key=lambda x: x.get("day", ""))
     
-    # Calculate score using only the data between start_date and end_date
+    def get_non_advertising_minutes(day_data):
+        """Calculate minutes watched excluding ADVERTISING traffic source for a given day."""
+        traffic_source_minutes = day_data.get('trafficSourceMinutes', {})
+        if not traffic_source_minutes:
+            # If no traffic source data, fall back to total estimatedMinutesWatched
+            return day_data.get('estimatedMinutesWatched', 0)
+        
+        total_minutes = sum(traffic_source_minutes.values())
+        advertising_minutes = traffic_source_minutes.get('ADVERTISING', 0)
+        non_advertising_minutes = total_minutes - advertising_minutes
+        
+        return max(0, non_advertising_minutes)  # Ensure non-negative
+    
+    # Calculate score using only the data between start_date and end_date, excluding advertising traffic
     scoreable_days = [item for item in daily_analytics if start_date <= item.get('day', '') <= end_date]
-    score = sum(item.get('estimatedMinutesWatched', 0) for item in scoreable_days)
+    score = sum(get_non_advertising_minutes(item) for item in scoreable_days)
 
     scoreable_history_days = [item for item in daily_analytics if item.get('day', '') <= end_date]
-    minutes_watched_w_lag = sum(item.get('estimatedMinutesWatched', 0) for item in scoreable_history_days)
+    scorableHistoryMins = sum(get_non_advertising_minutes(item) for item in scoreable_history_days)
 
     # Return both the score and the daily analytics data
     return {
         "score": score,
-        "minutes_watched_w_lag": minutes_watched_w_lag,
+        "scorableHistoryMins": scorableHistoryMins,
         "daily_analytics": daily_analytics
     } 
