@@ -20,7 +20,6 @@
 import time
 import bittensor as bt
 
-from bitcast.protocol import AccessTokenSynapse
 from bitcast.validator.reward import get_rewards
 from bitcast.utils.uids import get_all_uids
 from bitcast.validator.utils.publish_stats import publish_stats
@@ -41,20 +40,10 @@ async def forward(self):
 
         miner_uids = get_all_uids(self)
 
-        # The dendrite client queries the network.
-        responses = await self.dendrite(
-            # Send the query to selected miner axons in the network.
-            axons=[self.metagraph.axons[uid] for uid in miner_uids],
-            # Request an access token from miners
-            synapse=AccessTokenSynapse(),
-            # Don't deserialize the responses to get the AccessTokenSynapse objects directly
-            deserialize=False,
-        )
+        bt.logging.info(f"Number of miners to query: {len(miner_uids)}")
 
-        bt.logging.info(f"Number of responses received: {len(responses)}")
-
-        # Get rewards for the responses
-        rewards, yt_stats_list = get_rewards(self, miner_uids, responses=responses)
+        # Get rewards for the responses - now queries miners individually
+        rewards, yt_stats_list = await get_rewards(self, miner_uids)
 
         # Log the rewards for monitoring purposes
         bt.logging.info("UID Rewards:")
