@@ -240,6 +240,7 @@ def reset_scored_videos():
     reset_func()
     yield
 
+@pytest.mark.asyncio
 @patch('bitcast.validator.socials.youtube.youtube_scoring.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
@@ -250,7 +251,7 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
-def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
+async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
                         mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
     """Test the get_rewards function end-to-end with a single miner and UID 0"""
@@ -614,12 +615,18 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
     
+    # Create mock_query_miner function that returns responses based on UID
+    async def mock_query_miner(self, uid):
+        return responses[uid]
+    
     # Patch get_briefs to return our test briefs
     with patch('bitcast.validator.reward.get_briefs', return_value=briefs) as mock_get_briefs:
         # Create a wrapper around the reward function that resets scored videos between each UID
         with patch('bitcast.validator.reward.reward', side_effect=reward_wrapper):
-            # Call get_rewards
-            result, yt_stats_list = get_rewards(mock_self, uids, responses)
+            # Patch query_miner to return our mock responses
+            with patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch:
+                # Call get_rewards
+                result, yt_stats_list = await get_rewards(mock_self, uids)
         
         # Verify the result is a numpy array
         assert isinstance(result, np.ndarray)
@@ -634,6 +641,9 @@ def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
         
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
+        
+        # Verify that query_miner was called for each UID
+        assert mock_query_miner_patch.call_count == 3
         
         # Verify that yt_stats_list is returned
         assert isinstance(yt_stats_list, list)
