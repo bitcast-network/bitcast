@@ -508,7 +508,8 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
             }
             
             # Add metrics for each requested metric
-            for key, (metric, dims) in metric_dims.items():
+            for key, metric_config in metric_dims.items():
+                metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
                 if dims == "day":
                     if metric == "estimatedMinutesWatched":
                         result[key] = {

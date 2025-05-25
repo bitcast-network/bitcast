@@ -324,42 +324,41 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
             
     return met_brief_ids, reasonings
 
-def calculate_video_score(video_id, youtube_analytics_client):
+def calculate_video_score(video_id, youtube_analytics_client, video_publish_date):
     """Calculate the score for a video based on analytics data."""
-    query_start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+    # Use video publish date as query start date if provided, otherwise use default
+    try:
+        publish_datetime = datetime.strptime(video_publish_date, '%Y-%m-%dT%H:%M:%SZ')
+        query_start_date = publish_datetime.strftime('%Y-%m-%d')
+    except (ValueError, TypeError):
+        bt.logging.warning(f"Failed to parse video publish date: {video_publish_date}, using default")
+        query_start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+    
     start_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1)).strftime('%Y-%m-%d')
     end_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY)).strftime('%Y-%m-%d')
     today = datetime.now().strftime('%Y-%m-%d')
 
     # Get daily metrics from config
     metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=True)    
-    # Get analytics with the new day_metrics structure
     analytics_result = youtube_utils.get_video_analytics(
         youtube_analytics_client, 
         video_id, 
-        query_start_date,  # Use query_start_date (30 days) instead of start_date 
+        query_start_date,
         today, 
         metric_dims=metric_dims
     )
     
-    # Extract the daily metrics list
-    daily_analytics = list(analytics_result.get("day_metrics", {}).values())
-    
-    # Sort by date
-    daily_analytics = sorted(daily_analytics, key=lambda x: x.get("day", ""))
+    daily_analytics = sorted(analytics_result.get("day_metrics", {}).values(), key=lambda x: x.get("day", ""))
     
     def get_non_advertising_minutes(day_data):
         """Calculate minutes watched excluding ADVERTISING traffic source for a given day."""
         traffic_source_minutes = day_data.get('trafficSourceMinutes', {})
         if not traffic_source_minutes:
-            # If no traffic source data, fall back to total estimatedMinutesWatched
             return day_data.get('estimatedMinutesWatched', 0)
         
         total_minutes = sum(traffic_source_minutes.values())
         advertising_minutes = traffic_source_minutes.get('ADVERTISING', 0)
-        non_advertising_minutes = total_minutes - advertising_minutes
-        
-        return max(0, non_advertising_minutes)  # Ensure non-negative
+        return max(0, total_minutes - advertising_minutes)
     
     # Calculate score using only the data between start_date and end_date, excluding advertising traffic
     scoreable_days = [item for item in daily_analytics if start_date <= item.get('day', '') <= end_date]
@@ -368,7 +367,6 @@ def calculate_video_score(video_id, youtube_analytics_client):
     scoreable_history_days = [item for item in daily_analytics if item.get('day', '') <= end_date]
     scorableHistoryMins = sum(get_non_advertising_minutes(item) for item in scoreable_history_days)
 
-    # Return both the score and the daily analytics data
     return {
         "score": score,
         "scorableHistoryMins": scorableHistoryMins,
