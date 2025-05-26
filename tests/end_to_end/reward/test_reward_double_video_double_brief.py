@@ -328,8 +328,9 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
         # Handle the new metric_dims parameter
         if metric_dims:
             # Check if this is a daily metrics request
-            has_day_dimension = any('day' in dims for _, dims in metric_dims.values() if dims)
+            has_day_dimension = any('day' in dims for metric_config in metric_dims.values() for dims in [metric_config[1]] if dims)
             
+            # If we have day dimension metrics, include them in the result
             if has_day_dimension:
                 # Create day_metrics structure
                 day_metrics = {
@@ -347,39 +348,21 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                     }
                 }
                 
-                # Different metrics for each video
-                if video_id == "test_video_1":
-                    result = {
-                        "averageViewPercentage": 50,
-                        "estimatedMinutesWatched": 1000,
-                        "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
-                    }
-                else:  # test_video_2
-                    result = {
-                        "averageViewPercentage": 55,
-                        "estimatedMinutesWatched": 1200,
-                        "trafficSourceMinutes": {"YT_CHANNEL": 700, "EXT_URL": 500}
-                    }
+                result = {
+                    # Include averageViewPercentage at top level for vetting
+                    "averageViewPercentage": 50,
+                    "estimatedMinutesWatched": 1000,
+                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+                }
                 
                 # Add basic day metrics
-                for key, (metric, dims) in metric_dims.items():
+                for key, metric_config in metric_dims.items():
+                    metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
                     if dims == "day":
-                        if metric == "estimatedMinutesWatched":
-                            if video_id == "test_video_1":
-                                result[key] = {
-                                    day1: 500,
-                                    day2: 500
-                                }
-                            else:  # test_video_2
-                                result[key] = {
-                                    day1: 600,
-                                    day2: 600
-                                }
-                        else:
-                            result[key] = {
-                                day1: 250,
-                                day2: 250
-                            }
+                        result[key] = {
+                            day1: 500 if metric == "estimatedMinutesWatched" else 250,
+                            day2: 500 if metric == "estimatedMinutesWatched" else 250
+                        }
                 
                 # Add the day_metrics structure
                 result["day_metrics"] = day_metrics

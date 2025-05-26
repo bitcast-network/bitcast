@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from unittest.mock import patch, MagicMock
 from bitcast.validator.reward import get_rewards
 from bitcast.validator.reward import normalize_across_miners, normalize_across_briefs, normalise_scores
@@ -10,9 +11,10 @@ MOCK_TEST_BRIEFS = [
     {"id": "brief3", "max_burn": 0.0, "burn_decay": 0.01}
 ]
 
-def test_get_rewards():
+@pytest.mark.asyncio
+async def test_get_rewards():
     # Create mock responses
-    responses = [
+    mock_responses = [
         MagicMock(YT_access_token=None),
         MagicMock(YT_access_token="token1"),
         MagicMock(YT_access_token="token2")
@@ -35,12 +37,17 @@ def test_get_rewards():
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
 
-    # Patch get_briefs and reward functions
+    # Mock query_miner to return responses based on UID
+    async def mock_query_miner(self, uid):
+        return mock_responses[uid]
+
+    # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=MOCK_TEST_BRIEFS) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
-        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        result, yt_stats_list = await get_rewards(mock_self, uids)
         
         # Verify the result is a numpy array
         assert isinstance(result, np.ndarray)
@@ -53,6 +60,9 @@ def test_get_rewards():
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
         
+        # Verify that query_miner was called for each UID
+        assert mock_query_miner_patch.call_count == 3
+        
         # Verify that reward was called for each response
         assert mock_reward.call_count == 3
         
@@ -61,9 +71,10 @@ def test_get_rewards():
         assert len(yt_stats_list) == 3
 
 
-def test_get_rewards_identical_responses():
+@pytest.mark.asyncio
+async def test_get_rewards_identical_responses():
     # Create 4 mock responses (including for uid 0)
-    responses = [
+    mock_responses = [
         MagicMock(YT_access_token=None),  # for uid 0
         MagicMock(YT_access_token="token1"),
         MagicMock(YT_access_token="token2"),
@@ -90,12 +101,17 @@ def test_get_rewards_identical_responses():
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
 
-    # Patch get_briefs and reward functions
+    # Mock query_miner to return responses based on UID
+    async def mock_query_miner(self, uid):
+        return mock_responses[uid]
+
+    # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=MOCK_TEST_BRIEFS) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
-        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        result, yt_stats_list = await get_rewards(mock_self, uids)
         
         expected_result = np.array([0.0, 1/3, 1/3, 1/3])
         
@@ -105,6 +121,9 @@ def test_get_rewards_identical_responses():
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
         
+        # Verify that query_miner was called for each UID
+        assert mock_query_miner_patch.call_count == 4
+        
         # Verify that reward was called for each response
         assert mock_reward.call_count == 4
         
@@ -112,9 +131,10 @@ def test_get_rewards_identical_responses():
         assert isinstance(yt_stats_list, list)
         assert len(yt_stats_list) == 4
 
-def test_get_rewards_with_zeros():
+@pytest.mark.asyncio
+async def test_get_rewards_with_zeros():
     # Create 4 mock responses (including for uid 0)
-    responses = [
+    mock_responses = [
         MagicMock(YT_access_token=None),  # for uid 0
         MagicMock(YT_access_token="token1"),
         MagicMock(YT_access_token="token2"),
@@ -141,12 +161,17 @@ def test_get_rewards_with_zeros():
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
 
-    # Patch get_briefs and reward functions
+    # Mock query_miner to return responses based on UID
+    async def mock_query_miner(self, uid):
+        return mock_responses[uid]
+
+    # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=MOCK_TEST_BRIEFS) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
-        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        result, yt_stats_list = await get_rewards(mock_self, uids)
         
         expected_result = np.array([0.0, 1/3, 1/3, 1/3])
         
@@ -156,6 +181,9 @@ def test_get_rewards_with_zeros():
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
         
+        # Verify that query_miner was called for each UID
+        assert mock_query_miner_patch.call_count == 4
+        
         # Verify that reward was called for each response
         assert mock_reward.call_count == 4
         
@@ -163,9 +191,10 @@ def test_get_rewards_with_zeros():
         assert isinstance(yt_stats_list, list)
         assert len(yt_stats_list) == 4
 
-def test_get_rewards_all_zeros_in_first_position():
+@pytest.mark.asyncio
+async def test_get_rewards_all_zeros_in_first_position():
     # Create 4 mock responses (including for uid 0)
-    responses = [
+    mock_responses = [
         MagicMock(YT_access_token=None),  # for uid 0
         MagicMock(YT_access_token="token1"),
         MagicMock(YT_access_token="token2"),
@@ -199,12 +228,17 @@ def test_get_rewards_all_zeros_in_first_position():
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
 
-    # Patch get_briefs and reward functions
+    # Mock query_miner to return responses based on UID
+    async def mock_query_miner(self, uid):
+        return mock_responses[uid]
+
+    # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
-        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        result, yt_stats_list = await get_rewards(mock_self, uids)
         
         # Verify the result is a numpy array
         assert isinstance(result, np.ndarray)
@@ -222,6 +256,9 @@ def test_get_rewards_all_zeros_in_first_position():
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
         
+        # Verify that query_miner was called for each UID
+        assert mock_query_miner_patch.call_count == 4
+        
         # Verify that reward was called for each response
         assert mock_reward.call_count == 4
         
@@ -230,9 +267,10 @@ def test_get_rewards_all_zeros_in_first_position():
         assert len(yt_stats_list) == 4
         
 
-def test_get_rewards_empty_briefs():
+@pytest.mark.asyncio
+async def test_get_rewards_empty_briefs():
     # Create mock responses
-    responses = [
+    mock_responses = [
         MagicMock(YT_access_token="token1"),
         MagicMock(YT_access_token="token2"),
         MagicMock(YT_access_token="token3")
@@ -244,11 +282,16 @@ def test_get_rewards_empty_briefs():
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
 
+    # Mock query_miner to return responses based on UID
+    async def mock_query_miner(self, uid):
+        return mock_responses[uid]
+
     # Patch get_briefs to return an empty list
-    with patch('bitcast.validator.reward.get_briefs', return_value=[]) as mock_get_briefs:
+    with patch('bitcast.validator.reward.get_briefs', return_value=[]) as mock_get_briefs, \
+         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch:
         
         # Call get_rewards
-        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        result, yt_stats_list = await get_rewards(mock_self, uids)
         
         # Verify the result is a numpy array
         assert isinstance(result, np.ndarray)
@@ -259,6 +302,9 @@ def test_get_rewards_empty_briefs():
         
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
+        
+        # Verify that query_miner was NOT called since briefs is empty (early return)
+        assert mock_query_miner_patch.call_count == 0
         
         # Verify that yt_stats_list is returned with the correct structure
         assert isinstance(yt_stats_list, list)
@@ -368,9 +414,10 @@ def test_normalise_scores():
     print(f"FINAL SCORES {final_scores}")
     assert np.allclose(final_scores, [1.0, 0.0])
 
-def test_get_rewards_with_brief_weights():
+@pytest.mark.asyncio
+async def test_get_rewards_with_brief_weights():
     # Create mock responses
-    responses = [
+    mock_responses = [
         MagicMock(YT_access_token=None),  # for uid 0
         MagicMock(YT_access_token="token1"),
         MagicMock(YT_access_token="token2")
@@ -400,12 +447,17 @@ def test_get_rewards_with_brief_weights():
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
 
-    # Patch get_briefs and reward functions
+    # Mock query_miner to return responses based on UID
+    async def mock_query_miner(self, uid):
+        return mock_responses[uid]
+
+    # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats.pop(0)) as mock_reward:
+         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
-        result, yt_stats_list = get_rewards(mock_self, uids, responses)
+        result, yt_stats_list = await get_rewards(mock_self, uids)
         
         # Verify the result is a numpy array
         assert isinstance(result, np.ndarray)
@@ -424,6 +476,9 @@ def test_get_rewards_with_brief_weights():
         
         # Verify that get_briefs was called
         mock_get_briefs.assert_called_once()
+        
+        # Verify that query_miner was called for each UID
+        assert mock_query_miner_patch.call_count == 3
         
         # Verify that reward was called for each response
         assert mock_reward.call_count == 3

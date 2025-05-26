@@ -347,25 +347,9 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
         # Handle the new metric_dims parameter
         if metric_dims:
             # Check if this is a daily metrics request
-            has_day_dimension = any('day' in dims for _, dims in metric_dims.values() if dims)
+            has_day_dimension = any('day' in dims for metric_config in metric_dims.values() for dims in [metric_config[1]] if dims)
             
             if has_day_dimension:
-                # Create day_metrics structure
-                day_metrics = {
-                    day1: {
-                        "day": day1,
-                        "estimatedMinutesWatched": 0,
-                        "views": 0,
-                        "averageViewPercentage": 0
-                    },
-                    day2: {
-                        "day": day2,
-                        "estimatedMinutesWatched": 0,
-                        "views": 0,
-                        "averageViewPercentage": 0
-                    }
-                }
-                
                 # Assign watch minutes based on video
                 video_total_minutes = {
                     "test_video_1": 600,
@@ -375,11 +359,31 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 }
                 total_minutes = video_total_minutes[video_id]
                 
-                # Update day_metrics with appropriate values
-                day_metrics[day1]["estimatedMinutesWatched"] = total_minutes // 2
-                day_metrics[day2]["estimatedMinutesWatched"] = total_minutes // 2
-                day_metrics[day1]["views"] = total_minutes // 2
-                day_metrics[day2]["views"] = total_minutes // 2
+                # Create day_metrics structure
+                day_metrics = {
+                    day1: {
+                        "day": day1,
+                        "estimatedMinutesWatched": total_minutes // 2,
+                        "views": total_minutes // 2,
+                        "averageViewPercentage": {
+                            "test_video_1": 50,
+                            "test_video_2": 55,
+                            "test_video_3": 45,
+                            "test_video_4": 50
+                        }[video_id]
+                    },
+                    day2: {
+                        "day": day2,
+                        "estimatedMinutesWatched": total_minutes // 2,
+                        "views": total_minutes // 2,
+                        "averageViewPercentage": {
+                            "test_video_1": 50,
+                            "test_video_2": 55,
+                            "test_video_3": 45,
+                            "test_video_4": 50
+                        }[video_id]
+                    }
+                }
                 
                 # Create result with averageViewPercentage at top level for vetting
                 result = {
@@ -393,7 +397,8 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 }
                 
                 # Add basic day metrics for each requested metric
-                for key, (metric, dims) in metric_dims.items():
+                for key, metric_config in metric_dims.items():
+                    metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
                     if dims == "day":
                         if metric == "estimatedMinutesWatched":
                             result[key] = {
@@ -536,4 +541,5 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     assert isinstance(result["scores"]["brief2"], (int, float))
     # Check the new expected scores
     assert result["scores"]["brief1"] == 850  # 600 + 250
+    assert result["scores"]["brief2"] == 550  # 250 + 300
     assert result["scores"]["brief2"] == 550  # 250 + 300
