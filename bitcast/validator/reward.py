@@ -102,7 +102,7 @@ async def get_rewards(
     # Special case: If briefs is empty, return a list of scores where UID 0 gets 1.0 and others get 0.0
     if not briefs:
         bt.logging.info("No briefs available, returning special case scores.")
-        return np.array([1.0 if uid == 0 else 0.0 for uid in uids]), [{"scores": {}} for uid in uids]
+        return np.array([1.0 if uid == 0 else 0.0 for uid in uids]), [{"scores": {}, "uid": uid} for uid in uids]
 
     bt.logging.info(f"List of UIDs: {uids}")
 
@@ -113,9 +113,36 @@ async def get_rewards(
         # Query the individual miner
         miner_response = await query_miner(self, uid)
         
-        # Process the response immediately
-        yt_stats = reward(uid, briefs, miner_response)
-        yt_stats_list.append(yt_stats)
+        if not miner_response:
+            yt_stats_list.append({
+                "scores": {brief["id"]: 0.0 for brief in briefs},
+                "uid": uid
+            })
+            continue
+
+        # Initialize the stats structure for this UID
+        uid_stats = {
+            "uid": uid,
+            "scores": {brief["id"]: 0.0 for brief in briefs}
+        }
+
+        # Process each token separately
+        for token in (miner_response.YT_access_tokens or []):
+            if token:
+                single_token_response = AccessTokenSynapse(YT_access_token=token)
+                token_stats = reward(uid, briefs, single_token_response)
+                
+                # Extract account ID from the token stats
+                account_id = token_stats.get("yt_account", {}).get("id")
+                if account_id:
+                    # Store the full token stats for this account
+                    uid_stats[account_id] = token_stats
+                    
+                    # Add this account's scores to the aggregated scores
+                    for brief_id, score in token_stats.get("scores", {}).items():
+                        uid_stats["scores"][brief_id] = uid_stats["scores"].get(brief_id, 0.0) + score
+
+        yt_stats_list.append(uid_stats)
     
     # Convert dictionary scores to matrix format for normalization
     scores_matrix = []

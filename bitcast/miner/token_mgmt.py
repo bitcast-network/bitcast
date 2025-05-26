@@ -4,6 +4,7 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 import bittensor as bt
 import sys
+import glob
 
 current_dir = os.path.dirname(__file__)
 
@@ -34,13 +35,28 @@ def run_auth_flow():
     bt.logging.info("Refresh token saved.")
 
 def load_token():
-    bt.logging.info("Loading token from file.")
-    with open(os.path.join(current_dir, 'secrets/creds.pkl'), 'rb') as f:
-        creds = pickle.load(f)
+    bt.logging.info("Loading tokens from secrets directory.")
+    tokens = []
     
-    if creds.expired and creds.refresh_token:
-        bt.logging.info("Token expired, refreshing token.")
-        creds.refresh(Request())
-
-    bt.logging.info(f"Token loaded successfully.")
-    return creds.token
+    # Find all .pkl files in the secrets directory
+    cred_files = glob.glob(os.path.join(current_dir, 'secrets/*.pkl'))
+    
+    for cred_file in cred_files:
+        try:
+            with open(cred_file, 'rb') as f:
+                creds = pickle.load(f)
+            
+            if creds.expired and creds.refresh_token:
+                bt.logging.info(f"Token expired in {cred_file}, refreshing token.")
+                creds.refresh(Request())
+            
+            tokens.append(creds.token)
+            bt.logging.info(f"Token loaded successfully from {cred_file}")
+        except Exception as e:
+            bt.logging.error(f"Error loading token from {cred_file}: {e}")
+    
+    if not tokens:
+        bt.logging.error("No valid tokens found in secrets directory.")
+        return None
+        
+    return tokens
