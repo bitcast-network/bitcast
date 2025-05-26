@@ -56,10 +56,8 @@ class Miner(BaseMinerNeuron):
         Returns:
             template.protocol.AccessTokenSynapse: The same synapse object with the access tokens set.
         """
-        # Use token_mgmt logic to load (and refresh if needed) the access tokens
-        tokens = token_mgmt.load_token()
-        if tokens:
-            synapse.YT_access_tokens = tokens
+        # Use token_mgmt logic to load (and refresh if needed) all access tokens.
+        synapse.YT_access_tokens = token_mgmt.load_token()
         return synapse
 
     async def blacklist(

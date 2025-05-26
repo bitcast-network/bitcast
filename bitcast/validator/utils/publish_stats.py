@@ -66,8 +66,7 @@ def convert_numpy_types(obj):
 def clean_video_data(payload):
     """
     Clean and restructure video data to reduce payload size and improve organization.
-    Removes description and transcript fields, and restructures check outcomes to be
-    with their respective data sections.
+    Removes description and transcript fields from videos in the nested account structure.
     
     Args:
         payload: The payload to clean and restructure
@@ -76,26 +75,14 @@ def clean_video_data(payload):
         The cleaned and restructured payload
     """
     if isinstance(payload, dict):
-        # Check if this is a YouTube result with videos
-        if "videos" in payload and isinstance(payload["videos"], dict):
-            # Process each video
-            for video_id, video_data in payload["videos"].items():
-                # Clean video details by removing description and transcript
-                if "details" in video_data and isinstance(video_data["details"], dict):
-                    details = video_data["details"].copy()
-                    if "description" in details:
-                        del details["description"]
-                    if "transcript" in details:
-                        del details["transcript"]
-                    video_data["details"] = details
-                
-                # Preserve daily analytics data if it exists
-                if "analytics" in video_data and isinstance(video_data["analytics"], list):
-                    # Keep the daily analytics data as is
-                    pass
-                elif "analytics" in video_data and isinstance(video_data["analytics"], dict):
-                    # If it's a single analytics entry (not daily), keep it as is
-                    pass
+        # Check for nested account structure (account_1, account_2, etc.)
+        for key, value in payload.items():
+            if key.startswith("account_") and isinstance(value, dict):
+                # This is an account entry, check if it has videos
+                if "videos" in value and isinstance(value["videos"], dict):
+                    # Process each video in this account
+                    for video_id, video_data in value["videos"].items():
+                        clean_individual_video_data(video_data)
         
         # Recursively clean nested dictionaries
         return {key: clean_video_data(value) for key, value in payload.items()}
@@ -104,6 +91,31 @@ def clean_video_data(payload):
         return [clean_video_data(item) for item in payload]
     else:
         return payload
+
+def clean_individual_video_data(video_data):
+    """
+    Clean individual video data by removing description and transcript fields.
+    
+    Args:
+        video_data: The video data dictionary to clean
+    """
+    if isinstance(video_data, dict):
+        # Clean video details by removing description and transcript
+        if "details" in video_data and isinstance(video_data["details"], dict):
+            details = video_data["details"].copy()
+            if "description" in details:
+                del details["description"]
+            if "transcript" in details:
+                del details["transcript"]
+            video_data["details"] = details
+        
+        # Preserve daily analytics data if it exists
+        if "analytics" in video_data and isinstance(video_data["analytics"], list):
+            # Keep the daily analytics data as is
+            pass
+        elif "analytics" in video_data and isinstance(video_data["analytics"], dict):
+            # If it's a single analytics entry (not daily), keep it as is
+            pass
 
 def publish_stats(wallet: bt.wallet, json_payloads: List[Dict[str, Any]], uids: List[str]):
     """

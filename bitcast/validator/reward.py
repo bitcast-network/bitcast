@@ -30,36 +30,71 @@ from bitcast.protocol import AccessTokenSynapse
 def reward(uid, briefs, response) -> dict:
     """
     Returns:
-    - dict: The YouTube statistics dictionary for the miner.
+    - dict: The YouTube statistics dictionary for the miner with nested account structure.
     """
     bt.logging.info(f"===== Reward function called for UID: {uid} =====")
 
     # Give the burn UID 0 score for now.
     if uid == 0:
         bt.logging.info(f"Special case: Setting all scores to 0 for UID: {uid}")
-        return {"scores": {brief["id"]: 0 for brief in briefs}}
+        return {"scores": {brief["id"]: 0 for brief in briefs}, "uid": uid}
 
     if not response:
         bt.logging.info("No response provided, returning default scores.")
-        return {"scores": {brief["id"]: 0.0 for brief in briefs}}
+        return {"scores": {brief["id"]: 0.0 for brief in briefs}, "uid": uid}
     
-    yt_stats = {"scores": {brief["id"]: 0.0 for brief in briefs}}  # Initialize yt_stats outside the try block
+    # Initialize the new nested structure
+    yt_stats = {
+        "scores": {brief["id"]: 0.0 for brief in briefs},  # Aggregated scores across all accounts
+        "uid": uid
+    }
 
     try:
-        # YouTube Scoring
-        yt_access_token = response.YT_access_token
+        # YouTube Scoring - handle multiple tokens
+        yt_access_tokens = response.YT_access_tokens
 
-        if yt_access_token:
-            creds = Credentials(token=yt_access_token)
-            yt_stats = eval_youtube(creds, briefs)  # Assign yt_stats directly if successfully retrieved
+        if yt_access_tokens and isinstance(yt_access_tokens, list):
+            bt.logging.info(f"Processing {len(yt_access_tokens)} YouTube access tokens for UID {uid}")
+            
+            # Limit to maximum 10 tokens
+            tokens_to_process = yt_access_tokens[:10]
+            
+            for i, yt_access_token in enumerate(tokens_to_process):
+                if yt_access_token:
+                    account_id = f"account_{i+1}"
+                    bt.logging.info(f"Processing {account_id} for UID {uid}")
+                    
+                    try:
+                        creds = Credentials(token=yt_access_token)
+                        account_stats = eval_youtube(creds, briefs)
+                        
+                        # Store the account-specific data in the nested structure
+                        yt_stats[account_id] = {
+                            "yt_account": account_stats.get("yt_account", {}),
+                            "videos": account_stats.get("videos", {}),
+                            "scores": account_stats.get("scores", {brief["id"]: 0.0 for brief in briefs})
+                        }
+                        
+                        # Aggregate scores across accounts
+                        for brief_id, score in account_stats.get("scores", {}).items():
+                            yt_stats["scores"][brief_id] += score
+                            
+                    except Exception as e:
+                        bt.logging.error(f"Error processing {account_id} for UID {uid}: {e}")
+                        # Add empty account structure for failed accounts
+                        yt_stats[account_id] = {
+                            "yt_account": {},
+                            "videos": {},
+                            "scores": {brief["id"]: 0.0 for brief in briefs}
+                        }
+                else:
+                    bt.logging.warning(f"Empty token found at index {i} for UID {uid}")
         else:
-            bt.logging.warning(f"YT_access_token not found in response: {response}")
+            bt.logging.warning(f"YT_access_tokens not found or not a list in response: {response}")
 
     except Exception as e:
         bt.logging.error(f"Error in reward calculation: {e}")
-        # Instead of discarding the partial data, we'll keep the yt_stats object
-        # that was initialized above, which will have the default scores
-        # but will be properly structured for the publish_stats function
+        # Keep the initialized structure with default scores
 
     return yt_stats
 
@@ -102,7 +137,7 @@ async def get_rewards(
     # Special case: If briefs is empty, return a list of scores where UID 0 gets 1.0 and others get 0.0
     if not briefs:
         bt.logging.info("No briefs available, returning special case scores.")
-        return np.array([1.0 if uid == 0 else 0.0 for uid in uids]), [{"scores": {}, "uid": uid} for uid in uids]
+        return np.array([1.0 if uid == 0 else 0.0 for uid in uids]), [{"scores": {}} for uid in uids]
 
     bt.logging.info(f"List of UIDs: {uids}")
 
@@ -113,40 +148,14 @@ async def get_rewards(
         # Query the individual miner
         miner_response = await query_miner(self, uid)
         
-        if not miner_response:
-            yt_stats_list.append({
-                "scores": {brief["id"]: 0.0 for brief in briefs},
-                "uid": uid
-            })
-            continue
-
-        # Initialize the stats structure for this UID
-        uid_stats = {
-            "uid": uid,
-            "scores": {brief["id"]: 0.0 for brief in briefs}
-        }
-
-        # Process each token separately
-        for token in (miner_response.YT_access_tokens or []):
-            if token:
-                single_token_response = AccessTokenSynapse(YT_access_token=token)
-                token_stats = reward(uid, briefs, single_token_response)
-                
-                # Extract account ID from the token stats
-                account_id = token_stats.get("yt_account", {}).get("id")
-                if account_id:
-                    # Store the full token stats for this account
-                    uid_stats[account_id] = token_stats
-                    
-                    # Add this account's scores to the aggregated scores
-                    for brief_id, score in token_stats.get("scores", {}).items():
-                        uid_stats["scores"][brief_id] = uid_stats["scores"].get(brief_id, 0.0) + score
-
-        yt_stats_list.append(uid_stats)
+        # Process the response immediately
+        yt_stats = reward(uid, briefs, miner_response)
+        yt_stats_list.append(yt_stats)
     
     # Convert dictionary scores to matrix format for normalization
     scores_matrix = []
     for yt_stats in yt_stats_list:
+        # Extract aggregated scores from the new nested structure
         scores = [yt_stats["scores"].get(brief["id"], 0.0) for brief in briefs]
         scores_matrix.append(scores)
     
