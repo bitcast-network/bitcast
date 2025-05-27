@@ -275,7 +275,7 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     ]
     
     mock_response = MagicMock()
-    mock_response.YT_access_token = "mock_token"
+    mock_response.YT_access_tokens = ["mock_token"]
     
     youtube_data_client, youtube_analytics_client = get_mock_youtube_clients()
     

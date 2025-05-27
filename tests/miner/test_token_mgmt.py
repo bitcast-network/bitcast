@@ -28,9 +28,12 @@ def test_load_token_when_not_expired():
     mock_creds.token = "not_expired_token"
 
     with patch('builtins.open'), \
-         patch('pickle.load', return_value=mock_creds):
-        token = load_token()
-        assert token == "not_expired_token"
+         patch('pickle.load', return_value=mock_creds), \
+         patch('os.path.exists', return_value=True), \
+         patch('os.listdir', return_value=['creds.pkl']):
+        tokens = load_token()
+        assert tokens == ["not_expired_token"]
+        assert len(tokens) == 1
 
 def test_load_token_when_expired_and_has_refresh():
     from bitcast.miner.token_mgmt import load_token
@@ -44,9 +47,12 @@ def test_load_token_when_expired_and_has_refresh():
     with patch('builtins.open'), \
          patch('pickle.load', return_value=mock_creds), \
          patch('bitcast.miner.token_mgmt.Request'), \
-         patch.object(mock_creds, 'refresh'):
-        token = load_token()
-        assert token == "refreshed_token"
+         patch.object(mock_creds, 'refresh'), \
+         patch('os.path.exists', return_value=True), \
+         patch('os.listdir', return_value=['creds.pkl']):
+        tokens = load_token()
+        assert tokens == ["refreshed_token"]
+        assert len(tokens) == 1
 
 # init function
 def test_init():

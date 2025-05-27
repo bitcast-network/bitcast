@@ -281,15 +281,15 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     
     # Create responses for all UIDs
     mock_response_0 = MagicMock()
-    mock_response_0.YT_access_token = None  # UID 0 has no token
+    mock_response_0.YT_access_tokens = None  # UID 0 has no token
     mock_response_0.YT_channel_id = None
     
     mock_response_1 = MagicMock()
-    mock_response_1.YT_access_token = "mock_token_1"
+    mock_response_1.YT_access_tokens = ["mock_token_1"]
     mock_response_1.YT_channel_id = "test_channel"  # Add channel ID for UID 1
     
     mock_response_2 = MagicMock()
-    mock_response_2.YT_access_token = "mock_token_2"  # UID 2 has different token from UID 1
+    mock_response_2.YT_access_tokens = ["mock_token_2"]  # UID 2 has different token from UID 1
     mock_response_2.YT_channel_id = "test_channel_uid2"  # Add channel ID for UID 2
     
     responses = [mock_response_0, mock_response_1, mock_response_2]

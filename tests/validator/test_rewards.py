@@ -13,25 +13,41 @@ MOCK_TEST_BRIEFS = [
 
 @pytest.mark.asyncio
 async def test_get_rewards():
-    # Create mock responses
+    # Create mock responses with new synapse structure
     mock_responses = [
-        MagicMock(YT_access_token=None),
-        MagicMock(YT_access_token="token1"),
-        MagicMock(YT_access_token="token2")
+        MagicMock(YT_access_tokens=None),
+        MagicMock(YT_access_tokens=["token1"]),
+        MagicMock(YT_access_tokens=["token2"])
     ]
 
     # Create mock UIDs
     uids = [0, 1, 2]
 
-    # Mock yt_stats to be returned by reward function, including videos with minutes watched
+    # Mock yt_stats to be returned by reward function with new nested structure
     mock_yt_stats = [
-        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 15, "brief2": 15, "brief3": 15}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 20}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }}
+        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "uid": 0},
+        {
+            "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, 
+            "uid": 1,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 10, "brief2": 10, "brief3": 10}
+            }
+        },
+        {
+            "scores": {"brief1": 15, "brief2": 15, "brief3": 15}, 
+            "uid": 2,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 20}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 15, "brief2": 15, "brief3": 15}
+            }
+        }
     ]
 
     # Create a mock class instance for self parameter
@@ -75,10 +91,10 @@ async def test_get_rewards():
 async def test_get_rewards_identical_responses():
     # Create 4 mock responses (including for uid 0)
     mock_responses = [
-        MagicMock(YT_access_token=None),  # for uid 0
-        MagicMock(YT_access_token="token1"),
-        MagicMock(YT_access_token="token2"),
-        MagicMock(YT_access_token="token3")
+        MagicMock(YT_access_tokens=None),  # for uid 0
+        MagicMock(YT_access_tokens=["token1"]),
+        MagicMock(YT_access_tokens=["token2"]),
+        MagicMock(YT_access_tokens=["token3"])
     ]
 
     # Create mock UIDs (include uid 0)
@@ -86,16 +102,40 @@ async def test_get_rewards_identical_responses():
 
     # Mock yt_stats to be returned by reward function - all identical except for uid 0
     mock_yt_stats = [
-        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},  # Scores for response 1
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},  # Scores for response 2
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }}   # Scores for response 3
+        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "uid": 0},  # Scores for uid 0
+        {
+            "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, 
+            "uid": 1,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 5, "brief2": 10, "brief3": 15}
+            }
+        },  # Scores for response 1
+        {
+            "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, 
+            "uid": 2,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 5, "brief2": 10, "brief3": 15}
+            }
+        },  # Scores for response 2
+        {
+            "scores": {"brief1": 5, "brief2": 10, "brief3": 15}, 
+            "uid": 3,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 5, "brief2": 10, "brief3": 15}
+            }
+        }   # Scores for response 3
     ]
 
     # Create a mock class instance for self parameter
@@ -135,10 +175,10 @@ async def test_get_rewards_identical_responses():
 async def test_get_rewards_with_zeros():
     # Create 4 mock responses (including for uid 0)
     mock_responses = [
-        MagicMock(YT_access_token=None),  # for uid 0
-        MagicMock(YT_access_token="token1"),
-        MagicMock(YT_access_token="token2"),
-        MagicMock(YT_access_token="token3")
+        MagicMock(YT_access_tokens=None),  # for uid 0
+        MagicMock(YT_access_tokens=["token1"]),
+        MagicMock(YT_access_tokens=["token2"]),
+        MagicMock(YT_access_tokens=["token3"])
     ]
 
     # Create mock UIDs (include uid 0)
@@ -146,16 +186,40 @@ async def test_get_rewards_with_zeros():
 
     # Mock yt_stats to be returned by reward function - each has a zero in one position, uid 0 all zeros
     mock_yt_stats = [
-        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},  # Scores for response 1
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 0, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},  # Scores for response 2
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 0}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
-        }}   # Scores for response 3
+        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "uid": 0},  # Scores for uid 0
+        {
+            "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, 
+            "uid": 1,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 0, "brief2": 10, "brief3": 10}
+            }
+        },  # Scores for response 1
+        {
+            "scores": {"brief1": 10, "brief2": 0, "brief3": 10}, 
+            "uid": 2,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 10, "brief2": 0, "brief3": 10}
+            }
+        },  # Scores for response 2
+        {
+            "scores": {"brief1": 10, "brief2": 10, "brief3": 0}, 
+            "uid": 3,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 10, "brief2": 10, "brief3": 0}
+            }
+        }   # Scores for response 3
     ]
 
     # Create a mock class instance for self parameter
@@ -195,10 +259,10 @@ async def test_get_rewards_with_zeros():
 async def test_get_rewards_all_zeros_in_first_position():
     # Create 4 mock responses (including for uid 0)
     mock_responses = [
-        MagicMock(YT_access_token=None),  # for uid 0
-        MagicMock(YT_access_token="token1"),
-        MagicMock(YT_access_token="token2"),
-        MagicMock(YT_access_token="token3")
+        MagicMock(YT_access_tokens=None),  # for uid 0
+        MagicMock(YT_access_tokens=["token1"]),
+        MagicMock(YT_access_tokens=["token2"]),
+        MagicMock(YT_access_tokens=["token3"])
     ]
 
     # Create mock UIDs (include uid 0)
@@ -206,16 +270,40 @@ async def test_get_rewards_all_zeros_in_first_position():
 
     # Mock yt_stats to be returned by reward function - all have zero in first position, uid 0 all zeros
     mock_yt_stats = [
-        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},  # Scores for response 1
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},  # Scores for response 2
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }}   # Scores for response 3
+        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "uid": 0},  # Scores for uid 0
+        {
+            "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, 
+            "uid": 1,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 0, "brief2": 10, "brief3": 10}
+            }
+        },  # Scores for response 1
+        {
+            "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, 
+            "uid": 2,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 0, "brief2": 10, "brief3": 10}
+            }
+        },  # Scores for response 2
+        {
+            "scores": {"brief1": 0, "brief2": 10, "brief3": 10}, 
+            "uid": 3,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 0, "brief2": 10, "brief3": 10}
+            }
+        }   # Scores for response 3
     ]
 
     # Mock briefs to be returned by get_briefs (with max_burn=0)
@@ -271,9 +359,9 @@ async def test_get_rewards_all_zeros_in_first_position():
 async def test_get_rewards_empty_briefs():
     # Create mock responses
     mock_responses = [
-        MagicMock(YT_access_token="token1"),
-        MagicMock(YT_access_token="token2"),
-        MagicMock(YT_access_token="token3")
+        MagicMock(YT_access_tokens=["token1"]),
+        MagicMock(YT_access_tokens=["token2"]),
+        MagicMock(YT_access_tokens=["token3"])
     ]
 
     # Create mock UIDs - include UID 0
@@ -316,6 +404,95 @@ async def test_get_rewards_empty_briefs():
         # Verify that other UIDs have a score of 0.0
         assert yt_stats_list[1]["scores"] == {}
         assert yt_stats_list[2]["scores"] == {}
+
+@pytest.mark.asyncio
+async def test_get_rewards_with_brief_weights():
+    # Create mock responses
+    mock_responses = [
+        MagicMock(YT_access_tokens=None),  # for uid 0
+        MagicMock(YT_access_tokens=["token1"]),
+        MagicMock(YT_access_tokens=["token2"])
+    ]
+
+    # Create mock UIDs
+    uids = [0, 1, 2]
+
+    # Mock briefs with different weights
+    mock_briefs = [
+        {"id": "brief1", "max_burn": 0.0, "burn_decay": 0.01, "weight": 100},
+        {"id": "brief2", "max_burn": 0.0, "burn_decay": 0.01, "weight": 200},
+        {"id": "brief3", "max_burn": 0.0, "burn_decay": 0.01, "weight": 300}
+    ]
+
+    # Mock yt_stats with identical scores for each brief
+    mock_yt_stats = [
+        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "uid": 0},  # Scores for uid 0
+        {
+            "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, 
+            "uid": 1,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 10, "brief2": 10, "brief3": 10}
+            }
+        },  # Scores for response 1
+        {
+            "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, 
+            "uid": 2,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 10, "brief2": 10, "brief3": 10}
+            }
+        }   # Scores for response 2
+    ]
+
+    # Create a mock class instance for self parameter
+    mock_self = MagicMock()
+
+    # Mock query_miner to return responses based on UID
+    async def mock_query_miner(self, uid):
+        return mock_responses[uid]
+
+    # Patch get_briefs, query_miner, and reward functions
+    with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
+         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
+        
+        # Call get_rewards
+        result, yt_stats_list = await get_rewards(mock_self, uids)
+        
+        # Verify the result is a numpy array
+        assert isinstance(result, np.ndarray)
+        
+        # After applying weights:
+        # brief1: 10 * 100 = 1000
+        # brief2: 10 * 200 = 2000
+        # brief3: 10 * 300 = 3000
+        # After normalization across miners: [0, 0.5, 0.5] for each brief
+        # After normalization across briefs: [0, 0.5/3, 0.5/3] for each brief
+        # Final sum for each: [0, 0.5, 0.5]
+        expected_result = np.array([0.0, 0.5, 0.5])
+        
+        # Check that the result matches the expected values (with some tolerance for floating point)
+        np.testing.assert_allclose(result, expected_result, rtol=1e-5, atol=1e-10)
+        
+        # Verify that get_briefs was called
+        mock_get_briefs.assert_called_once()
+        
+        # Verify that query_miner was called for each UID
+        assert mock_query_miner_patch.call_count == 3
+        
+        # Verify that reward was called for each response
+        assert mock_reward.call_count == 3
+        
+        # Verify that yt_stats_list is returned
+        assert isinstance(yt_stats_list, list)
+        assert len(yt_stats_list) == 3
 
 def test_normalize_across_miners():
     # Test with regular matrix
@@ -372,13 +549,29 @@ def test_normalise_scores():
     # Test with regular matrix
     scores_matrix = np.array([[0, 0, 0], [10, 30, 2], [90, 70, 2]])
     mock_yt_stats = [
-        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}},
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 90, "brief2": 70, "brief3": 2}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 20}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }}
+        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "uid": 0},
+        {
+            "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, 
+            "uid": 1,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 10, "brief2": 30, "brief3": 2}
+            }
+        },
+        {
+            "scores": {"brief1": 90, "brief2": 70, "brief3": 2}, 
+            "uid": 2,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 20}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 90, "brief2": 70, "brief3": 2}
+            }
+        }
     ]
     
     final_scores = normalise_scores(scores_matrix, mock_yt_stats, MOCK_TEST_BRIEFS)
@@ -392,97 +585,48 @@ def test_normalise_scores():
     
     # Test with single row
     scores_matrix = np.array([[10, 30, 2]])
-    mock_yt_stats = [{"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, "videos": {
-        "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-    }}]
+    mock_yt_stats = [{
+        "scores": {"brief1": 10, "brief2": 30, "brief3": 2}, 
+        "uid": 0,
+        "account_1": {
+            "yt_account": {"channel_vet_result": True},
+            "videos": {
+                "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
+            },
+            "scores": {"brief1": 10, "brief2": 30, "brief3": 2}
+        }
+    }]
     final_scores = normalise_scores(scores_matrix, mock_yt_stats, MOCK_TEST_BRIEFS)
     assert np.allclose(final_scores, [1.0])
     
     # Test with all zeros
     scores_matrix = np.array([[0, 0], [0, 0]])
     mock_yt_stats = [
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 0}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
-        }},
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 0, "brief2": 0}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
-        }}
+        {
+            "scores": {"brief1": 0, "brief2": 0}, 
+            "uid": 0,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 0, "brief2": 0}
+            }
+        },
+        {
+            "scores": {"brief1": 0, "brief2": 0}, 
+            "uid": 1,
+            "account_1": {
+                "yt_account": {"channel_vet_result": True},
+                "videos": {
+                    "video1": {"analytics": {"scorableHistoryMins": 0}, "matching_brief_ids": ["brief1", "brief2"], "decision_details": {"video_vet_result": True}}
+                },
+                "scores": {"brief1": 0, "brief2": 0}
+            }
+        }
     ]
     mock_briefs = [{"id": "brief1", "max_burn": 0.0, "burn_decay": 0.01},
                    {"id": "brief2", "max_burn": 0.0, "burn_decay": 0.01}]
     final_scores = normalise_scores(scores_matrix, mock_yt_stats, mock_briefs)
     print(f"FINAL SCORES {final_scores}")
     assert np.allclose(final_scores, [1.0, 0.0])
-
-@pytest.mark.asyncio
-async def test_get_rewards_with_brief_weights():
-    # Create mock responses
-    mock_responses = [
-        MagicMock(YT_access_token=None),  # for uid 0
-        MagicMock(YT_access_token="token1"),
-        MagicMock(YT_access_token="token2")
-    ]
-
-    # Create mock UIDs
-    uids = [0, 1, 2]
-
-    # Mock briefs with different weights
-    mock_briefs = [
-        {"id": "brief1", "max_burn": 0.0, "burn_decay": 0.01, "weight": 100},
-        {"id": "brief2", "max_burn": 0.0, "burn_decay": 0.01, "weight": 200},
-        {"id": "brief3", "max_burn": 0.0, "burn_decay": 0.01, "weight": 300}
-    ]
-
-    # Mock yt_stats with identical scores for each brief
-    mock_yt_stats = [
-        {"scores": {"brief1": 0, "brief2": 0, "brief3": 0}, "videos": {}},  # Scores for uid 0
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }},  # Scores for response 1
-        {"yt_account": {"channel_vet_result": True}, "scores": {"brief1": 10, "brief2": 10, "brief3": 10}, "videos": {
-            "video1": {"analytics": {"scorableHistoryMins": 10}, "matching_brief_ids": ["brief1", "brief2", "brief3"], "decision_details": {"video_vet_result": True}}
-        }}   # Scores for response 2
-    ]
-
-    # Create a mock class instance for self parameter
-    mock_self = MagicMock()
-
-    # Mock query_miner to return responses based on UID
-    async def mock_query_miner(self, uid):
-        return mock_responses[uid]
-
-    # Patch get_briefs, query_miner, and reward functions
-    with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
-         patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
-        
-        # Call get_rewards
-        result, yt_stats_list = await get_rewards(mock_self, uids)
-        
-        # Verify the result is a numpy array
-        assert isinstance(result, np.ndarray)
-        
-        # After applying weights:
-        # brief1: 10 * 100 = 1000
-        # brief2: 10 * 200 = 2000
-        # brief3: 10 * 300 = 3000
-        # After normalization across miners: [0, 0.5, 0.5] for each brief
-        # After normalization across briefs: [0, 0.5/3, 0.5/3] for each brief
-        # Final sum for each: [0, 0.5, 0.5]
-        expected_result = np.array([0.0, 0.5, 0.5])
-        
-        # Check that the result matches the expected values (with some tolerance for floating point)
-        np.testing.assert_allclose(result, expected_result, rtol=1e-5, atol=1e-10)
-        
-        # Verify that get_briefs was called
-        mock_get_briefs.assert_called_once()
-        
-        # Verify that query_miner was called for each UID
-        assert mock_query_miner_patch.call_count == 3
-        
-        # Verify that reward was called for each response
-        assert mock_reward.call_count == 3
-        
-        # Verify that yt_stats_list is returned
-        assert isinstance(yt_stats_list, list)
-        assert len(yt_stats_list) == 3
