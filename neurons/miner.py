@@ -48,16 +48,16 @@ class Miner(BaseMinerNeuron):
         self, synapse: AccessTokenSynapse
     ) -> AccessTokenSynapse:
         """
-        Processes the incoming AccessTokenSynapse by loading an access token using token management logic.
+        Processes the incoming AccessTokenSynapse by loading access tokens using token management logic.
         
         Args:
             synapse (template.protocol.AccessTokenSynapse): The synapse object representing the token request.
         
         Returns:
-            template.protocol.AccessTokenSynapse: The same synapse object with the access token set.
+            template.protocol.AccessTokenSynapse: The same synapse object with the access tokens set.
         """
-        # Use token_mgmt logic to load (and refresh if needed) the access token.
-        synapse.YT_access_token = token_mgmt.load_token()
+        # Use token_mgmt logic to load (and refresh if needed) all access tokens.
+        synapse.YT_access_tokens = token_mgmt.load_token()
         return synapse
 
     async def blacklist(
