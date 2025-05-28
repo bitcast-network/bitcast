@@ -305,83 +305,60 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
         # Handle the new metric_dims parameter
         if metric_dims:
             # Check if this is a daily metrics request
-            has_day_dimension = any('day' in dims for _, dims in metric_dims.values() if dims)
+            has_day_dimension = any('day' in dims for metric_config in metric_dims.values() for dims in [metric_config[1]] if dims)
             
+            # If we have day dimension metrics, include them in the result
             if has_day_dimension:
-                # Create a day_metrics structure
+                # Create day_metrics structure
                 day_metrics = {
                     day1: {
                         "day": day1,
                         "estimatedMinutesWatched": 500,
                         "views": 250,
-                        "likes": 100,
-                        "comments": 20,
-                        "shares": 10,
-                        "averageViewDuration": 180,
                         "averageViewPercentage": 50
                     },
                     day2: {
                         "day": day2,
                         "estimatedMinutesWatched": 500,
                         "views": 250,
-                        "likes": 100,
-                        "comments": 20,
-                        "shares": 10,
-                        "averageViewDuration": 180,
                         "averageViewPercentage": 50
                     }
                 }
                 
                 result = {
-                    # Make sure averageViewPercentage is included at the top level for vetting
+                    # Include averageViewPercentage at top level for vetting
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 1000,
                     "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
                 }
                 
                 # Add basic day metrics
-                for key, (metric, dims) in metric_dims.items():
+                for key, metric_config in metric_dims.items():
+                    metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
                     if dims == "day":
                         result[key] = {
                             day1: 500 if metric == "estimatedMinutesWatched" else 250,
                             day2: 500 if metric == "estimatedMinutesWatched" else 250
                         }
                 
-                # Add complex day metrics (like deviceType)
-                for key, (metric, dims) in metric_dims.items():
-                    if dims and "," in dims and "day" in dims:
-                        # For complex metrics like deviceTypeMinutes
-                        if key == "deviceTypeMinutes":
-                            result[key] = {
-                                f"DESKTOP|{day1}": 400,
-                                f"MOBILE|{day1}": 100,
-                                f"DESKTOP|{day2}": 400,
-                                f"MOBILE|{day2}": 100
-                            }
-                        elif key == "operatingSystemMinutes":
-                            result[key] = {
-                                f"WINDOWS|{day1}": 300,
-                                f"ANDROID|{day1}": 200,
-                                f"WINDOWS|{day2}": 300,
-                                f"ANDROID|{day2}": 200
-                            }
-                
                 # Add the day_metrics structure
                 result["day_metrics"] = day_metrics
                 return result
-            else:
-                # Return general analytics
-                return {
-                    "views": 500,
-                    "comments": 40,
-                    "likes": 200, 
-                    "dislikes": 10,
-                    "shares": 20,
-                    "averageViewDuration": 180,
-                    "averageViewPercentage": 50,
-                    "estimatedMinutesWatched": 1000,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
-                }
+            
+            # Check if this video meets briefs for non-day dimension case
+            result = {
+                "averageViewPercentage": 50,
+                "estimatedMinutesWatched": 1000,
+                "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500}
+            }
+            
+            # Add non-day metrics
+            for key, metric_config in metric_dims.items():
+                metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
+                if dims != "day":
+                    result[key] = 100  # Default value for non-day metrics
+            
+            return result
         
         # Legacy format support for backward compatibility
         if dimensions == 'day':
