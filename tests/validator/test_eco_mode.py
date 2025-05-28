@@ -126,8 +126,10 @@ def test_eco_mode_disabled_continues_despite_early_return():
         mock_publish_date.assert_called_once()
         mock_retention.assert_called_once()
         mock_captions.assert_called_once()
-        mock_transcript.assert_called_once()
-        mock_prompt_injection.assert_called_once()
+        # Note: transcript and prompt injection are NOT called because all_checks_passed is False
+        # This is the new optimized behavior - transcript is only retrieved when all checks pass
+        mock_transcript.assert_not_called()
+        mock_prompt_injection.assert_not_called()
         mock_evaluate.assert_not_called()  # This is still not called because all_checks_passed is False
         
         # Verify result contains expected values
