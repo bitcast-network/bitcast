@@ -109,7 +109,7 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
             
             # Implement sliding expiration - reset the 24-hour timer on access
             with OpenaiClient._cache_lock:
-                cache.set(prompt_content, cached_result, expire=86400)
+                cache.set(prompt_content, cached_result, expire=259200)
             
             emoji = "✅" if meets_brief else "❌"
             bt.logging.info(f"Meets brief '{brief['id']}': {meets_brief} {emoji} (cache)")
@@ -135,7 +135,7 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
 
         if cache is not None:
             with OpenaiClient._cache_lock:
-                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=86400)  # 1 day cache
+                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=259200)  # 3 day cache
 
         emoji = "✅" if meets_brief else "❌"
         bt.logging.info(f"Brief {brief['id']} met: {meets_brief} {emoji}")
@@ -179,7 +179,7 @@ def check_for_prompt_injection(description, transcript):
             
             # Implement sliding expiration - reset the 24-hour timer on access
             with OpenaiClient._cache_lock:
-                cache.set(injection_prompt_template, injection_detected, expire=86400)
+                cache.set(injection_prompt_template, injection_detected, expire=259200)
             
             bt.logging.info(f"Prompt Injection: {injection_detected} (cache)")
             return injection_detected
@@ -202,7 +202,7 @@ def check_for_prompt_injection(description, transcript):
 
         if cache is not None:
             with OpenaiClient._cache_lock:
-                cache.set(injection_prompt_template, injection_detected, expire=86400)  # 1 day cache
+                cache.set(injection_prompt_template, injection_detected, expire=259200)  # 3 day cache
 
         bt.logging.info(f"Prompt Injection Check: {'Failed' if injection_detected else 'Passed'}")
         return injection_detected
