@@ -106,6 +106,11 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
             cached_result = cache[prompt_content]
             meets_brief = cached_result["meets_brief"]
             reasoning = cached_result["reasoning"]
+            
+            # Implement sliding expiration - reset the 24-hour timer on access
+            with OpenaiClient._cache_lock:
+                cache.set(prompt_content, cached_result, expire=86400)
+            
             emoji = "✅" if meets_brief else "❌"
             bt.logging.info(f"Meets brief '{brief['id']}': {meets_brief} {emoji} (cache)")
             return meets_brief, reasoning
@@ -171,6 +176,11 @@ def check_for_prompt_injection(description, transcript):
         cache = None if DISABLE_LLM_CACHING else OpenaiClient.get_cache()
         if cache is not None and injection_prompt_template in cache:
             injection_detected = cache[injection_prompt_template]
+            
+            # Implement sliding expiration - reset the 24-hour timer on access
+            with OpenaiClient._cache_lock:
+                cache.set(injection_prompt_template, injection_detected, expire=86400)
+            
             bt.logging.info(f"Prompt Injection: {injection_detected} (cache)")
             return injection_detected
 
