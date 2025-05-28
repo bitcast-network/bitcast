@@ -173,28 +173,29 @@ def vet_video(video_id, briefs, video_data, video_analytics):
         if handle_check_failure():
             return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
-    # Get transcript
-    transcript = get_video_transcript(video_id, video_data)
-    if transcript is None:
-        if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
-    
-    # Check for prompt injection
-    if transcript is not None and not check_prompt_injection(video_id, video_data, transcript, decision_details):
-        if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
-    elif transcript is None:
-        # If transcript is None, set prompt injection check to False
-        decision_details["promptInjectionCheck"] = False
-    
-    # Evaluate content against briefs if all checks passed
+    # Only get transcript and run prompt injection/brief checks if all other checks passed
     met_brief_ids = []
     brief_reasonings = []
-    if all_checks_passed and transcript is not None:
-        # Only now set contentAgainstBriefCheck
-        met_brief_ids, brief_reasonings = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+    if all_checks_passed:
+        # Get transcript only when needed
+        transcript = get_video_transcript(video_id, video_data)
+        if transcript is None:
+            decision_details["video_vet_result"] = False
+            decision_details["promptInjectionCheck"] = False
+            decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
+            brief_reasonings = ["Failed to get video transcript"] * len(briefs)
+        else:
+            # Check for prompt injection
+            if not check_prompt_injection(video_id, video_data, transcript, decision_details):
+                decision_details["video_vet_result"] = False
+                decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
+                brief_reasonings = ["Video failed prompt injection check"] * len(briefs)
+            else:
+                # Evaluate content against briefs only if prompt injection check passed
+                met_brief_ids, brief_reasonings = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
     else:
-        # If any check failed, set all briefs to false
+        # If any check failed, set all briefs to false and prompt injection to false
+        decision_details["promptInjectionCheck"] = False
         decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
         brief_reasonings = ["Video failed initial checks"] * len(briefs)
     
