@@ -17,7 +17,7 @@ from bitcast.validator.utils.config import (
     ECO_MODE,
     BITCAST_BLACKLIST_SOURCES_ENDPOINT
 )
-from bitcast.validator.socials.youtube.config import get_youtube_metrics
+from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics
 from bitcast.validator.utils.blacklist import is_blacklisted, get_blacklist_sources
 import requests
 
@@ -131,6 +131,13 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     decision_details = vet_result["decision_details"]
     results[video_id] = decision_details["contentAgainstBriefCheck"]
     video_decision_details[video_id] = decision_details
+    
+    # Retrieve advanced metrics only for qualified videos when not in eco mode
+    if not ECO_MODE and decision_details.get("anyBriefMatched", False):
+        bt.logging.info(f"Fetching advanced metrics.")
+        advanced_metrics = get_advanced_metrics()
+        advanced_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
+        video_analytics_dict[video_id].update(advanced_analytics)
     
     valid_checks = [check for check in decision_details["contentAgainstBriefCheck"] if check is not None]
     bt.logging.info(f"Video meets {sum(valid_checks)} briefs.")

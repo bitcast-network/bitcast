@@ -49,11 +49,15 @@ ADDITIONAL_METRICS = {
     "elapsedVideoTimeRatioAudienceWatchRatio": ("audienceWatchRatio", "elapsedVideoTimeRatio", None, None, None),
     "sharingServiceShares": ("shares", "sharingService", None, None, "-shares"),
     "relativeRetentionPerformance": ("relativeRetentionPerformance", "elapsedVideoTimeRatio", None, None, None),
-    #"insightTrafficSourceDetail_YT_SEARCH": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_SEARCH", 10, "-estimatedMinutesWatched"),
-    #"insightTrafficSourceDetail_RELATED_VIDEO": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==RELATED_VIDEO", 10, "-estimatedMinutesWatched"),
-    #"insightTrafficSourceDetail_YT_CHANNEL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_CHANNEL", 10, "-estimatedMinutesWatched"),
     "creatorContentTypeMinutes": ("estimatedMinutesWatched", "creatorContentType", None, None, None),
     "subscribedStatusMinutes": ("averageViewPercentage", "subscribedStatus", None, None, None),
+}
+
+# Slow API calls that we only use in non eco mode on videos of interest
+ADVANCED_METRICS = {
+    "insightTrafficSourceDetail_YT_SEARCH": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_SEARCH", 10, "-estimatedMinutesWatched"),
+    "insightTrafficSourceDetail_RELATED_VIDEO": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==RELATED_VIDEO", 10, "-estimatedMinutesWatched"),
+    "insightTrafficSourceDetail_YT_CHANNEL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_CHANNEL", 10, "-estimatedMinutesWatched"),
 }
 
 # Core daily metrics - all metrics with day dimension
@@ -108,3 +112,9 @@ def get_youtube_metrics(eco_mode, for_daily=False):
         return {**CORE_METRICS}
     else:
         return {**CORE_METRICS, **ADDITIONAL_METRICS}
+
+def get_advanced_metrics():
+    """
+    Get only the advanced YouTube metrics configuration.
+    """
+    return ADVANCED_METRICS
