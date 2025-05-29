@@ -243,6 +243,7 @@ def reset_scored_videos():
 @pytest.mark.asyncio
 @patch('bitcast.validator.socials.youtube.youtube_scoring.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
+@patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
@@ -253,8 +254,14 @@ def reset_scored_videos():
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
-                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
-    """Test the get_rewards function end-to-end with a single miner and UID 0"""
+                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist_sources,
+                        mock_get_blacklist, mock_build):
+    """Test the get_rewards function with a single miner."""
+    # Mock blacklist sources to return ADVERTISING
+    mock_get_blacklist_sources.return_value = ["ADVERTISING"]
+    
+    # Mock blacklist to return empty list (no blacklisted channels)
+    mock_get_blacklist.return_value = []
     
     # Setup test data
     uids = [0, 1, 2]  # Include UIDs 0, 1, and 2
@@ -303,7 +310,6 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     mock_build.side_effect = lambda service, version, credentials=None: (
         youtube_data_client if service == "youtube" else youtube_analytics_client
     )
-    mock_get_blacklist.return_value = []
     
     # Track which UID we're currently evaluating
     current_uid = [0]  # Use a list so we can modify it inside functions
