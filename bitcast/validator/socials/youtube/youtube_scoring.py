@@ -169,7 +169,9 @@ def check_video_brief_matches(video_id, video_matches, briefs):
 
 def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result):
     """Calculate and update the score for a video that matches a brief."""
-    video_score_result = calculate_video_score(video_id, youtube_analytics_client)
+    video_publish_date = result["videos"][video_id]["details"].get("publishedAt")
+    
+    video_score_result = calculate_video_score(video_id, youtube_analytics_client, video_publish_date)
     video_score = video_score_result["score"]
     bt.logging.info(f"Raw video_score from calculate_video_score: {video_score}")
     

@@ -48,7 +48,7 @@ def mark_video_as_scored(video_id):
 # ============================================================================
 
 @retry(**YT_API_RETRY_CONFIG)
-def _query(client, start_date, end_date, metric, dimensions=None, filters=None):
+def _query(client, start_date, end_date, metric, dimensions=None, filters=None, max_results=None, sort=None):
     params = {
         'ids': 'channel==MINE',
         'startDate': start_date,
@@ -59,6 +59,11 @@ def _query(client, start_date, end_date, metric, dimensions=None, filters=None):
         params['dimensions'] = dimensions
     if filters:
         params['filters'] = filters
+    if max_results:
+        params['maxResults'] = max_results
+    if sort:
+        params['sort'] = sort
+    
     resp = client.reports().query(**params).execute()
     rows = resp.get("rows") or []
     if not rows:
@@ -77,7 +82,7 @@ def _query(client, start_date, end_date, metric, dimensions=None, filters=None):
     return data
 
 @retry(**YT_API_RETRY_CONFIG)
-def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensions=None, filters=None):
+def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensions=None, filters=None, max_results=None, sort=None):
     """Query multiple metrics in a single API call and return split results.
     
     Args:
@@ -87,6 +92,8 @@ def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensio
         metrics_list: List of metric names to fetch
         dimensions: Dimensions for the query
         filters: Filters for the query
+        max_results: Maximum number of results to return
+        sort: Sort parameter for ordering results
         
     Returns:
         Dictionary with metric names as keys and their respective results as values
@@ -102,6 +109,10 @@ def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensio
         params['dimensions'] = dimensions
     if filters:
         params['filters'] = filters
+    if max_results:
+        params['maxResults'] = max_results
+    if sort:
+        params['sort'] = sort
     
     resp = client.reports().query(**params).execute()
     rows = resp.get("rows") or []
@@ -164,6 +175,15 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
         "averageViewDuration","averageViewPercentage",
         "subscribersGained","subscribersLost","estimatedMinutesWatched"
     ])
+    
+    params = {
+        'ids': 'channel==MINE',
+        'startDate': start_date,
+        'endDate': end,
+        'dimensions': dimensions,
+        'metrics': metrics
+    }
+    
     resp = youtube_analytics_client.reports().query(
         ids="channel==MINE",
         startDate=start_date,
@@ -296,7 +316,7 @@ def get_video_data(youtube_data_client, video_id, discrete_mode=False):
         "privacyStatus": info["status"]["privacyStatus"]
     }
 
-def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, metric_dims=None):
+def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, metric_dims=None, filters=None):
     """Get video analytics based on specified metric-dimension combinations.
     
     Args:
@@ -304,8 +324,10 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
         video_id: The YouTube video ID
         start_date: Start date for analytics (defaults to 1 year ago)
         end_date: End date for analytics (defaults to today)
-        metric_dims: Dictionary of {output_key: (metric, dimensions)} to fetch
+        metric_dims: Dictionary of {output_key: (metric, dimensions, filter, maxResults, sort)} to fetch
                     If None, raises ValueError
+        filters: Optional additional filters to combine with the video filter and per-metric filters
+                Format: "filter1==value1;filter2==value2" 
     
     Returns:
         Dictionary of analytics results keyed by the provided output_keys
@@ -316,28 +338,57 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
     end = end_date or datetime.today().strftime('%Y-%m-%d')
     start = start_date or (datetime.today() - timedelta(days=365)).strftime('%Y-%m-%d')
     
-    # Group metrics by dimensions to consolidate API calls
-    dimension_groups = {}
-    key_to_metric_dim = {}
+    # Build the base filters string - always include video filter
+    base_filters = f"video=={video_id}"
+    if filters:
+        base_filters = f"{base_filters};{filters}"
     
-    for key, (metric, dims) in metric_dims.items():
-        key_to_metric_dim[key] = (metric, dims)
-        dims_key = dims or ""  # Use empty string for no dimensions
+    # Group metrics by dimensions, filters, maxResults AND sort to consolidate API calls
+    dimension_filter_groups = {}
+    key_to_metric_dim_filter_max_sort = {}
+    
+    for key, metric_config in metric_dims.items():
+        # Expect 5-tuple format: (metric, dimensions, filter, maxResults, sort)
+        if len(metric_config) != 5:
+            raise ValueError(f"Invalid metric configuration for {key}: expected 5-tuple (metric, dimensions, filter, maxResults, sort), got {metric_config}")
+            
+        metric, dims, metric_filter, max_results, sort = metric_config
+        key_to_metric_dim_filter_max_sort[key] = (metric, dims, metric_filter, max_results, sort)
         
-        if dims_key not in dimension_groups:
-            dimension_groups[dims_key] = []
-        dimension_groups[dims_key].append((key, metric))
+        # Build the complete filter string for this metric
+        complete_filters = base_filters
+        if metric_filter:
+            complete_filters = f"{complete_filters};{metric_filter}"
+        
+        # Group by dimensions, filter combination, maxResults AND sort
+        dims_key = dims or ""  # Use empty string for no dimensions
+        max_results_key = str(max_results) if max_results else ""
+        sort_key = str(sort) if sort else ""
+        group_key = f"{dims_key}|||{complete_filters}|||{max_results_key}|||{sort_key}"  # Use ||| as separator
+        
+        if group_key not in dimension_filter_groups:
+            dimension_filter_groups[group_key] = []
+        dimension_filter_groups[group_key].append((key, metric))
     
     results = {}
     day_structured_data = {}
     day_metrics = {}
     has_day_dimension = False
     
-    # Make consolidated API calls for each dimension group
-    for dims_key, metrics_list in dimension_groups.items():
+    # Make consolidated API calls for each dimension-filter-maxResults-sort group
+    for group_key, metrics_list in dimension_filter_groups.items():
         if not metrics_list:
             continue
             
+        # Parse the group key to get dimensions, filters, maxResults and sort
+        parts = group_key.split("|||")
+        dims_key = parts[0] if parts[0] else None
+        complete_filters = parts[1] if len(parts) > 1 else None
+        max_results_str = parts[2] if len(parts) > 2 and parts[2] else None
+        sort_str = parts[3] if len(parts) > 3 and parts[3] else None
+        max_results = int(max_results_str) if max_results_str else None
+        sort = sort_str if sort_str else None
+        
         # Extract just the metric names for the API call
         metric_names = [metric for _, metric in metrics_list]
         key_names = [key for key, _ in metrics_list]
@@ -346,13 +397,15 @@ def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end
             # Make consolidated API call
             consolidated_results = _query_multiple_metrics(
                 youtube_analytics_client, start, end,
-                metric_names, dims_key if dims_key else None,
-                filters=f"video=={video_id}"
+                metric_names, dims_key,
+                filters=complete_filters,
+                max_results=max_results,
+                sort=sort
             )
             
             # Distribute results back to individual keys
             for i, (key, metric) in enumerate(metrics_list):
-                dims = key_to_metric_dim[key][1]
+                dims = key_to_metric_dim_filter_max_sort[key][1]
                 query_result = consolidated_results.get(metric, {} if dims else [])
                 
                 # Handle scalar values for metrics with no dimensions
