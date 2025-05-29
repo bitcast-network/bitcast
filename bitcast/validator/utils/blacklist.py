@@ -4,7 +4,7 @@ from diskcache import Cache
 import os
 from threading import Lock
 import atexit
-from bitcast.validator.utils.config import BITCAST_BLACKLIST_ENDPOINT, CACHE_DIRS
+from bitcast.validator.utils.config import BITCAST_BLACKLIST_ENDPOINT, BITCAST_BLACKLIST_SOURCES_ENDPOINT, CACHE_DIRS
 
 # Cache expiration time in seconds (10 minutes)
 BLACKLIST_CACHE_EXPIRY = 10 * 60
@@ -103,3 +103,44 @@ def is_blacklisted(id: str) -> bool:
     """
     blacklist = get_blacklist()
     return id in blacklist
+
+def get_blacklist_sources() -> list[str]:
+    """
+    Fetches the list of traffic sources that should be excluded from scoring.
+    Uses caching to store the results and reduce API calls.
+    Cache expires after 10 minutes.
+
+    :return: List of blacklisted traffic sources
+    """
+    cache = BlacklistCache.get_cache()
+    cache_key = "blacklist_sources"
+    
+    # First try to get from cache
+    cached_sources = cache.get(cache_key)
+    if cached_sources is not None:
+        bt.logging.info("Using cached blacklist sources data")
+        return cached_sources
+    
+    try:
+        # If no cache, fetch from API
+        response = requests.get(BITCAST_BLACKLIST_SOURCES_ENDPOINT)
+        response.raise_for_status()
+        sources_data = response.json()
+        
+        # Extract items from response
+        sources = sources_data.get("items", [])
+        bt.logging.info(f"Fetched {len(sources)} blacklisted sources from API.")
+
+        # Store the successful API response in cache with 10-minute expiration
+        cache.set(cache_key, sources, expire=BLACKLIST_CACHE_EXPIRY)
+        return sources
+
+    except requests.exceptions.RequestException as e:
+        bt.logging.error(f"Error fetching blacklist sources: {e}")
+        # Try to return cached data if available (even if expired)
+        cached_sources = cache.get(cache_key)
+        if cached_sources is not None:
+            bt.logging.warning("Using cached blacklist sources due to API error")
+            return cached_sources
+        bt.logging.error("No cached blacklist sources available")
+        return ["ADVERTISING"]  # Fallback to default if API fails and no cache

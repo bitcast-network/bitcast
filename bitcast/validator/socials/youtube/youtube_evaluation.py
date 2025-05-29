@@ -14,10 +14,12 @@ from bitcast.validator.utils.config import (
     YT_MIN_MINS_WATCHED,
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER,
-    ECO_MODE
+    ECO_MODE,
+    BITCAST_BLACKLIST_SOURCES_ENDPOINT
 )
 from bitcast.validator.socials.youtube.config import get_youtube_metrics
-from bitcast.validator.utils.blacklist import is_blacklisted
+from bitcast.validator.utils.blacklist import is_blacklisted, get_blacklist_sources
+import requests
 
 def vet_channel(channel_data, channel_analytics):
     bt.logging.info(f"Checking channel")
@@ -351,22 +353,26 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     
     daily_analytics = sorted(analytics_result.get("day_metrics", {}).values(), key=lambda x: x.get("day", ""))
     
-    def get_non_advertising_minutes(day_data):
-        """Calculate minutes watched excluding ADVERTISING traffic source for a given day."""
+    def get_scorable_minutes(day_data):
+        """Calculate minutes watched excluding blacklisted traffic sources for a given day."""
         traffic_source_minutes = day_data.get('trafficSourceMinutes', {})
         if not traffic_source_minutes:
             return day_data.get('estimatedMinutesWatched', 0)
         
         total_minutes = sum(traffic_source_minutes.values())
-        advertising_minutes = traffic_source_minutes.get('ADVERTISING', 0)
-        return max(0, total_minutes - advertising_minutes)
+        blacklisted_sources = get_blacklist_sources()
+        blacklisted_minutes = sum(
+            traffic_source_minutes.get(source, 0) 
+            for source in blacklisted_sources
+        )
+        return max(0, total_minutes - blacklisted_minutes)
     
-    # Calculate score using only the data between start_date and end_date, excluding advertising traffic
+    # Calculate score using only the data between start_date and end_date, excluding blacklisted traffic
     scoreable_days = [item for item in daily_analytics if start_date <= item.get('day', '') <= end_date]
-    score = sum(get_non_advertising_minutes(item) for item in scoreable_days)
+    score = sum(get_scorable_minutes(item) for item in scoreable_days)
 
     scoreable_history_days = [item for item in daily_analytics if item.get('day', '') <= end_date]
-    scorableHistoryMins = sum(get_non_advertising_minutes(item) for item in scoreable_history_days)
+    scorableHistoryMins = sum(get_scorable_minutes(item) for item in scoreable_history_days)
 
     return {
         "score": score,

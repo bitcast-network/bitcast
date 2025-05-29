@@ -239,8 +239,10 @@ def reset_scored_videos():
     reset_func()
     yield
 
+@pytest.mark.asyncio
 @patch('bitcast.validator.socials.youtube.youtube_scoring.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
+@patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
@@ -249,10 +251,16 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
-def test_reward_function(mock_make_openai_request, mock_get_transcript,
+async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
-                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
-    """Test the reward function end-to-end with mocked YouTube API responses for two briefs and two videos"""
+                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist_sources,
+                        mock_get_blacklist, mock_build):
+    """Test the reward function with a complex scenario."""
+    # Mock blacklist sources to return ADVERTISING
+    mock_get_blacklist_sources.return_value = ["ADVERTISING"]
+    
+    # Mock blacklist to return empty list (no blacklisted channels)
+    mock_get_blacklist.return_value = []
     
     # Setup test data
     uid = 1
@@ -281,7 +289,6 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     youtube_data_client, youtube_analytics_client = get_mock_youtube_clients()
     
     mock_build.side_effect = [youtube_data_client, youtube_analytics_client]
-    mock_get_blacklist.return_value = []
     
     mock_get_channel_data.return_value = {
         "bitcastChannelId": "test_channel",
