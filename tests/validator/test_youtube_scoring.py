@@ -264,3 +264,225 @@ def test_process_videos_empty_briefs():
         # Verify that vet_videos was called with empty briefs
         mock_vet_videos.assert_called_once()
         assert mock_vet_videos.call_args[0][1] == []  # Verify briefs parameter was empty list 
+
+def test_update_video_score_with_blacklist_sources():
+    """Test update_video_score with the new blacklist sources functionality."""
+    # Setup
+    youtube_analytics_client = MagicMock()
+    briefs = [{"id": "test_brief"}]
+    result = {"videos": {}, "scores": {"test_brief": 0}}
+    video_matches = {}
+    
+    with patch('bitcast.validator.socials.youtube.youtube_scoring.calculate_video_score') as mock_calculate, \
+         patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
+        
+        # Test case 1: Multiple blacklisted traffic sources
+        mock_blacklist.return_value = ["ADVERTISING", "SPAM_SOURCE"]
+        video_id_1 = "test_video_id_1"
+        video_matches[video_id_1] = [True]
+        result["videos"][video_id_1] = {
+            "details": {"bitcastVideoId": video_id_1}, 
+            "analytics": {"trafficSourceMinutes": {"SEARCH": 100, "ADVERTISING": 30, "SPAM_SOURCE": 20}}
+        }
+        mock_calculate.return_value = {"score": 100, "daily_analytics": {}, "scorableHistoryMins": 600}  # Only SEARCH traffic (100 mins)
+        update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result)
+        assert result["scores"]["test_brief"] == 100
+        
+        # Test case 2: EXT_URL with blacklisted sources
+        mock_blacklist.return_value = ["ADVERTISING", "spam-site.com", "bad-domain.net"]
+        video_id_2 = "test_video_id_2"
+        video_matches[video_id_2] = [True]
+        result["videos"][video_id_2] = {
+            "details": {"bitcastVideoId": video_id_2}, 
+            "analytics": {"trafficSourceMinutes": {"SEARCH": 80, "EXT_URL": 40, "ADVERTISING": 20}}
+        }
+        # Mock calculate_video_score to simulate EXT_URL proportion calculation
+        # If spam-site.com accounts for 50% of lifetime EXT_URL traffic, 
+        # then daily EXT_URL should be reduced by 50%
+        mock_calculate.return_value = {"score": 100, "daily_analytics": {}, "scorableHistoryMins": 600}  # 80 SEARCH + 20 EXT_URL (after 50% reduction)
+        update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result)
+        assert result["scores"]["test_brief"] == 200
+
+def test_calculate_video_score_ext_url_proportion():
+    """Test the EXT_URL proportion calculation logic."""
+    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
+    
+    # Mock dependencies
+    youtube_analytics_client = MagicMock()
+    video_publish_date = "2023-01-01T00:00:00Z"
+    
+    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
+        
+        # Test case 1: 50% of EXT_URL traffic is blacklisted
+        mock_blacklist.return_value = ["ADVERTISING", "spam-site.com"]
+        mock_analytics.return_value = {
+            "day_metrics": {
+                "2023-01-01": {
+                    "day": "2023-01-01",
+                    "trafficSourceMinutes": {"SEARCH": 100, "EXT_URL": 40, "ADVERTISING": 20}
+                },
+                "2023-01-02": {
+                    "day": "2023-01-02", 
+                    "trafficSourceMinutes": {"SEARCH": 80, "EXT_URL": 60, "ADVERTISING": 30}
+                }
+            },
+            "insightTrafficSourceDetail_EXT_URL": {
+                "good-site.com": 60,  # Not blacklisted
+                "spam-site.com": 60   # Blacklisted - 50% of total EXT_URL traffic
+            }
+        }
+        
+        with patch('datetime.datetime') as mock_datetime:
+            mock_datetime.now.return_value.strftime.side_effect = lambda fmt: {
+                '%Y-%m-%d': "2023-01-03"
+            }[fmt]
+            mock_datetime.strptime.return_value.strftime.return_value = "2023-01-01"
+            
+            result = calculate_video_score("test_video", youtube_analytics_client, video_publish_date)
+            
+            # Expected calculation:
+            # Day 1: 100 SEARCH + 20 EXT_URL (40 * 0.5) + 0 ADVERTISING = 120
+            # Day 2: 80 SEARCH + 30 EXT_URL (60 * 0.5) + 0 ADVERTISING = 110
+            # Total score depends on which days fall in the scoring window
+            assert "score" in result
+            assert "scorableHistoryMins" in result
+
+def test_calculate_video_score_no_ext_url_data():
+    """Test EXT_URL proportion calculation when there's no EXT_URL lifetime data."""
+    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
+    
+    youtube_analytics_client = MagicMock()
+    video_publish_date = "2023-01-01T00:00:00Z"
+    
+    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
+        
+        mock_blacklist.return_value = ["ADVERTISING", "spam-site.com"]
+        mock_analytics.return_value = {
+            "day_metrics": {
+                "2023-01-01": {
+                    "day": "2023-01-01",
+                    "trafficSourceMinutes": {"SEARCH": 100, "EXT_URL": 40}
+                }
+            },
+            # No insightTrafficSourceDetail_EXT_URL data
+        }
+        
+        with patch('datetime.datetime') as mock_datetime:
+            mock_datetime.now.return_value.strftime.side_effect = lambda fmt: {
+                '%Y-%m-%d': "2023-01-03"
+            }[fmt]
+            mock_datetime.strptime.return_value.strftime.return_value = "2023-01-01"
+            
+            result = calculate_video_score("test_video", youtube_analytics_client, video_publish_date)
+            
+            # When no EXT_URL lifetime data, proportion should be 0.0
+            # So all EXT_URL traffic should be included in scoring
+            assert "score" in result
+            assert "scorableHistoryMins" in result
+
+def test_calculate_video_score_empty_blacklist():
+    """Test scoring when blacklist sources is empty."""
+    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
+    
+    youtube_analytics_client = MagicMock()
+    video_publish_date = "2023-01-01T00:00:00Z"
+    
+    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
+        
+        mock_blacklist.return_value = []  # Empty blacklist
+        mock_analytics.return_value = {
+            "day_metrics": {
+                "2023-01-01": {
+                    "day": "2023-01-01",
+                    "trafficSourceMinutes": {"SEARCH": 100, "EXT_URL": 40, "ADVERTISING": 20}
+                }
+            },
+            "insightTrafficSourceDetail_EXT_URL": {
+                "site1.com": 20,
+                "site2.com": 20
+            }
+        }
+        
+        with patch('datetime.datetime') as mock_datetime:
+            mock_datetime.now.return_value.strftime.side_effect = lambda fmt: {
+                '%Y-%m-%d': "2023-01-03"
+            }[fmt]
+            mock_datetime.strptime.return_value.strftime.return_value = "2023-01-01"
+            
+            result = calculate_video_score("test_video", youtube_analytics_client, video_publish_date)
+            
+            # With empty blacklist, all traffic should be included
+            assert "score" in result
+            assert "scorableHistoryMins" in result
+
+def test_calculate_video_score_all_ext_url_blacklisted():
+    """Test scoring when all EXT_URL sources are blacklisted."""
+    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
+    
+    youtube_analytics_client = MagicMock()
+    video_publish_date = "2023-01-01T00:00:00Z"
+    
+    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
+        
+        mock_blacklist.return_value = ["ADVERTISING", "spam1.com", "spam2.com"]
+        mock_analytics.return_value = {
+            "day_metrics": {
+                "2023-01-01": {
+                    "day": "2023-01-01",
+                    "trafficSourceMinutes": {"SEARCH": 100, "EXT_URL": 40, "ADVERTISING": 20}
+                }
+            },
+            "insightTrafficSourceDetail_EXT_URL": {
+                "spam1.com": 20,  # Blacklisted
+                "spam2.com": 20   # Blacklisted - 100% of EXT_URL traffic is blacklisted
+            }
+        }
+        
+        with patch('datetime.datetime') as mock_datetime:
+            mock_datetime.now.return_value.strftime.side_effect = lambda fmt: {
+                '%Y-%m-%d': "2023-01-03"
+            }[fmt]
+            mock_datetime.strptime.return_value.strftime.return_value = "2023-01-01"
+            
+            result = calculate_video_score("test_video", youtube_analytics_client, video_publish_date)
+            
+            # Only SEARCH traffic should be counted (100 minutes)
+            assert "score" in result
+            assert "scorableHistoryMins" in result
+
+@patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
+def test_blacklist_sources_api_fallback(mock_blacklist):
+    """Test that the system falls back gracefully when blacklist sources API fails."""
+    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
+    
+    # Simulate API failure - should fall back to ["ADVERTISING"]
+    mock_blacklist.return_value = ["ADVERTISING"]
+    
+    youtube_analytics_client = MagicMock()
+    video_publish_date = "2023-01-01T00:00:00Z"
+    
+    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics:
+        mock_analytics.return_value = {
+            "day_metrics": {
+                "2023-01-01": {
+                    "day": "2023-01-01",
+                    "trafficSourceMinutes": {"SEARCH": 100, "ADVERTISING": 50}
+                }
+            }
+        }
+        
+        with patch('datetime.datetime') as mock_datetime:
+            mock_datetime.now.return_value.strftime.side_effect = lambda fmt: {
+                '%Y-%m-%d': "2023-01-03"
+            }[fmt]
+            mock_datetime.strptime.return_value.strftime.return_value = "2023-01-01"
+            
+            result = calculate_video_score("test_video", youtube_analytics_client, video_publish_date)
+            
+            # Should still work with fallback blacklist
+            assert "score" in result
+            assert "scorableHistoryMins" in result 

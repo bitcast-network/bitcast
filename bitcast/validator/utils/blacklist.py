@@ -5,9 +5,14 @@ import os
 from threading import Lock
 import atexit
 from bitcast.validator.utils.config import BITCAST_BLACKLIST_ENDPOINT, BITCAST_BLACKLIST_SOURCES_ENDPOINT, CACHE_DIRS
+from typing import Dict, List, TypedDict
 
 # Cache expiration time in seconds (10 minutes)
 BLACKLIST_CACHE_EXPIRY = 10 * 60
+
+class BlacklistSources(TypedDict):
+    traffic_sources: List[str]
+    external_urls: List[str]
 
 class BlacklistCache:
     _instance = None
@@ -104,13 +109,14 @@ def is_blacklisted(id: str) -> bool:
     blacklist = get_blacklist()
     return id in blacklist
 
-def get_blacklist_sources() -> list[str]:
+def get_blacklist_sources() -> List[str]:
     """
-    Fetches the list of traffic sources that should be excluded from scoring.
+    Fetches the list of sources that should be excluded from scoring.
+    This includes both traffic sources (e.g., 'ADVERTISING') and external URLs.
     Uses caching to store the results and reduce API calls.
     Cache expires after 10 minutes.
 
-    :return: List of blacklisted traffic sources
+    :return: List of blacklisted sources
     """
     cache = BlacklistCache.get_cache()
     cache_key = "blacklist_sources"

@@ -33,6 +33,7 @@ CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
+    "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
 }
 
 # Additional metrics for full analytics (when not in ECO_MODE)
@@ -47,15 +48,12 @@ ADDITIONAL_METRICS = {
     "ageGroupViewerPercentage": ("viewerPercentage", "ageGroup,gender", None, None, None),
     "elapsedVideoTimeRatioAudienceWatchRatio": ("audienceWatchRatio", "elapsedVideoTimeRatio", None, None, None),
     "sharingServiceShares": ("shares", "sharingService", None, None, "-shares"),
-
     "relativeRetentionPerformance": ("relativeRetentionPerformance", "elapsedVideoTimeRatio", None, None, None),
-    "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
     #"insightTrafficSourceDetail_YT_SEARCH": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_SEARCH", 10, "-estimatedMinutesWatched"),
     #"insightTrafficSourceDetail_RELATED_VIDEO": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==RELATED_VIDEO", 10, "-estimatedMinutesWatched"),
     #"insightTrafficSourceDetail_YT_CHANNEL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_CHANNEL", 10, "-estimatedMinutesWatched"),
     "creatorContentTypeMinutes": ("estimatedMinutesWatched", "creatorContentType", None, None, None),
     "subscribedStatusMinutes": ("averageViewPercentage", "subscribedStatus", None, None, None),
-
 }
 
 # Core daily metrics - all metrics with day dimension
@@ -79,7 +77,6 @@ ADDITIONAL_DAILY_METRICS = {
     "avgViewPercentageByTrafficSource": ("averageViewPercentage", "insightTrafficSourceType,day", None, None, "day"),
     "liveOrOnDemandMinutes": ("estimatedMinutesWatched", "liveOrOnDemand,day", None, None, "day"),
     "youtubeProductMinutes": ("estimatedMinutesWatched", "youtubeProduct,day", None, None, "day"),
-
     "engagedViews": ("engagedViews", "day", None, None, "day"),
     "videosAddedToPlaylists": ("videosAddedToPlaylists", "day", None, None, "day"),
 }
