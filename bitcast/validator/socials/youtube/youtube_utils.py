@@ -243,48 +243,62 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     return info
 
 # ============================================================================
-# Video Playlist and List Management
+# Video Management
 # ============================================================================
 
 @retry(**YT_API_RETRY_CONFIG)
-def get_uploads_playlist_id(youtube):
-    """Retrieve the channel's uploads playlist id."""
-    resp = youtube.channels().list(mine=True, part="contentDetails").execute()
-    items = resp.get("items") or []
-    if not items:
-        raise Exception("No channel found for the authenticated user.")
-    return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
-
-@retry(**YT_API_RETRY_CONFIG)
-def list_all_videos(youtube, uploads_playlist_id):
-    """List all videos in the uploads playlist."""
-    all_items, token = [], None
-    while True:
-        resp = youtube.playlistItems().list(
-            playlistId=uploads_playlist_id,
-            part="snippet",
-            maxResults=50,
-            pageToken=token
-        ).execute()
-        all_items.extend(resp.get("items", []))
-        token = resp.get("nextPageToken")
-        if not token:
-            break
-    return all_items
-
-@retry(**YT_API_RETRY_CONFIG)
 def get_all_uploads(youtube_data_client, max_age_days=365):
-    """Get all video IDs uploaded within the specified time period."""
-    pid = get_uploads_playlist_id(youtube_data_client)
-    videos = list_all_videos(youtube_data_client, pid)
+    """Get all video IDs uploaded within the specified time period using the Search API.
+    
+    This function uses the Search API instead of the playlist API to avoid pagination issues.
+    It searches for videos in the authenticated user's channel and filters by date.
+    """
+    
+    # Get channel ID
+    channel_resp = youtube_data_client.channels().list(mine=True, part="id").execute()
+    channel_id = channel_resp['items'][0]['id']
+    
+    # Calculate cutoff date
     cutoff = datetime.utcnow() - timedelta(days=max_age_days)
-    vids = []
-    for v in videos:
-        pub = datetime.strptime(v["snippet"]["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
-        if pub >= cutoff:
-            vids.append(v["snippet"]["resourceId"]["videoId"])
-    bt.logging.info(f"Found {len(vids)} videos uploaded in the last {max_age_days} days")
-    return vids
+    
+    # Get all videos using Search API with pagination
+    all_items = []
+    token = None
+    page_count = 0
+    
+    while True:
+        page_count += 1        
+        try:
+            search_resp = youtube_data_client.search().list(
+                part="snippet",
+                channelId=channel_id,
+                type="video",
+                order="date",
+                maxResults=50,  # Maximum allowed by API
+                pageToken=token
+            ).execute()
+            
+            items = search_resp.get("items", [])
+            
+            # Filter by date and collect video IDs
+            for item in items:
+                pub = datetime.strptime(item["snippet"]["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
+                if pub >= cutoff:
+                    video_id = item["id"]["videoId"]
+                    all_items.append(video_id)
+            
+            token = search_resp.get("nextPageToken")
+            if not token:
+                break
+                
+            time.sleep(0.25)
+            
+        except Exception as e:
+            bt.logging.error(f"Error on search page {page_count}")
+            break
+    
+    bt.logging.info(f"Found {len(all_items)} videos")
+    return all_items
 
 # ============================================================================
 # Video Analytics Functions
