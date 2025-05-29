@@ -15,7 +15,7 @@ CACHE_DIRS = {
     "blacklist": os.path.join(CACHE_ROOT, "blacklist")
 }
 
-__version__ = "1.4.5"
+__version__ = "1.4.6"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
