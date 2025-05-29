@@ -363,7 +363,13 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
             for key, metric_config in metric_dims.items():
                 metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
                 if dims != "day":
-                    result[key] = 100  # Default value for non-day metrics
+                    # Special handling for EXT_URL detail metrics
+                    if key == "insightTrafficSourceDetail_EXT_URL":
+                        result[key] = {"twitter.com": 50, "discord.com": 30}  # Mock EXT_URL sources
+                    elif "trafficSourceMinutes" in key:
+                        result[key] = {"YT_CHANNEL": 300, "EXT_URL": 200}  # Mock traffic source data
+                    else:
+                        result[key] = 100  # Default value for other non-day metrics
             
             return result
         

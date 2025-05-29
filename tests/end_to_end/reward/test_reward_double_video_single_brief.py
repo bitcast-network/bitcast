@@ -331,7 +331,12 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 result = {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 1000,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500},
+                    "trafficSourceMinutes": {
+                        f"YT_CHANNEL|{day1}": 250,
+                        f"EXT_URL|{day1}": 250,
+                        f"YT_CHANNEL|{day2}": 250,
+                        f"EXT_URL|{day2}": 250
+                    },
                     "day_metrics": day_metrics
                 }
                 
@@ -358,15 +363,24 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 # Non-daily analytics (for video vetting) - return simple structure
                 result = {}
                 for key, metric_config in metric_dims.items():
-                    metric = metric_config[0]  # Extract metric from 5-tuple
-                    if metric == "averageViewPercentage":
-                        result[key] = 50
-                    elif metric == "estimatedMinutesWatched":
-                        result[key] = 1000
-                    elif "traffic" in key.lower():
-                        result[key] = {"YT_CHANNEL": 500, "EXT_URL": 500}
+                    metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
+                    
+                    # If metric has dimensions, it should return a dictionary
+                    if dims:  # Any metric with dimensions should be a dictionary
+                        if key == "insightTrafficSourceDetail_EXT_URL":
+                            result[key] = {"twitter.com": 50, "discord.com": 30}  # Mock EXT_URL sources
+                        elif "insightTrafficSourceDetail" in key:
+                            result[key] = {"youtube.com": 40, "google.com": 20}  # Mock other traffic source details
+                        else:
+                            result[key] = {"YT_CHANNEL": 300, "EXT_URL": 200, "OTHER": 100}  # Generic dictionary for dimensioned metrics
                     else:
-                        result[key] = 100  # Default value for other metrics
+                        # Simple scalar metrics
+                        if metric == "averageViewPercentage":
+                            result[key] = 50
+                        elif metric == "estimatedMinutesWatched":
+                            result[key] = 1000
+                        else:
+                            result[key] = 100  # Default value for scalar metrics
                 
                 return result
         
