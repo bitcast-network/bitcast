@@ -340,13 +340,18 @@ def calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sourc
     if not ext_url_lifetime:
         return 0.0
     
-    total_ext_url_minutes = sum(ext_url_lifetime.values())
+    total_ext_url_minutes = analytics_result.get("trafficSourceMinutes", {}).get("EXT_URL", 0)
     blacklisted_ext_url_minutes = sum(
         ext_url_lifetime.get(url, 0)
         for url in blacklisted_sources
     )
     
-    return blacklisted_ext_url_minutes / total_ext_url_minutes if total_ext_url_minutes > 0 else 0.0
+    blacklisted_ext_url_proportion = blacklisted_ext_url_minutes / total_ext_url_minutes if total_ext_url_minutes > 0 else 0.0
+
+    if blacklisted_ext_url_proportion != 1:
+        bt.logging.info(f"Blacklisted EXT_URL proportion: {blacklisted_ext_url_proportion}")
+        
+    return blacklisted_ext_url_proportion
 
 def get_scorable_minutes(day_data, blacklisted_sources, blacklisted_ext_url_proportion):
     """Calculate minutes watched excluding blacklisted sources for a given day."""
