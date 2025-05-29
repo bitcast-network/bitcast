@@ -334,15 +334,21 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
             
     return met_brief_ids, reasonings
 
-def calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources):
-    """Calculate what proportion of lifetime EXT_URL traffic comes from blacklisted sources."""
-    ext_url_lifetime = analytics_result.get("insightTrafficSourceDetail_EXT_URL", {})
-    if not ext_url_lifetime:
-        return 0.0
+def calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources, ext_url_lifetime_data):
+    """Calculate what proportion of lifetime EXT_URL traffic comes from blacklisted sources."""    
     
-    total_ext_url_minutes = analytics_result.get("trafficSourceMinutes", {}).get("EXT_URL", 0)
+    if not ext_url_lifetime_data:
+        return 0.0
+
+    # Sum up all EXT_URL minutes across all days from the daily traffic source data
+    traffic_source_minutes = analytics_result.get("trafficSourceMinutes", {})
+    total_ext_url_minutes = sum(
+        minutes for key, minutes in traffic_source_minutes.items() 
+        if key.startswith("EXT_URL|")
+    )
+    
     blacklisted_ext_url_minutes = sum(
-        ext_url_lifetime.get(url, 0)
+        ext_url_lifetime_data.get(url, 0)
         for url in blacklisted_sources
     )
     
@@ -375,7 +381,7 @@ def get_scorable_minutes(day_data, blacklisted_sources, blacklisted_ext_url_prop
     
     return max(0, total_minutes - blacklisted_traffic_minutes - blacklisted_ext_url_daily_minutes)
 
-def calculate_video_score(video_id, youtube_analytics_client, video_publish_date):
+def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, existing_analytics):
     """Calculate the score for a video based on analytics data."""
     # Use video publish date as query start date if provided, otherwise use default
     try:
@@ -404,8 +410,9 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     # Get blacklist sources once and reuse
     blacklisted_sources = get_blacklist_sources()
     
-    # Calculate the proportion of blacklisted EXT_URL traffic from lifetime data
-    blacklisted_ext_url_proportion = calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources)
+    # Get EXT_URL lifetime data from existing analytics and calculate the proportion
+    ext_url_lifetime_data = existing_analytics.get("insightTrafficSourceDetail_EXT_URL", {})
+    blacklisted_ext_url_proportion = calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources, ext_url_lifetime_data)
     
     # Calculate score using only the data between start_date and end_date, excluding blacklisted traffic
     scoreable_days = [item for item in daily_analytics if start_date <= item.get('day', '') <= end_date]
