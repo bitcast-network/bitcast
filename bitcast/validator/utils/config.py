@@ -15,13 +15,14 @@ CACHE_DIRS = {
     "blacklist": os.path.join(CACHE_ROOT, "blacklist")
 }
 
-__version__ = "1.4.3"
+__version__ = "1.5.0"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
 BITCAST_BRIEFS_ENDPOINT = f"{BITCAST_SERVER_URL}:8013/briefs"
 BITCAST_STATS_ENDPOINT = f"{BITCAST_SERVER_URL}:8003/submit"
 BITCAST_BLACKLIST_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist"
+BITCAST_BLACKLIST_SOURCES_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist-sources"
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')

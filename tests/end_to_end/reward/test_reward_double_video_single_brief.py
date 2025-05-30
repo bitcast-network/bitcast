@@ -234,8 +234,10 @@ def reset_scored_videos():
     reset_func()
     yield
 
+@pytest.mark.asyncio
 @patch('bitcast.validator.socials.youtube.youtube_scoring.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
+@patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
@@ -244,10 +246,16 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
-def test_reward_function(mock_make_openai_request, mock_get_transcript,
+async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
-                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
-    """Test the reward function end-to-end with mocked YouTube API responses"""
+                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist_sources,
+                        mock_get_blacklist, mock_build):
+    """Test the reward function with two videos and one brief."""
+    # Mock blacklist sources to return ADVERTISING
+    mock_get_blacklist_sources.return_value = ["ADVERTISING"]
+    
+    # Mock blacklist to return empty list (no blacklisted channels)
+    mock_get_blacklist.return_value = []
     
     # Setup test data
     uid = 1
@@ -267,7 +275,6 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     youtube_data_client, youtube_analytics_client = get_mock_youtube_clients()
     
     mock_build.side_effect = [youtube_data_client, youtube_analytics_client]
-    mock_get_blacklist.return_value = []
     
     mock_get_channel_data.return_value = {
         "bitcastChannelId": "test_channel",
@@ -324,7 +331,12 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 result = {
                     "averageViewPercentage": 50,
                     "estimatedMinutesWatched": 1000,
-                    "trafficSourceMinutes": {"YT_CHANNEL": 500, "EXT_URL": 500},
+                    "trafficSourceMinutes": {
+                        f"YT_CHANNEL|{day1}": 250,
+                        f"EXT_URL|{day1}": 250,
+                        f"YT_CHANNEL|{day2}": 250,
+                        f"EXT_URL|{day2}": 250
+                    },
                     "day_metrics": day_metrics
                 }
                 
@@ -351,15 +363,24 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 # Non-daily analytics (for video vetting) - return simple structure
                 result = {}
                 for key, metric_config in metric_dims.items():
-                    metric = metric_config[0]  # Extract metric from 5-tuple
-                    if metric == "averageViewPercentage":
-                        result[key] = 50
-                    elif metric == "estimatedMinutesWatched":
-                        result[key] = 1000
-                    elif "traffic" in key.lower():
-                        result[key] = {"YT_CHANNEL": 500, "EXT_URL": 500}
+                    metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
+                    
+                    # If metric has dimensions, it should return a dictionary
+                    if dims:  # Any metric with dimensions should be a dictionary
+                        if key == "insightTrafficSourceDetail_EXT_URL":
+                            result[key] = {"twitter.com": 50, "discord.com": 30}  # Mock EXT_URL sources
+                        elif "insightTrafficSourceDetail" in key:
+                            result[key] = {"youtube.com": 40, "google.com": 20}  # Mock other traffic source details
+                        else:
+                            result[key] = {"YT_CHANNEL": 300, "EXT_URL": 200, "OTHER": 100}  # Generic dictionary for dimensioned metrics
                     else:
-                        result[key] = 100  # Default value for other metrics
+                        # Simple scalar metrics
+                        if metric == "averageViewPercentage":
+                            result[key] = 50
+                        elif metric == "estimatedMinutesWatched":
+                            result[key] = 1000
+                        else:
+                            result[key] = 100  # Default value for scalar metrics
                 
                 return result
         
