@@ -80,6 +80,8 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     video_analytics_dict = {}  # Store video analytics for all videos
     video_decision_details = {}  # Store decision details for all videos
 
+    video_data_dict = youtube_utils.get_video_data_batch(youtube_data_client, video_ids, DISCRETE_MODE)
+
     for video_id in video_ids:
         try:
             # Check if video has already been scored
@@ -113,8 +115,8 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
                          results, video_data_dict, video_analytics_dict, video_decision_details):
     """Process the vetting of a single video."""
-    # Get video data and analytics
-    video_data = youtube_utils.get_video_data(youtube_data_client, video_id, DISCRETE_MODE)
+
+    video_data = video_data_dict.get(video_id)
     
     # Get all metrics from config using the helper function
     all_metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=False)

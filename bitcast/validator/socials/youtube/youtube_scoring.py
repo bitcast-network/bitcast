@@ -29,10 +29,17 @@ def eval_youtube(creds, briefs):
     
     # Initialize the result structure and get API clients
     result, youtube_data_client, youtube_analytics_client = initialize_youtube_evaluation(creds, briefs)
+    # Reset API call counters for this token evaluation
+    youtube_utils.reset_api_call_counts()
     
     # Get and process channel information
     channel_data, channel_analytics = get_channel_information(youtube_data_client, youtube_analytics_client)
     if channel_data is None or channel_analytics is None:
+        # Attach API call counts on early exit
+        result["api_call_counts"] = {
+            "data_api_calls": youtube_utils.data_api_call_count,
+            "analytics_api_calls": youtube_utils.analytics_api_call_count
+        }
         return result
     
     # Store channel details in the result
@@ -45,12 +52,22 @@ def eval_youtube(creds, briefs):
 
     if not channel_vet_result and ECO_MODE:
         bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")
+        # Attach API call counts on early exit
+        result["api_call_counts"] = {
+            "data_api_calls": youtube_utils.data_api_call_count,
+            "analytics_api_calls": youtube_utils.analytics_api_call_count
+        }
         return result
 
     briefs = channel_briefs_filter(briefs, channel_analytics)
     
     # Process videos and update the result
     result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
+    # Attach API call counts to result after full evaluation
+    result["api_call_counts"] = {
+        "data_api_calls": youtube_utils.data_api_call_count,
+        "analytics_api_calls": youtube_utils.analytics_api_call_count
+    }
     
     return result
 
