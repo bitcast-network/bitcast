@@ -14,10 +14,12 @@ from bitcast.validator.utils.config import (
     YT_MIN_MINS_WATCHED,
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER,
-    ECO_MODE
+    ECO_MODE,
+    BITCAST_BLACKLIST_SOURCES_ENDPOINT
 )
-from bitcast.validator.socials.youtube.config import get_youtube_metrics
-from bitcast.validator.utils.blacklist import is_blacklisted
+from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics
+from bitcast.validator.utils.blacklist import is_blacklisted, get_blacklist_sources
+import requests
 
 def vet_channel(channel_data, channel_analytics):
     bt.logging.info(f"Checking channel")
@@ -78,6 +80,8 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     video_analytics_dict = {}  # Store video analytics for all videos
     video_decision_details = {}  # Store decision details for all videos
 
+    video_data_dict = youtube_utils.get_video_data_batch(youtube_data_client, video_ids, DISCRETE_MODE)
+
     for video_id in video_ids:
         try:
             # Check if video has already been scored
@@ -111,8 +115,8 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
                          results, video_data_dict, video_analytics_dict, video_decision_details):
     """Process the vetting of a single video."""
-    # Get video data and analytics
-    video_data = youtube_utils.get_video_data(youtube_data_client, video_id, DISCRETE_MODE)
+
+    video_data = video_data_dict.get(video_id)
     
     # Get all metrics from config using the helper function
     all_metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=False)
@@ -129,6 +133,13 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     decision_details = vet_result["decision_details"]
     results[video_id] = decision_details["contentAgainstBriefCheck"]
     video_decision_details[video_id] = decision_details
+    
+    # Retrieve advanced metrics only for qualified videos when not in eco mode
+    if not ECO_MODE and decision_details.get("anyBriefMatched", False):
+        bt.logging.info(f"Fetching advanced metrics.")
+        advanced_metrics = get_advanced_metrics()
+        advanced_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
+        video_analytics_dict[video_id].update(advanced_analytics)
     
     valid_checks = [check for check in decision_details["contentAgainstBriefCheck"] if check is not None]
     bt.logging.info(f"Video meets {sum(valid_checks)} briefs.")
@@ -325,7 +336,54 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
             
     return met_brief_ids, reasonings
 
-def calculate_video_score(video_id, youtube_analytics_client, video_publish_date):
+def calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources, ext_url_lifetime_data):
+    """Calculate what proportion of lifetime EXT_URL traffic comes from blacklisted sources."""    
+    
+    if not ext_url_lifetime_data:
+        return 0.0
+
+    # Sum up all EXT_URL minutes across all days from the daily traffic source data
+    traffic_source_minutes = analytics_result.get("trafficSourceMinutes", {})
+    total_ext_url_minutes = sum(
+        minutes for key, minutes in traffic_source_minutes.items() 
+        if key.startswith("EXT_URL|")
+    )
+    
+    blacklisted_ext_url_minutes = sum(
+        ext_url_lifetime_data.get(url, 0)
+        for url in blacklisted_sources
+    )
+    
+    blacklisted_ext_url_proportion = blacklisted_ext_url_minutes / total_ext_url_minutes if total_ext_url_minutes > 0 else 0.0
+
+    if blacklisted_ext_url_proportion != 1:
+        bt.logging.info(f"Blacklisted EXT_URL proportion: {blacklisted_ext_url_proportion}")
+        
+    return blacklisted_ext_url_proportion
+
+def get_scorable_minutes(day_data, blacklisted_sources, blacklisted_ext_url_proportion):
+    """Calculate minutes watched excluding blacklisted sources for a given day."""
+    traffic_source_minutes = day_data.get('trafficSourceMinutes', {})
+    
+    if not traffic_source_minutes:
+        return day_data.get('estimatedMinutesWatched', 0)
+    
+    total_minutes = sum(traffic_source_minutes.values())
+    
+    # Calculate minutes from blacklisted traffic sources (excluding EXT_URL for now)
+    blacklisted_traffic_minutes = sum(
+        traffic_source_minutes.get(source, 0) 
+        for source in blacklisted_sources
+        if source != "EXT_URL"  # Handle EXT_URL separately
+    )
+    
+    # Handle EXT_URL traffic using the calculated proportion
+    ext_url_daily_minutes = traffic_source_minutes.get('EXT_URL', 0)
+    blacklisted_ext_url_daily_minutes = ext_url_daily_minutes * blacklisted_ext_url_proportion
+    
+    return max(0, total_minutes - blacklisted_traffic_minutes - blacklisted_ext_url_daily_minutes)
+
+def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, existing_analytics):
     """Calculate the score for a video based on analytics data."""
     # Use video publish date as query start date if provided, otherwise use default
     try:
@@ -351,22 +409,19 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     
     daily_analytics = sorted(analytics_result.get("day_metrics", {}).values(), key=lambda x: x.get("day", ""))
     
-    def get_non_advertising_minutes(day_data):
-        """Calculate minutes watched excluding ADVERTISING traffic source for a given day."""
-        traffic_source_minutes = day_data.get('trafficSourceMinutes', {})
-        if not traffic_source_minutes:
-            return day_data.get('estimatedMinutesWatched', 0)
-        
-        total_minutes = sum(traffic_source_minutes.values())
-        advertising_minutes = traffic_source_minutes.get('ADVERTISING', 0)
-        return max(0, total_minutes - advertising_minutes)
+    # Get blacklist sources once and reuse
+    blacklisted_sources = get_blacklist_sources()
     
-    # Calculate score using only the data between start_date and end_date, excluding advertising traffic
+    # Get EXT_URL lifetime data from existing analytics and calculate the proportion
+    ext_url_lifetime_data = existing_analytics.get("insightTrafficSourceDetail_EXT_URL", {})
+    blacklisted_ext_url_proportion = calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources, ext_url_lifetime_data)
+    
+    # Calculate score using only the data between start_date and end_date, excluding blacklisted traffic
     scoreable_days = [item for item in daily_analytics if start_date <= item.get('day', '') <= end_date]
-    score = sum(get_non_advertising_minutes(item) for item in scoreable_days)
+    score = sum(get_scorable_minutes(item, blacklisted_sources, blacklisted_ext_url_proportion) for item in scoreable_days)
 
     scoreable_history_days = [item for item in daily_analytics if item.get('day', '') <= end_date]
-    scorableHistoryMins = sum(get_non_advertising_minutes(item) for item in scoreable_history_days)
+    scorableHistoryMins = sum(get_scorable_minutes(item, blacklisted_sources, blacklisted_ext_url_proportion) for item in scoreable_history_days)
 
     return {
         "score": score,

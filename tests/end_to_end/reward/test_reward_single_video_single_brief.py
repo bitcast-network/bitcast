@@ -27,7 +27,6 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
     from bitcast.validator.socials.youtube.youtube_utils import (
         get_channel_data,
         get_channel_analytics,
-        get_video_data,
         get_video_analytics,
         get_all_uploads,
         reset_scored_videos
@@ -124,10 +123,16 @@ class MockYouTubeDataClient:
             def list(self, part=None, id=None):
                 return MockResponse({
                     "items": [{
+                        "id": "mock_video_1",
                         "snippet": {
                             "title": "Mock Video",
                             "description": "Mock Description",
                             "publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+                        },
+                        "statistics": {
+                            "viewCount": "1000",
+                            "likeCount": "100",
+                            "commentCount": "50"
                         },
                         "contentDetails": {
                             "duration": "PT10M",
@@ -234,20 +239,28 @@ def reset_scored_videos():
     reset_func()
     yield
 
+@pytest.mark.asyncio
 @patch('bitcast.validator.socials.youtube.youtube_scoring.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
+@patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data')
+@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data_batch')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
-def test_reward_function(mock_make_openai_request, mock_get_transcript,
-                        mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
-                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist, mock_build):
-    """Test the reward function end-to-end with mocked YouTube API responses"""
+async def test_reward_function(mock_make_openai_request, mock_get_transcript,
+                        mock_get_video_analytics, mock_get_video_data_batch, mock_get_all_uploads, 
+                        mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist_sources,
+                        mock_get_blacklist, mock_build):
+    """Test the reward function with one video and one brief."""
+    # Mock blacklist sources to return ADVERTISING
+    mock_get_blacklist_sources.return_value = ["ADVERTISING"]
+    
+    # Mock blacklist to return empty list (no blacklisted channels)
+    mock_get_blacklist.return_value = []
     
     # Setup test data
     uid = 1
@@ -268,7 +281,6 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     youtube_data_client, youtube_analytics_client = get_mock_youtube_clients()
     
     mock_build.side_effect = [youtube_data_client, youtube_analytics_client]
-    mock_get_blacklist.return_value = []
     
     mock_get_channel_data.return_value = {
         "bitcastChannelId": "test_channel",
@@ -282,18 +294,35 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
     
     mock_get_all_uploads.return_value = ["test_video_1", "test_video_2"]
     
-    def mock_get_video_data_side_effect(client, video_id, *args, **kwargs):
-        return {
-            "bitcastVideoId": video_id,
-            "title": f"Test Video {video_id}",
-            "description": f"Test Description for {video_id}",
-            "publishedAt": "2023-01-15T00:00:00Z",
-            "duration": "PT10M",
-            "caption": False,
-            "privacyStatus": "public"
+    # Use single-video helper to build batch results
+    def mock_get_video_data_side_effect(client, video_id, discrete_mode=False):
+        # existing mapping of video_id to video_data
+        video_data = {
+            "test_video_1": {
+                "bitcastVideoId": "test_video_1",
+                "title": "Test Video 1",
+                "description": "Test Description 1",
+                "publishedAt": "2023-01-15T00:00:00Z",
+                "duration": "PT10M",
+                "caption": False,
+                "privacyStatus": "public"
+            },
+            "test_video_2": {
+                "bitcastVideoId": "test_video_2",
+                "title": "Test Video 2",
+                "description": "Test Description 2",
+                "publishedAt": "2023-01-16T00:00:00Z",
+                "duration": "PT10M",
+                "caption": False,
+                "privacyStatus": "public"
+            }
         }
+        return video_data[video_id]
     
-    mock_get_video_data.side_effect = mock_get_video_data_side_effect
+    def mock_get_video_data_batch_side_effect(client, video_ids, discrete_mode=False):
+        return {vid: mock_get_video_data_side_effect(client, vid) for vid in video_ids}
+    
+    mock_get_video_data_batch.side_effect = mock_get_video_data_batch_side_effect
     
     # Note: The hardcoded dates (2023-01-15, 2023-01-16) in the mock data are not significant.
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, metric_dims=None, dimensions=None):
@@ -356,7 +385,13 @@ def test_reward_function(mock_make_openai_request, mock_get_transcript,
             for key, metric_config in metric_dims.items():
                 metric, dims = metric_config[0], metric_config[1]  # Extract metric and dims from 5-tuple
                 if dims != "day":
-                    result[key] = 100  # Default value for non-day metrics
+                    # Special handling for EXT_URL detail metrics
+                    if key == "insightTrafficSourceDetail_EXT_URL":
+                        result[key] = {"twitter.com": 50, "discord.com": 30}  # Mock EXT_URL sources
+                    elif "trafficSourceMinutes" in key:
+                        result[key] = {"YT_CHANNEL": 300, "EXT_URL": 200}  # Mock traffic source data
+                    else:
+                        result[key] = 100  # Default value for other non-day metrics
             
             return result
         
