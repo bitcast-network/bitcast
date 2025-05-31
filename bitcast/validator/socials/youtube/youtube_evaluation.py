@@ -356,7 +356,7 @@ def calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sourc
     
     blacklisted_ext_url_proportion = blacklisted_ext_url_minutes / total_ext_url_minutes if total_ext_url_minutes > 0 else 0.0
 
-    if blacklisted_ext_url_proportion != 1:
+    if blacklisted_ext_url_proportion > 0:
         bt.logging.info(f"Blacklisted EXT_URL proportion: {blacklisted_ext_url_proportion}")
         
     return blacklisted_ext_url_proportion
