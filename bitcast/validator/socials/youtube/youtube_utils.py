@@ -23,6 +23,10 @@ YT_API_RETRY_CONFIG = {
     'reraise': True
 }
 
+# API call counters to track usage of YouTube Data and Analytics APIs for each token
+data_api_call_count = 0
+analytics_api_call_count = 0
+
 def reset_scored_videos():
     """Reset the global scored_video_ids list.
     
@@ -43,12 +47,20 @@ def mark_video_as_scored(video_id):
     """Mark a video as scored to prevent duplicate processing."""
     scored_video_ids.append(video_id)
 
+def reset_api_call_counts():
+    """Reset the API call counters for YouTube Data and Analytics APIs."""
+    global data_api_call_count, analytics_api_call_count
+    data_api_call_count = 0
+    analytics_api_call_count = 0
+
 # ============================================================================
 # Channel Analytics Functions
 # ============================================================================
 
 @retry(**YT_API_RETRY_CONFIG)
 def _query(client, start_date, end_date, metric, dimensions=None, filters=None, max_results=None, sort=None):
+    global analytics_api_call_count
+    analytics_api_call_count += 1
     params = {
         'ids': 'channel==MINE',
         'startDate': start_date,
@@ -83,6 +95,8 @@ def _query(client, start_date, end_date, metric, dimensions=None, filters=None, 
 
 @retry(**YT_API_RETRY_CONFIG)
 def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensions=None, filters=None, max_results=None, sort=None):
+    global analytics_api_call_count
+    analytics_api_call_count += 1
     """Query multiple metrics in a single API call and return split results.
     
     Args:
@@ -147,6 +161,8 @@ def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensio
 
 @retry(**YT_API_RETRY_CONFIG)
 def get_channel_data(youtube_data_client, discrete_mode=False):
+    global data_api_call_count
+    data_api_call_count += 1
     """Get basic channel information."""
     resp = youtube_data_client.channels().list(
         part="snippet,contentDetails,statistics",
@@ -168,6 +184,8 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
 
 @retry(**YT_API_RETRY_CONFIG)
 def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, dimensions=""):
+    global analytics_api_call_count
+    analytics_api_call_count += 1
     """Get comprehensive channel analytics including traffic sources."""
     end = end_date or datetime.today().strftime('%Y-%m-%d')
     metrics = ",".join([
@@ -248,6 +266,8 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
 
 @retry(**YT_API_RETRY_CONFIG)
 def get_all_uploads(youtube_data_client, max_age_days=365):
+    global data_api_call_count
+    data_api_call_count += 1
     """Get all video IDs uploaded within the specified time period using the Search API.
     
     This function uses the Search API instead of the playlist API to avoid pagination issues.
@@ -260,6 +280,8 @@ def get_all_uploads(youtube_data_client, max_age_days=365):
     
     # Calculate cutoff date
     cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+    # Format cutoff in RFC3339 for server-side filtering
+    cutoff_iso = cutoff.strftime('%Y-%m-%dT%H:%M:%SZ')
     
     # Get all videos using Search API with pagination
     all_items = []
@@ -267,25 +289,25 @@ def get_all_uploads(youtube_data_client, max_age_days=365):
     page_count = 0
     
     while True:
+        data_api_call_count += 1
         page_count += 1        
         try:
+            # Only fetch videos published after cutoff to reduce paging
             search_resp = youtube_data_client.search().list(
                 part="snippet",
                 channelId=channel_id,
                 type="video",
                 order="date",
                 maxResults=50,  # Maximum allowed by API
+                publishedAfter=cutoff_iso,
                 pageToken=token
             ).execute()
             
             items = search_resp.get("items", [])
-            
-            # Filter by date and collect video IDs
+            # Append all returned video IDs (already filtered by publishedAfter)
             for item in items:
-                pub = datetime.strptime(item["snippet"]["publishedAt"], "%Y-%m-%dT%H:%M:%SZ")
-                if pub >= cutoff:
-                    video_id = item["id"]["videoId"]
-                    all_items.append(video_id)
+                video_id = item["id"]["videoId"]
+                all_items.append(video_id)
             
             token = search_resp.get("nextPageToken")
             if not token:
@@ -304,31 +326,68 @@ def get_all_uploads(youtube_data_client, max_age_days=365):
 # Video Analytics Functions
 # ============================================================================
 
+# @retry(**YT_API_RETRY_CONFIG)
+# def get_video_data(youtube_data_client, video_id, discrete_mode=False):
+#     """Get basic video information."""
+#     resp = youtube_data_client.videos().list(
+#         part="snippet,statistics,contentDetails,status",
+#         id=video_id
+#     ).execute()
+#     items = resp.get("items") or []
+#     if not items:
+#         raise Exception("No video found with matching ID")
+#     info = items[0]
+#     bcid = ("bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]) if discrete_mode else video_id
+#     return {
+#         "videoId": video_id,
+#         "bitcastVideoId": bcid,
+#         "title": info["snippet"]["title"],
+#         "description": info["snippet"]["description"],
+#         "publishedAt": info["snippet"]["publishedAt"],
+#         "viewCount": info["statistics"].get("viewCount", 0),
+#         "likeCount": info["statistics"].get("likeCount", 0),
+#         "commentCount": info["statistics"].get("commentCount", 0),
+#         "duration": info["contentDetails"]["duration"],
+#         "caption": info["contentDetails"]["caption"].lower() == "true",
+#         "privacyStatus": info["status"]["privacyStatus"]
+#     }
+
 @retry(**YT_API_RETRY_CONFIG)
+def get_video_data_batch(youtube_data_client, video_ids, discrete_mode=False):
+    """Fetch basic video information for up to 50 IDs per API call, batching to reduce calls."""
+    global data_api_call_count
+    result = {}
+    # Batch in chunks of 50 IDs
+    for i in range(0, len(video_ids), 50):
+        batch = video_ids[i:i+50]
+        data_api_call_count += 1
+        resp = youtube_data_client.videos().list(
+            part="snippet,statistics,contentDetails,status",
+            id=','.join(batch)
+        ).execute()
+        items = resp.get('items', []) or []
+        for info in items:
+            vid = info['id']
+            bcid = ("bitcast_" + hashlib.sha256(vid.encode()).hexdigest()[:8]) if discrete_mode else vid
+            result[vid] = {
+                "videoId": vid,
+                "bitcastVideoId": bcid,
+                "title": info['snippet']['title'],
+                "description": info['snippet']['description'],
+                "publishedAt": info['snippet']['publishedAt'],
+                "viewCount": info['statistics'].get('viewCount', 0),
+                "likeCount": info['statistics'].get('likeCount', 0),
+                "commentCount": info['statistics'].get('commentCount', 0),
+                "duration": info['contentDetails']['duration'],
+                "caption": info['contentDetails']['caption'].lower() == 'true',
+                "privacyStatus": info['status']['privacyStatus']
+            }
+    return result
+
+# Provide single-video get_video_data for compatibility with tests
 def get_video_data(youtube_data_client, video_id, discrete_mode=False):
-    """Get basic video information."""
-    resp = youtube_data_client.videos().list(
-        part="snippet,statistics,contentDetails,status",
-        id=video_id
-    ).execute()
-    items = resp.get("items") or []
-    if not items:
-        raise Exception("No video found with matching ID")
-    info = items[0]
-    bcid = ("bitcast_" + hashlib.sha256(video_id.encode()).hexdigest()[:8]) if discrete_mode else video_id
-    return {
-        "videoId": video_id,
-        "bitcastVideoId": bcid,
-        "title": info["snippet"]["title"],
-        "description": info["snippet"]["description"],
-        "publishedAt": info["snippet"]["publishedAt"],
-        "viewCount": info["statistics"].get("viewCount", 0),
-        "likeCount": info["statistics"].get("likeCount", 0),
-        "commentCount": info["statistics"].get("commentCount", 0),
-        "duration": info["contentDetails"]["duration"],
-        "caption": info["contentDetails"]["caption"].lower() == "true",
-        "privacyStatus": info["status"]["privacyStatus"]
-    }
+    """Fetch basic video information for a single video by wrapping batch function."""
+    return get_video_data_batch(youtube_data_client, [video_id], discrete_mode)[video_id]
 
 def get_video_analytics(youtube_analytics_client, video_id, start_date=None, end_date=None, metric_dims=None, filters=None):
     """Get video analytics based on specified metric-dimension combinations.

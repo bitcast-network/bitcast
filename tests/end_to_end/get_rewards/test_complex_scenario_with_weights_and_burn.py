@@ -33,7 +33,6 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
     from bitcast.validator.socials.youtube.youtube_utils import (
         get_channel_data,
         get_channel_analytics,
-        get_video_data,
         get_video_analytics,
         get_all_uploads,
         reset_scored_videos
@@ -130,10 +129,16 @@ class MockYouTubeDataClient:
             def list(self, part=None, id=None):
                 return MockResponse({
                     "items": [{
+                        "id": "mock_video_1",
                         "snippet": {
                             "title": "Mock Video",
                             "description": "Mock Description",
                             "publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+                        },
+                        "statistics": {
+                            "viewCount": "1000",
+                            "likeCount": "100",
+                            "commentCount": "50"
                         },
                         "contentDetails": {
                             "duration": "PT10M",
@@ -247,13 +252,13 @@ def reset_scored_videos():
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data')
+@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data_batch')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
-                        mock_get_video_analytics, mock_get_video_data, mock_get_all_uploads, 
+                        mock_get_video_analytics, mock_get_video_data_batch, mock_get_all_uploads, 
                         mock_get_channel_analytics, mock_get_channel_data, mock_get_blacklist_sources,
                         mock_get_blacklist, mock_build):
     """Test the get_rewards function with a single miner."""
@@ -377,8 +382,9 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     
     mock_get_all_uploads.side_effect = mock_get_all_uploads_side_effect
     
+    # Use single-video helper to build batch results
     def mock_get_video_data_side_effect(client, video_id, discrete_mode=False):
-        logger.info(f"get_video_data called with video_id: {video_id}")
+        # existing mapping of video_id to video_data
         video_data = {
             # UID 1's videos
             "test_video_1_uid1": {
@@ -455,11 +461,12 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "privacyStatus": "public"
             }
         }
-        result = video_data[video_id]
-        logger.info(f"Returning video data for {video_id}: {result}")
-        return result
+        return video_data[video_id]
     
-    mock_get_video_data.side_effect = mock_get_video_data_side_effect
+    def mock_get_video_data_batch_side_effect(client, video_ids, discrete_mode=False):
+        return {vid: mock_get_video_data_side_effect(client, vid) for vid in video_ids}
+    
+    mock_get_video_data_batch.side_effect = mock_get_video_data_batch_side_effect
     
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None, metric_dims=None):
         logger.info(f"get_video_analytics called with video_id: {video_id}, dimensions: {dimensions}, metric_dims: {metric_dims}")
