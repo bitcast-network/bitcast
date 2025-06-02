@@ -18,6 +18,14 @@ from bitcast.validator.utils.config import (
     CACHE_DIRS
 )
 
+# Global counter to track the number of OpenAI API requests
+openai_request_count = 0
+
+def reset_openai_request_count():
+    """Reset the OpenAI API request counter."""
+    global openai_request_count
+    openai_request_count = 0
+
 class OpenaiClient:
     _instance = None
     _lock = Lock()
@@ -70,6 +78,8 @@ OpenaiClient.initialize_cache()
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def _make_openai_request(client, **kwargs):
     """Make OpenAI API request with retry logic."""
+    global openai_request_count
+    openai_request_count += 1
     try:
         return client.beta.chat.completions.parse(**kwargs)
     except APIError as e:
