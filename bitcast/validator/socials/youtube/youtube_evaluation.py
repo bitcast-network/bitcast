@@ -305,7 +305,7 @@ def get_video_transcript(video_id, video_data):
         bt.logging.warning(f"Transcript retrieval failed for video: {video_data['bitcastVideoId']}")
         return None
         
-    return transcript
+    return str(transcript)
 
 def check_prompt_injection(video_id, video_data, transcript, decision_details):
     """Check if the video contains prompt injection."""

@@ -90,15 +90,22 @@ def _make_openai_request(client, **kwargs):
         bt.logging.error(f"Unexpected error during OpenAI request: {e}")
         raise
 
+def _crop_transcript(transcript) -> str:
+    """Convert transcript to string and trim to TRANSCRIPT_MAX_LENGTH if needed."""
+    
+    # Apply character-based length limit
+    if len(transcript) > TRANSCRIPT_MAX_LENGTH:
+        return transcript[:TRANSCRIPT_MAX_LENGTH]
+    
+    return transcript
+
 def evaluate_content_against_brief(brief, duration, description, transcript):
     """
     Evaluate the transcript against the brief using OpenAI GPT-4 to determine if the content meets the brief.
     Returns a tuple of (bool, str) where bool indicates if the content meets the brief, and str is the reasoning.
     """
-    # crop transcript to max length
-    if len(transcript) > TRANSCRIPT_MAX_LENGTH:
-        bt.logging.warning(f"Transcript length {len(transcript)} exceeds max {TRANSCRIPT_MAX_LENGTH}, cropping.")
-        transcript = transcript[:TRANSCRIPT_MAX_LENGTH]
+    # prepare transcript for prompt
+    transcript = _crop_transcript(transcript)
     prompt_content = (
         "///// BRIEF /////\n"
         f"{brief['brief']}\n"
@@ -168,10 +175,8 @@ def check_for_prompt_injection(description, transcript):
     Check for potential prompt injection attempts within the video description and transcript.
     Returns True if any prompt injection is detected, otherwise False.
     """
-    # crop transcript to max length
-    if len(transcript) > TRANSCRIPT_MAX_LENGTH:
-        bt.logging.warning(f"Transcript length {len(transcript)} exceeds max {TRANSCRIPT_MAX_LENGTH}, cropping.")
-        transcript = transcript[:TRANSCRIPT_MAX_LENGTH]
+    # prepare transcript for prompt
+    transcript = _crop_transcript(transcript)
     token = secrets.token_hex(8)
     placeholder_token = "{TOKEN}"
     injection_prompt_template = (
