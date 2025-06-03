@@ -15,7 +15,8 @@ from bitcast.validator.utils.config import (
     DISABLE_LLM_CACHING,
     LANGCHAIN_API_KEY,
     LANGCHAIN_TRACING_V2,
-    CACHE_DIRS
+    CACHE_DIRS,
+    TRANSCRIPT_MAX_LENGTH
 )
 
 # Global counter to track the number of OpenAI API requests
@@ -94,6 +95,10 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
     Evaluate the transcript against the brief using OpenAI GPT-4 to determine if the content meets the brief.
     Returns a tuple of (bool, str) where bool indicates if the content meets the brief, and str is the reasoning.
     """
+    # crop transcript to max length
+    if len(transcript) > TRANSCRIPT_MAX_LENGTH:
+        bt.logging.warning(f"Transcript length {len(transcript)} exceeds max {TRANSCRIPT_MAX_LENGTH}, cropping.")
+        transcript = transcript[:TRANSCRIPT_MAX_LENGTH]
     prompt_content = (
         "///// BRIEF /////\n"
         f"{brief['brief']}\n"
@@ -163,6 +168,10 @@ def check_for_prompt_injection(description, transcript):
     Check for potential prompt injection attempts within the video description and transcript.
     Returns True if any prompt injection is detected, otherwise False.
     """
+    # crop transcript to max length
+    if len(transcript) > TRANSCRIPT_MAX_LENGTH:
+        bt.logging.warning(f"Transcript length {len(transcript)} exceeds max {TRANSCRIPT_MAX_LENGTH}, cropping.")
+        transcript = transcript[:TRANSCRIPT_MAX_LENGTH]
     token = secrets.token_hex(8)
     placeholder_token = "{TOKEN}"
     injection_prompt_template = (
