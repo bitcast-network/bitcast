@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from bitcast.validator.socials.youtube.youtube_evaluation import vet_video
 from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.utils.config import RAPID_API_KEY
+import asyncio
 
 # Configure logging to show all logs
 logging.basicConfig(
@@ -41,8 +42,9 @@ async def vet_video_endpoint(request: VideoRequest):
         logging.debug(f"Received request for video: {request.video_id}")
         logging.debug(f"Request contains {len(request.briefs)} briefs")
         
-        # Call the vet_video function from youtube_scoring.py
-        result = vet_video(
+        # Offload synchronous vet_video call to a thread to avoid blocking
+        result = await asyncio.to_thread(
+            vet_video,
             video_id=request.video_id,
             briefs=request.briefs,
             video_data=request.video_data,
@@ -60,8 +62,10 @@ async def vet_video_endpoint(request: VideoRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 def main():
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    import multiprocessing
+    multiprocessing.set_start_method('fork', force=True)
+    import uvicorn, os
+    uvicorn.run("internal_api:app", host="0.0.0.0", port=8000, workers=os.cpu_count())
 
 if __name__ == "__main__":
     main()
