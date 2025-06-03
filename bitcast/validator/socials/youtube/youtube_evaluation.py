@@ -415,13 +415,14 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     # Get EXT_URL lifetime data from existing analytics and calculate the proportion
     ext_url_lifetime_data = existing_analytics.get("insightTrafficSourceDetail_EXT_URL", {})
     blacklisted_ext_url_proportion = calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources, ext_url_lifetime_data)
-    
-    # Calculate score using only the data between start_date and end_date, excluding blacklisted traffic
-    scoreable_days = [item for item in daily_analytics if start_date <= item.get('day', '') <= end_date]
-    score = sum(get_scorable_minutes(item, blacklisted_sources, blacklisted_ext_url_proportion) for item in scoreable_days)
 
-    scoreable_history_days = [item for item in daily_analytics if item.get('day', '') <= end_date]
-    scorableHistoryMins = sum(get_scorable_minutes(item, blacklisted_sources, blacklisted_ext_url_proportion) for item in scoreable_history_days)
+    # Compute scorableMins once per day
+    for item in daily_analytics:
+        item['scorableMins'] = get_scorable_minutes(item, blacklisted_sources, blacklisted_ext_url_proportion)
+
+    # Calculate score and history using pre-computed scorableMins
+    score = sum(item['scorableMins'] for item in daily_analytics if start_date <= item.get('day', '') <= end_date)
+    scorableHistoryMins = sum(item['scorableMins'] for item in daily_analytics if item.get('day', '') <= end_date)
 
     return {
         "score": score,
