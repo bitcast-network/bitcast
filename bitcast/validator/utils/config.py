@@ -12,8 +12,14 @@ CACHE_ROOT = Path(__file__).resolve().parents[2] / "cache"
 CACHE_DIRS = {
     "openai": os.path.join(CACHE_ROOT, "openai"),
     "briefs": os.path.join(CACHE_ROOT, "briefs"),
-    "blacklist": os.path.join(CACHE_ROOT, "blacklist")
+    "blacklist": os.path.join(CACHE_ROOT, "blacklist"),
+    "youtube_search": os.path.join(CACHE_ROOT, "youtube_search")
 }
+
+# Cache expiry times (in seconds)
+YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
+BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
+OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
 __version__ = "1.5.2"
 
