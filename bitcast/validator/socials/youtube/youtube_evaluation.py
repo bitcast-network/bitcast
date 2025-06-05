@@ -27,7 +27,7 @@ def vet_channel(channel_data, channel_analytics):
     # Check if channel is blacklisted
     if is_blacklisted(channel_data["bitcastChannelId"]):
         bt.logging.warning(f"Channel is blacklisted: {channel_data['bitcastChannelId']}")
-        return False
+        return False, True  # Return (vet_result, blacklisted)
 
     # Calculate channel age
     channel_age_days = calculate_channel_age(channel_data)
@@ -37,10 +37,10 @@ def vet_channel(channel_data, channel_analytics):
     
     if criteria_met:
         bt.logging.info(f"Channel Evaluation Passed")
-        return True
+        return True, False  # Return (vet_result, blacklisted)
     else:
         bt.logging.info(f"Channel Evaluation Failed")
-        return False
+        return False, False  # Return (vet_result, blacklisted)
 
 def calculate_channel_age(channel_data):
     """Calculate the age of the channel in days."""

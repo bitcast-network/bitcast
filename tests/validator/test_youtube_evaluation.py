@@ -97,8 +97,9 @@ def test_vet_channel_blacklisted(mock_blacklist):
     mock_blacklist.return_value = ["blacklisted_channel"]
     
     # Channel should fail vetting even if it meets all other criteria
-    result = vet_channel(channel_data, channel_analytics)
-    assert result == False
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
+    assert vet_result == False
+    assert is_blacklisted == True
     mock_blacklist.assert_called_once()
 
 def test_vet_channel_not_blacklisted(mock_blacklist):
@@ -118,8 +119,9 @@ def test_vet_channel_not_blacklisted(mock_blacklist):
     mock_blacklist.return_value = []
     
     # Channel should pass vetting if it meets all criteria
-    result = vet_channel(channel_data, channel_analytics)
-    assert result == True
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
+    assert vet_result == True
+    assert is_blacklisted == False
     mock_blacklist.assert_called_once()
 
 def test_vet_channel():
@@ -134,11 +136,15 @@ def test_vet_channel():
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
         "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
     }
-    assert vet_channel(channel_data, channel_analytics) == True
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
+    assert vet_result == True
+    assert is_blacklisted == False
 
     # Test case 2: Channel fails age check
     channel_data["channel_start"] = (datetime.now() - timedelta(days=YT_MIN_CHANNEL_AGE - 10)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    assert vet_channel(channel_data, channel_analytics) == False
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
+    assert vet_result == False
+    assert is_blacklisted == False
 
 # ============================================================================
 # Video Evaluation Tests
