@@ -3,14 +3,61 @@ import requests
 import time
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
-from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY
+from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY, CACHE_DIRS, YOUTUBE_SEARCH_CACHE_EXPIRY
 import httpx
 import hashlib
 import asyncio
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
+from googleapiclient.errors import HttpError
 import os
 import json
 import re
+from diskcache import Cache
+from threading import Lock
+import atexit
+
+class YouTubeSearchCache:
+    _instance = None
+    _lock = Lock()
+    _cache: Cache = None
+    _cache_dir = CACHE_DIRS["youtube_search"]
+
+    @classmethod
+    def initialize_cache(cls) -> None:
+        """Initialize the cache if it hasn't been initialized yet."""
+        if cls._cache is None:
+            os.makedirs(cls._cache_dir, exist_ok=True)
+            cls._cache = Cache(
+                directory=cls._cache_dir,
+                size_limit=1e8,  # 100MB - search results can be sizable
+                disk_min_file_size=0,
+                disk_pickle_protocol=4,
+            )
+            # Register cleanup on program exit
+            atexit.register(cls.cleanup)
+
+    @classmethod
+    def cleanup(cls) -> None:
+        """Clean up resources."""
+        if cls._cache is not None:
+            with cls._lock:
+                if cls._cache is not None:
+                    cls._cache.close()
+                    cls._cache = None
+
+    @classmethod
+    def get_cache(cls) -> Cache:
+        """Thread-safe cache access."""
+        if cls._cache is None:
+            cls.initialize_cache()
+        return cls._cache
+
+    def __del__(self):
+        """Ensure cleanup on object destruction."""
+        self.cleanup()
+
+# Initialize cache
+YouTubeSearchCache.initialize_cache()
 
 # Global list to track which videos have already been scored
 # This list is shared between youtube_scoring.py and youtube_evaluation.py
@@ -265,62 +312,115 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
 # ============================================================================
 
 @retry(**YT_API_RETRY_CONFIG)
-def get_all_uploads(youtube_data_client, max_age_days=365):
+def _get_uploads_playlist_id(youtube):
+    """Return the channel's 'uploads' playlist ID (1-unit call)."""
     global data_api_call_count
     data_api_call_count += 1
-    """Get all video IDs uploaded within the specified time period using the Search API.
+    resp = youtube.channels().list(mine=True, part="contentDetails").execute()
+    items = resp.get("items") or []
+    if not items:
+        raise RuntimeError("No channel found for the authenticated user")
+    return items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+
+
+def _fallback_via_search(youtube, channel_id, cutoff_iso):
+    """Quota-heavy fallback path (100 units per request). Uses caching to reduce API calls."""
+    global data_api_call_count
     
-    This function uses the Search API instead of the playlist API to avoid pagination issues.
-    It searches for videos in the authenticated user's channel and filters by date.
-    """
+    # Create cache key from channel_id and cutoff_iso
+    cache_key = f"{channel_id}"
+    cache = YouTubeSearchCache.get_cache()
     
-    # Get channel ID
-    channel_resp = youtube_data_client.channels().list(mine=True, part="id").execute()
-    channel_id = channel_resp['items'][0]['id']
+    # Check cache first
+    cached_vids = cache.get(cache_key)
+    if cached_vids is not None:
+        bt.logging.info(f"Found {len(cached_vids)} videos in search cache")
+        return cached_vids
     
-    # Calculate cutoff date
-    cutoff = datetime.utcnow() - timedelta(days=max_age_days)
-    # Format cutoff in RFC3339 for server-side filtering
-    cutoff_iso = cutoff.strftime('%Y-%m-%dT%H:%M:%SZ')
+    # Cache miss - perform API search (limited to 3 calls, sorted by date)
+    vids, token, call_count = [], None, 0
+    max_calls = 2   # limit to most recent 100 videos because the search calls cost 100 credits
     
-    # Get all videos using Search API with pagination
-    all_items = []
-    token = None
-    page_count = 0
-    
-    while True:
-        data_api_call_count += 1
-        page_count += 1        
-        try:
-            # Only fetch videos published after cutoff to reduce paging
-            search_resp = youtube_data_client.search().list(
-                part="snippet",
-                channelId=channel_id,
-                type="video",
-                order="date",
-                maxResults=50,  # Maximum allowed by API
-                publishedAfter=cutoff_iso,
-                pageToken=token
-            ).execute()
-            
-            items = search_resp.get("items", [])
-            # Append all returned video IDs (already filtered by publishedAfter)
-            for item in items:
-                video_id = item["id"]["videoId"]
-                all_items.append(video_id)
-            
-            token = search_resp.get("nextPageToken")
-            if not token:
-                break
-                
-            time.sleep(0.25)
-            
-        except Exception as e:
-            bt.logging.error(f"Error on search page {page_count}")
+    while call_count < max_calls:
+        data_api_call_count += 100  # search.list() uses 100 credits per call
+        resp = youtube.search().list(
+            part="id",
+            type="video",
+            channelId=channel_id,
+            publishedAfter=cutoff_iso,
+            maxResults=50,
+            pageToken=token,
+            order="date"  # Sort by publish time (newest first)
+        ).execute()
+        vids += [item["id"]["videoId"] for item in resp.get("items", [])]
+        call_count += 1
+        
+        token = resp.get("nextPageToken")
+        if not token:
             break
+        time.sleep(0.25)  # courteous pause
     
-    bt.logging.info(f"Found {len(all_items)} videos")
-    return all_items
+    bt.logging.info(f"API search found {len(vids)} videos")
+    
+    # Store in cache for 12 hours
+    cache.set(cache_key, vids, expire=YOUTUBE_SEARCH_CACHE_EXPIRY)
+    
+    return vids
+
+@retry(**YT_API_RETRY_CONFIG)
+def get_all_uploads(youtube, max_age_days: int = 365):
+    """
+    Return a list of video IDs uploaded within the last `max_age_days`.
+
+    Strategy:
+      1. Use playlistItems.list (cheap) and bail out early when items get old.
+      2. If we hit the rare invalidPageToken bug, fall back to search.list.
+    """
+    global data_api_call_count
+    cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+    cutoff_iso = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # 1) cheap path ----------------------------------------------------------
+    playlist_id = _get_uploads_playlist_id(youtube)
+    req = youtube.playlistItems().list(
+        playlistId=playlist_id,
+        part="snippet,contentDetails",
+        maxResults=50,
+        fields="items(snippet/publishedAt,"
+        "contentDetails/videoId),nextPageToken",
+    )
+
+    vids = []
+    while req:
+        try:
+            data_api_call_count += 1  # Count each req.execute() call (1 credit each)
+            resp = req.execute()
+        except HttpError as e:
+            if e.resp.status == 404 and "playlistNotFound" in str(e):
+                bt.logging.warning("Playlist not found - switching to search method")
+                # Need channel ID for fallback
+                data_api_call_count += 1  # channels.list() call for fallback
+                channel_id = youtube.channels().list(mine=True, part="id").execute()[
+                    "items"
+                ][0]["id"]
+                return _fallback_via_search(youtube, channel_id, cutoff_iso)
+            raise  # other errors → retry via decorator
+
+        for item in resp["items"]:
+            pub = datetime.strptime(
+                item["snippet"]["publishedAt"], "%Y-%m-%dT%H:%M:%SZ"
+            )
+            if pub < cutoff:
+                bt.logging.info(
+                    f"Found {len(vids)} uploads in last {max_age_days} days (playlist)"
+                )
+                return vids
+            vids.append(item["contentDetails"]["videoId"])
+
+        req = youtube.playlistItems().list_next(req, resp)
+
+    bt.logging.info(f"Found {len(vids)} uploads in last {max_age_days} days (playlist)")
+    return vids
 
 # ============================================================================
 # Video Analytics Functions

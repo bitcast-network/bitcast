@@ -6,6 +6,7 @@ from bitcast.validator.utils.config import CACHE_DIRS, CACHE_ROOT
 from bitcast.validator.clients.OpenaiClient import OpenaiClient
 from bitcast.validator.utils.briefs import BriefsCache
 from bitcast.validator.utils.blacklist import BlacklistCache
+from bitcast.validator.socials.youtube.youtube_utils import YouTubeSearchCache
 
 def clear_all_caches():
     """Clear all cache directories and instances."""
@@ -14,6 +15,7 @@ def clear_all_caches():
         clear_openai_cache()
         clear_briefs_cache()
         clear_blacklist_cache()
+        clear_youtube_search_cache()
         
         # Clear all cache directories
         for cache_dir in CACHE_DIRS.values():
@@ -33,6 +35,7 @@ def clear_expired_caches():
         clear_expired_openai_cache()
         clear_expired_briefs_cache()
         clear_expired_blacklist_cache()
+        clear_expired_youtube_search_cache()
         bt.logging.info("Successfully cleared expired cache entries")
     except Exception as e:
         bt.logging.error(f"Error clearing expired cache entries: {str(e)}")
@@ -114,4 +117,30 @@ def clear_expired_blacklist_cache():
             bt.logging.warning("Blacklist cache not initialized")
     except Exception as e:
         bt.logging.error(f"Error clearing expired Blacklist cache entries: {str(e)}")
+        raise
+
+def clear_youtube_search_cache():
+    """Clear YouTube search cache."""
+    bt.logging.info("Clearing YouTube search cache")
+    try:
+        if YouTubeSearchCache._cache:
+            YouTubeSearchCache._cache.clear()
+            bt.logging.info("Successfully cleared YouTube search cache")
+        else:
+            bt.logging.warning("YouTube search cache not initialized")
+    except Exception as e:
+        bt.logging.error(f"Error clearing YouTube search cache: {str(e)}")
+        raise
+
+def clear_expired_youtube_search_cache():
+    """Clear expired YouTube search cache entries."""
+    bt.logging.info("Clearing expired YouTube search cache entries")
+    try:
+        if YouTubeSearchCache._cache:
+            YouTubeSearchCache._cache.expire()
+            bt.logging.info("Successfully cleared expired YouTube search cache entries")
+        else:
+            bt.logging.warning("YouTube search cache not initialized")
+    except Exception as e:
+        bt.logging.error(f"Error clearing expired YouTube search cache entries: {str(e)}")
         raise

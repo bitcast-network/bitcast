@@ -51,8 +51,15 @@ async def forward(self):
             bt.logging.info(f"UID {uid}: {reward}")
             yt_stats_list[i]["reward"] = float(reward)
         
+        # Extract blacklisted UIDs from the stats
+        blacklisted_uids = []
+        for i, (uid, yt_stats) in enumerate(zip(miner_uids, yt_stats_list)):
+            if yt_stats.get("yt_account", {}).get("blacklisted", False):
+                blacklisted_uids.append(uid)
+                bt.logging.info(f"UID {uid} is blacklisted")
+        
         # Update the scores based on the rewards
-        self.update_scores(rewards, miner_uids)
+        self.update_scores(rewards, miner_uids, blacklisted_uids)
 
         publish_stats(self.wallet, yt_stats_list, miner_uids)
 

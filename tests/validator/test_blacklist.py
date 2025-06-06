@@ -1,5 +1,6 @@
 import requests
-from bitcast.validator.utils.blacklist import get_blacklist, BlacklistCache, BLACKLIST_CACHE_EXPIRY, is_blacklisted
+from bitcast.validator.utils.blacklist import get_blacklist, BlacklistCache, is_blacklisted
+from bitcast.validator.utils.config import BLACKLIST_CACHE_EXPIRY
 import time
 
 class MockResponse:

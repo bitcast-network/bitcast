@@ -12,10 +12,16 @@ CACHE_ROOT = Path(__file__).resolve().parents[2] / "cache"
 CACHE_DIRS = {
     "openai": os.path.join(CACHE_ROOT, "openai"),
     "briefs": os.path.join(CACHE_ROOT, "briefs"),
-    "blacklist": os.path.join(CACHE_ROOT, "blacklist")
+    "blacklist": os.path.join(CACHE_ROOT, "blacklist"),
+    "youtube_search": os.path.join(CACHE_ROOT, "youtube_search")
 }
 
-__version__ = "1.5.0"
+# Cache expiry times (in seconds)
+YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
+BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
+OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
+
+__version__ = "1.5.2"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -54,6 +60,9 @@ YT_MIN_VIDEO_RETENTION = 10
 # transcript api
 TRANSCRIPT_MAX_RETRY = 10
 
+# transcript maximum length in characters
+TRANSCRIPT_MAX_LENGTH = 250000
+
 # validation cycle
 VALIDATOR_WAIT = 60 # 60 seconds
 VALIDATOR_STEPS_INTERVAL = 240 # 4 hours
@@ -76,6 +85,7 @@ bt.logging.info(f"YT_ROLLING_WINDOW: {YT_ROLLING_WINDOW}")
 bt.logging.info(f"YT_REWARD_DELAY: {YT_REWARD_DELAY}")
 bt.logging.info(f"YT_LOOKBACK: {YT_LOOKBACK}")
 bt.logging.info(f"TRANSCRIPT_MAX_RETRY: {TRANSCRIPT_MAX_RETRY}")
+bt.logging.info(f"TRANSCRIPT_MAX_LENGTH: {TRANSCRIPT_MAX_LENGTH}")
 bt.logging.info(f"VALIDATOR_WAIT: {VALIDATOR_WAIT}")
 bt.logging.info(f"VALIDATOR_STEPS_INTERVAL: {VALIDATOR_STEPS_INTERVAL}")
 bt.logging.info(f"DISCRETE_MODE: {DISCRETE_MODE}")

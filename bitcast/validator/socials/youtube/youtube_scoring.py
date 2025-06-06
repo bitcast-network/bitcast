@@ -2,6 +2,7 @@ import asyncio
 import bittensor as bt
 from datetime import datetime, timedelta
 from googleapiclient.discovery import build
+import time
 
 from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.socials.youtube.youtube_evaluation import (
@@ -24,6 +25,8 @@ from bitcast.validator.utils.config import (
     RAPID_API_KEY
 )
 
+import bitcast.validator.clients.OpenaiClient as openai_client_module
+
 def eval_youtube(creds, briefs):
     bt.logging.info(f"Scoring Youtube Content")
     
@@ -31,14 +34,19 @@ def eval_youtube(creds, briefs):
     result, youtube_data_client, youtube_analytics_client = initialize_youtube_evaluation(creds, briefs)
     # Reset API call counters for this token evaluation
     youtube_utils.reset_api_call_counts()
+    openai_client_module.reset_openai_request_count()
+    start = time.perf_counter()
     
     # Get and process channel information
     channel_data, channel_analytics = get_channel_information(youtube_data_client, youtube_analytics_client)
     if channel_data is None or channel_analytics is None:
         # Attach API call counts on early exit
-        result["api_call_counts"] = {
+        elapsed = time.perf_counter() - start
+        result["performance_stats"] = {
             "data_api_calls": youtube_utils.data_api_call_count,
-            "analytics_api_calls": youtube_utils.analytics_api_call_count
+            "analytics_api_calls": youtube_utils.analytics_api_call_count,
+            "openai_requests": openai_client_module.openai_request_count,
+            "evaluation_time": elapsed
         }
         return result
     
@@ -47,15 +55,19 @@ def eval_youtube(creds, briefs):
     result["yt_account"]["analytics"] = channel_analytics
     
     # Vet the channel and store the result
-    channel_vet_result = vet_channel(channel_data, channel_analytics)
+    channel_vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
+    result["yt_account"]["blacklisted"] = is_blacklisted
 
     if not channel_vet_result and ECO_MODE:
         bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")
         # Attach API call counts on early exit
-        result["api_call_counts"] = {
+        elapsed = time.perf_counter() - start
+        result["performance_stats"] = {
             "data_api_calls": youtube_utils.data_api_call_count,
-            "analytics_api_calls": youtube_utils.analytics_api_call_count
+            "analytics_api_calls": youtube_utils.analytics_api_call_count,
+            "openai_requests": openai_client_module.openai_request_count,
+            "evaluation_time_s": elapsed
         }
         return result
 
@@ -63,10 +75,13 @@ def eval_youtube(creds, briefs):
     
     # Process videos and update the result
     result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
-    # Attach API call counts to result after full evaluation
-    result["api_call_counts"] = {
+    # Attach performance stats to result after full evaluation
+    elapsed = time.perf_counter() - start
+    result["performance_stats"] = {
         "data_api_calls": youtube_utils.data_api_call_count,
-        "analytics_api_calls": youtube_utils.analytics_api_call_count
+        "analytics_api_calls": youtube_utils.analytics_api_call_count,
+        "openai_requests": openai_client_module.openai_request_count,
+        "evaluation_time_s": elapsed
     }
     
     return result
