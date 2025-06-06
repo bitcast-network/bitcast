@@ -4,11 +4,8 @@ from diskcache import Cache
 import os
 from threading import Lock
 import atexit
-from bitcast.validator.utils.config import BITCAST_BLACKLIST_ENDPOINT, BITCAST_BLACKLIST_SOURCES_ENDPOINT, CACHE_DIRS
+from bitcast.validator.utils.config import BITCAST_BLACKLIST_ENDPOINT, BITCAST_BLACKLIST_SOURCES_ENDPOINT, CACHE_DIRS, BLACKLIST_CACHE_EXPIRY
 from typing import Dict, List, TypedDict
-
-# Cache expiration time in seconds (10 minutes)
-BLACKLIST_CACHE_EXPIRY = 10 * 60
 
 class BlacklistSources(TypedDict):
     traffic_sources: List[str]

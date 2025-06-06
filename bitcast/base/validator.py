@@ -317,7 +317,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # Update the hotkeys.
         self.hotkeys = copy.deepcopy(self.metagraph.hotkeys)
 
-    def update_scores(self, rewards: np.ndarray, uids: List[int]):
+    def update_scores(self, rewards: np.ndarray, uids: List[int], blacklisted_uids: List[int] = None):
         """Performs exponential moving average on the scores based on the rewards received from the miners."""
 
         # Check if rewards contains NaN values.
@@ -364,6 +364,18 @@ class BaseValidatorNeuron(BaseNeuron):
         )
         bt.logging.debug(f"Updated moving avg scores: {self.scores}")
 
+        # Handle blacklisted UIDs by setting their scores to 0 immediately
+        if blacklisted_uids:
+            blacklisted_uids_array = np.array(blacklisted_uids)
+            self.scores[blacklisted_uids_array] = 0.0
+            bt.logging.info(f"Set scores to 0 for blacklisted UIDs: {blacklisted_uids}")
+            
+            # Renormalize scores to sum to 1 after blacklisting
+            total_score = np.sum(self.scores)
+            if total_score > 0:
+                self.scores = self.scores / total_score
+                bt.logging.debug(f"Renormalized scores to sum=1 after blacklisting. New sum: {np.sum(self.scores)}")
+            
     def save_state(self):
         """Saves the state of the validator to a file."""
         bt.logging.info("Saving validator state.")
