@@ -254,12 +254,10 @@ async def test_process_video_vetting(mock_make_openai_request, mock_get_transcri
     """Test the complete video vetting process."""
     # Setup test data
     video_id = "test_video_1"
-    briefs = [{"id": "brief1"}]
+    briefs = [{"id": "brief1", "start_date": "2023-01-01"}]
     youtube_data_client = MagicMock()
     youtube_analytics_client = MagicMock()
     results = {}
-    video_data_dict = {}
-    video_analytics_dict = {}
     video_decision_details = {}
 
     # Mock video data
@@ -279,27 +277,6 @@ async def test_process_video_vetting(mock_make_openai_request, mock_get_transcri
         "estimatedMinutesWatched": 1000
     }
 
-    # Use single-video helper to build batch results
-    def mock_get_video_data_side_effect(client, video_id, discrete_mode=False):
-        # existing mapping of video_id to video_data
-        video_data = {
-            "test_video_1": {
-                "bitcastVideoId": "test_video_1",
-                "title": "Test Video 1",
-                "description": "Test Description 1",
-                "publishedAt": "2023-01-15T00:00:00Z",
-                "duration": "PT10M",
-                "caption": False,
-                "privacyStatus": "public"
-            }
-        }
-        return video_data[video_id]
-    
-    def mock_get_video_data_batch_side_effect(client, video_ids, discrete_mode=False):
-        return {vid: mock_get_video_data_side_effect(client, vid) for vid in video_ids}
-    
-    mock_get_video_data_batch.side_effect = mock_get_video_data_batch_side_effect
-
     # Mock YouTube API responses
     with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics', return_value=video_analytics):
         with patch('bitcast.validator.socials.youtube.youtube_evaluation.vet_video', return_value={
@@ -310,29 +287,30 @@ async def test_process_video_vetting(mock_make_openai_request, mock_get_transcri
                 "publishDateCheck": True,
                 "averageViewPercentageCheck": True,
                 "manualCaptionsCheck": True,
-                "promptInjectionCheck": True
+                "promptInjectionCheck": True,
+                "anyBriefMatched": True,
+                "video_vet_result": True
             }
         }):
-            # Pre-populate video_data_dict so process_video_vetting sees the video data
-            video_data_dict[video_id] = video_data
-            # Process the video
+            # Process the video - pass individual video data and analytics, not dictionaries
             process_video_vetting(
                 video_id,
                 briefs,
                 youtube_data_client,
                 youtube_analytics_client,
                 results,
-                video_data_dict,
-                video_analytics_dict,
+                video_data,        # Individual video data
+                video_analytics,   # Individual video analytics  
                 video_decision_details
             )
 
-            # Verify results
+            # Verify results - the function should populate results and video_decision_details
             assert video_id in results
-            assert video_id in video_data_dict
-            assert video_id in video_analytics_dict
             assert video_id in video_decision_details
             assert results[video_id] == [True]
-            assert video_data_dict[video_id] == video_data
-            assert video_analytics_dict[video_id] == video_analytics
-            assert video_decision_details[video_id]["contentAgainstBriefCheck"] == [True] 
+            assert video_decision_details[video_id]["contentAgainstBriefCheck"] == [True]
+            assert video_decision_details[video_id]["publicVideo"] == True
+            assert video_decision_details[video_id]["publishDateCheck"] == True
+            assert video_decision_details[video_id]["averageViewPercentageCheck"] == True
+            assert video_decision_details[video_id]["manualCaptionsCheck"] == True
+            assert video_decision_details[video_id]["promptInjectionCheck"] == True 

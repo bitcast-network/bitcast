@@ -20,6 +20,7 @@ from bitcast.validator.utils.config import (
 from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics
 from bitcast.validator.utils.blacklist import is_blacklisted, get_blacklist_sources
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def vet_channel(channel_data, channel_analytics):
     bt.logging.info(f"Checking channel")
@@ -74,13 +75,39 @@ def check_channel_criteria(channel_data, channel_analytics, channel_age_days):
 
     return criteria_met
 
+def get_video_analytics_batch(youtube_analytics_client, video_ids):
+    """Get analytics data for all videos in batch."""
+    video_analytics_dict = {}
+    
+    # Get all metrics from config using the helper function
+    all_metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=False)
+    
+    for video_id in video_ids:
+        try:
+            # Get all analytics in a single call
+            video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
+            video_analytics_dict[video_id] = video_analytics
+        except Exception as e:
+            bt.logging.error(f"Error getting analytics for video {video_id}: {youtube_utils._format_error(e)}")
+            video_analytics_dict[video_id] = {}
+    
+    return video_analytics_dict
+
 def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client):
     results = {}
     video_data_dict = {}  # Store video data for all videos
     video_analytics_dict = {}  # Store video analytics for all videos
     video_decision_details = {}  # Store decision details for all videos
 
+    import time
+    
+    start_time = time.time()
     video_data_dict = youtube_utils.get_video_data_batch(youtube_data_client, video_ids, DISCRETE_MODE)
+    bt.logging.info(f"Video data batch fetch took {time.time() - start_time:.2f} seconds")
+
+    start_time = time.time()
+    video_analytics_dict = get_video_analytics_batch(youtube_analytics_client, video_ids)
+    bt.logging.info(f"Video analytics batch fetch took {time.time() - start_time:.2f} seconds")
 
     for video_id in video_ids:
         try:
@@ -88,6 +115,10 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
             if youtube_utils.is_video_already_scored(video_id):
                 results[video_id] = [False] * len(briefs)
                 continue
+            
+            # Get the video data and analytics for this specific video
+            video_data = video_data_dict.get(video_id)
+            video_analytics = video_analytics_dict.get(video_id, {})
                 
             # Process the video
             process_video_vetting(
@@ -96,8 +127,8 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 youtube_data_client, 
                 youtube_analytics_client, 
                 results, 
-                video_data_dict, 
-                video_analytics_dict, 
+                video_data,
+                video_analytics,
                 video_decision_details
             )
             
@@ -113,20 +144,8 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     return results, video_data_dict, video_analytics_dict, video_decision_details
 
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
-                         results, video_data_dict, video_analytics_dict, video_decision_details):
+                         results, video_data, video_analytics, video_decision_details):
     """Process the vetting of a single video."""
-
-    video_data = video_data_dict.get(video_id)
-    
-    # Get all metrics from config using the helper function
-    all_metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=False)
-    
-    # Get all analytics in a single call
-    video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
-    
-    # Store video data and analytics regardless of vetting result
-    video_data_dict[video_id] = video_data
-    video_analytics_dict[video_id] = video_analytics
 
     # Get decision details for the video
     vet_result = vet_video(video_id, briefs, video_data, video_analytics)
@@ -139,7 +158,7 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
         bt.logging.info(f"Fetching advanced metrics.")
         advanced_metrics = get_advanced_metrics()
         advanced_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
-        video_analytics_dict[video_id].update(advanced_analytics)
+        video_analytics.update(advanced_analytics)
     
     valid_checks = [check for check in decision_details["contentAgainstBriefCheck"] if check is not None]
     bt.logging.info(f"Video meets {sum(valid_checks)} briefs.")
@@ -318,21 +337,50 @@ def check_prompt_injection(video_id, video_data, transcript, decision_details):
         return True
 
 def evaluate_content_against_briefs(briefs, video_data, transcript, decision_details):
-    """Evaluate the video content against each brief."""
+    """Evaluate the video content against each brief concurrently."""
     met_brief_ids = []
-    reasonings = []  # Store reasonings separately
-
-    for brief in briefs:
-        try:
-            match, reasoning = evaluate_content_against_brief(brief, video_data['duration'], video_data['description'], transcript)
-            decision_details["contentAgainstBriefCheck"].append(match)
-            reasonings.append(reasoning)  # Store reasoning in separate list
-            if match:
-                met_brief_ids.append(brief["id"])
-        except Exception as e:
-            bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {youtube_utils._format_error(e)}")
-            decision_details["contentAgainstBriefCheck"].append(False)
-            reasonings.append(f"Error during evaluation: {str(e)}")  # Store error as reasoning
+    reasonings = []
+    
+    # Initialize results lists with the correct size
+    brief_results = [False] * len(briefs)
+    brief_reasonings = [""] * len(briefs)
+    
+    # Use ThreadPoolExecutor for concurrent brief evaluations
+    max_workers = min(len(briefs), 5)  # Limit to 5 concurrent workers to avoid overwhelming the API
+    
+    bt.logging.info(f"Evaluating {len(briefs)} briefs concurrently with {max_workers} workers")
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all brief evaluation tasks
+        future_to_brief = {
+            executor.submit(
+                evaluate_content_against_brief, 
+                brief, 
+                video_data['duration'], 
+                video_data['description'], 
+                transcript
+            ): (i, brief)
+            for i, brief in enumerate(briefs)
+        }
+        
+        # Collect results as they complete
+        for future in as_completed(future_to_brief):
+            brief_index, brief = future_to_brief[future]
+            try:
+                match, reasoning = future.result()
+                brief_results[brief_index] = match
+                brief_reasonings[brief_index] = reasoning
+                if match:
+                    met_brief_ids.append(brief["id"])
+                # Note: Individual brief completion logs will appear from OpenaiClient
+            except Exception as e:
+                bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {youtube_utils._format_error(e)}")
+                brief_results[brief_index] = False
+                brief_reasonings[brief_index] = f"Error during evaluation: {str(e)}"
+    
+    # Update decision_details with results in correct order
+    decision_details["contentAgainstBriefCheck"].extend(brief_results)
+    reasonings = brief_reasonings
             
     return met_brief_ids, reasonings
 

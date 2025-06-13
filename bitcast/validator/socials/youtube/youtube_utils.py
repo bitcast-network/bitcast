@@ -478,9 +478,9 @@ def get_video_data_batch(youtube_data_client, video_ids, discrete_mode=False):
                 "viewCount": info['statistics'].get('viewCount', 0),
                 "likeCount": info['statistics'].get('likeCount', 0),
                 "commentCount": info['statistics'].get('commentCount', 0),
-                "duration": info['contentDetails']['duration'],
-                "caption": info['contentDetails']['caption'].lower() == 'true',
-                "privacyStatus": info['status']['privacyStatus']
+                "duration": info['contentDetails'].get('duration', 'PT0S'),
+                "caption": info['contentDetails'].get('caption', 'false').lower() == 'true',
+                "privacyStatus": info['status'].get('privacyStatus', 'private')
             }
     return result
 
