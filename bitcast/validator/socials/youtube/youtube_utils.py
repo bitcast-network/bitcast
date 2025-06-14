@@ -3,7 +3,7 @@ import requests
 import time
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
-from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY, CACHE_DIRS, YOUTUBE_SEARCH_CACHE_EXPIRY
+from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY, CACHE_DIRS, YOUTUBE_SEARCH_CACHE_EXPIRY, YT_MAX_VIDEOS
 import httpx
 import hashlib
 import asyncio
@@ -371,7 +371,8 @@ def _fallback_via_search(youtube, channel_id, cutoff_iso):
     
     bt.logging.info(f"API search found {len(vids)} videos")
     
-    # Store in cache for 12 hours
+    # Limit to max videos per account and store in cache
+    vids = vids[:YT_MAX_VIDEOS]
     cache.set(cache_key, vids, expire=YOUTUBE_SEARCH_CACHE_EXPIRY)
     
     return vids
@@ -423,13 +424,13 @@ def get_all_uploads(youtube, max_age_days: int = 365):
                 bt.logging.info(
                     f"Found {len(vids)} uploads in last {max_age_days} days (playlist)"
                 )
-                return vids
+                return vids[:YT_MAX_VIDEOS]
             vids.append(item["contentDetails"]["videoId"])
 
         req = youtube.playlistItems().list_next(req, resp)
 
     bt.logging.info(f"Found {len(vids)} uploads in last {max_age_days} days (playlist)")
-    return vids
+    return vids[:YT_MAX_VIDEOS]
 
 # ============================================================================
 # Video Analytics Functions
