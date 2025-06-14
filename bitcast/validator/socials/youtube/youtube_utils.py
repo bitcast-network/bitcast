@@ -229,48 +229,57 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
         "url": f"https://www.youtube.com/channel/{cid}"
     }
 
-@retry(**YT_API_RETRY_CONFIG)
+def _parse_analytics_response(resp, metrics_list, dimensions=""):
+    """Helper to parse analytics response into structured data."""
+    rows = resp.get("rows")
+    if not rows:
+        return None
+    
+    if dimensions:
+        dims_keys = dimensions.split(",")
+        return [{**dict(zip(metrics_list, row[len(dims_keys):])), 
+                 **{dims_keys[i]: row[i] for i in range(len(dims_keys))}} 
+                for row in rows]
+    return dict(zip(metrics_list, rows[0]))
+
+@retry(**YT_API_RETRY_CONFIG) 
 def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, dimensions=""):
     global analytics_api_call_count
     analytics_api_call_count += 1
     """Get comprehensive channel analytics including traffic sources."""
     end = end_date or datetime.today().strftime('%Y-%m-%d')
-    metrics = ",".join([
-        "views","comments","likes","dislikes","shares",
-        "averageViewDuration","averageViewPercentage",
-        "subscribersGained","subscribersLost","estimatedMinutesWatched"
-    ])
     
-    params = {
-        'ids': 'channel==MINE',
-        'startDate': start_date,
-        'endDate': end,
-        'dimensions': dimensions,
-        'metrics': metrics
-    }
+    all_metrics = ["views","comments","likes","dislikes","shares",
+                   "averageViewDuration","averageViewPercentage", 
+                   "subscribersGained","subscribersLost","estimatedMinutesWatched",
+                   "estimatedAdRevenue","playbackBasedCpm"]
     
-    resp = youtube_analytics_client.reports().query(
-        ids="channel==MINE",
-        startDate=start_date,
-        endDate=end,
-        dimensions=dimensions,
-        metrics=metrics
-    ).execute()
-    rows = resp.get("rows")
-    if not rows:
+    # Try all metrics first, fallback to core metrics if revenue metrics fail
+    try:
+        resp = youtube_analytics_client.reports().query(
+            ids="channel==MINE", startDate=start_date, endDate=end,
+            dimensions=dimensions, metrics=",".join(all_metrics)
+        ).execute()
+        info = _parse_analytics_response(resp, all_metrics, dimensions)
+    except Exception as e:
+        bt.logging.warning(f"Revenue metrics failed, retrying without them: {_format_error(e)}")
+        analytics_api_call_count += 1
+        core_metrics = all_metrics[:-2]  # Remove revenue metrics
+        resp = youtube_analytics_client.reports().query(
+            ids="channel==MINE", startDate=start_date, endDate=end,
+            dimensions=dimensions, metrics=",".join(core_metrics)
+        ).execute()
+        info = _parse_analytics_response(resp, core_metrics, dimensions)
+        # Add missing revenue metrics with default values
+        revenue_defaults = {"estimatedAdRevenue": 0, "playbackBasedCpm": 0}
+        if dimensions:
+            for entry in info:
+                entry.update(revenue_defaults)
+        else:
+            info.update(revenue_defaults)
+    
+    if not info:
         raise Exception("No channel analytics data found.")
-    names = metrics.split(",")
-    if dimensions:
-        info = []
-        dims_keys = dimensions.split(",")
-        for row in rows:
-            dims, vals = row[:len(dims_keys)], row[len(dims_keys):]
-            entry = dict(zip(names, vals))
-            for i, d in enumerate(dims_keys):
-                entry[d] = dims[i]
-            info.append(entry)
-    else:
-        info = dict(zip(names, rows[0]))
 
     # Consolidate API calls for traffic source data
     traffic_data = _query_multiple_metrics(
