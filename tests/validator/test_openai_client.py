@@ -58,15 +58,17 @@ class TestBriefVersioning:
         
         # Check for v2 specific elements
         assert "///// SPONSOR BRIEF /////" in prompt
-        assert "**Key definitions**" in prompt
-        assert "**Evaluation checklist**" in prompt
-        assert "**Dedicated video**" in prompt
-        assert "**Pre‑roll ad**" in prompt
-        assert "**Silent / music‑only**" in prompt
-        assert "## Requirement‑by‑Requirement" in prompt
+        assert "**Step-by-step instructions**" in prompt
+        assert "**Response format (exactly):**" in prompt
+        assert "## Requirement-by-Requirement" in prompt
         assert "## Additional Gates" in prompt
         assert "## Verdict" in prompt
-        assert "when in doubt, choose **NO**" in prompt
+        assert "When in doubt, choose **NO**." in prompt
+
+        # Ensure v1 specific elements are NOT present
+        assert "///// BRIEF /////" not in prompt
+        assert "You are evaluating a video and its content" not in prompt
+        assert "Be thorough and objective." not in prompt
 
     @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
     @patch('bitcast.validator.clients.OpenaiClient.OpenaiClient.get_cache')
@@ -133,7 +135,8 @@ class TestBriefVersioning:
         
         # Check that it's using v2 format
         assert "///// SPONSOR BRIEF /////" in prompt_content
-        assert "**Key definitions**" in prompt_content
+        assert "**Step-by-step instructions**" in prompt_content
+        assert "**Response format (exactly):**" in prompt_content
         assert "///// BRIEF /////" not in prompt_content
         
         assert meets_brief == False
@@ -247,11 +250,10 @@ class TestPromptContentValidation:
             "///// YOUR TASK /////",
             "VIDEO DURATION: 5:00",
             "VIDEO DESCRIPTION: Test description",
-            "VIDEO TRANSCRIPT (timestamps included):",
-            "**Key definitions**",
-            "**Evaluation checklist**",
+            "VIDEO TRANSCRIPT (list of dicts with 'start' (s), 'dur' (s), 'text'):",
+            "**Step-by-step instructions**",
             "**Response format (exactly):**",
-            "## Requirement‑by‑Requirement",
+            "## Requirement-by-Requirement",
             "## Additional Gates",
             "## Verdict"
         ]
@@ -259,15 +261,16 @@ class TestPromptContentValidation:
         for section in required_sections:
             assert section in prompt, f"Missing section: {section}"
             
-        # Check for key definitions
-        key_definitions = [
-            "**Dedicated video**",
-            "**Pre‑roll ad**",
-            "**Silent / music‑only**"
+        # Check for key instructional content
+        key_instructions = [
+            "You are the sponsor's review agent",
+            "**Auto-number** each requirement line",
+            "**Video-type check**",
+            "**Silent content check**"
         ]
         
-        for definition in key_definitions:
-            assert definition in prompt, f"Missing definition: {definition}"
+        for instruction in key_instructions:
+            assert instruction in prompt, f"Missing instruction: {instruction}"
 
 
 class TestUnifiedPromptInterface:
