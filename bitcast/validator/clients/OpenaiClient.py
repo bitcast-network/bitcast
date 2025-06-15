@@ -19,6 +19,7 @@ from bitcast.validator.utils.config import (
     TRANSCRIPT_MAX_LENGTH,
     OPENAI_CACHE_EXPIRY
 )
+from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt
 
 # Global counter to track the number of OpenAI API requests
 openai_request_count = 0
@@ -100,28 +101,25 @@ def _crop_transcript(transcript) -> str:
     
     return transcript
 
+def _get_prompt_version(brief):
+    """Get the prompt version for a brief, defaulting to v1 for backwards compatibility."""
+    return brief.get('prompt_version', 1)
+
 def evaluate_content_against_brief(brief, duration, description, transcript):
     """
     Evaluate the transcript against the brief using OpenAI GPT-4 to determine if the content meets the brief.
     Returns a tuple of (bool, str) where bool indicates if the content meets the brief, and str is the reasoning.
+    
+    Supports multiple prompt versions based on the brief's prompt_version field:
+    - Version 1 (default): Original prompt format for backwards compatibility
+    - Version 2: Enhanced prompt with detailed evaluation criteria and structured response
     """
-    # prepare transcript for prompt
+    # Prepare transcript for prompt
     transcript = _crop_transcript(transcript)
-    prompt_content = (
-        "///// BRIEF /////\n"
-        f"{brief['brief']}\n"
-        "///// VIDEO DETAILS /////\n"
-        f"VIDEO DURATION: {duration}\n"
-        f"VIDEO DESCRIPTION: {description}\n"
-        f"VIDEO TRANSCRIPT: {transcript}\n\n"
-        "///// YOUR TASK /////\n"
-        "You are evaluating a video and its content (description + transcript) on behalf of its marketing sponsor. Your job is to decide whether the content meets the sponsor's brief. "
-        "The video duration, description and transcript were taken directly from the video. "
-        "This is a high-stakes decision — if the content does not meet the brief, the creator will not be paid. "
-        "Carefully review the content against each requirement in the brief, step by step. At the end, provide a binary decision: "
-        "YES if the content fully meets the brief. NO if any part of the brief is not adequately fulfilled. "
-        "Be thorough and objective."
-    )
+    
+    # Generate prompt based on version
+    prompt_version = _get_prompt_version(brief)
+    prompt_content = generate_brief_evaluation_prompt(brief, duration, description, transcript, prompt_version)
 
     try:
         cache = None if DISABLE_LLM_CACHING else OpenaiClient.get_cache()
@@ -135,7 +133,7 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
                 cache.set(prompt_content, cached_result, expire=OPENAI_CACHE_EXPIRY)
             
             emoji = "✅" if meets_brief else "❌"
-            bt.logging.info(f"Meets brief '{brief['id']}': {meets_brief} {emoji} (cache)")
+            bt.logging.info(f"Meets brief '{brief['id']}' (v{prompt_version}): {meets_brief} {emoji} (cache)")
             return meets_brief, reasoning
 
         # Define response format
@@ -158,10 +156,10 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
 
         if cache is not None:
             with OpenaiClient._cache_lock:
-                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=OPENAI_CACHE_EXPIRY)  # 3 day cache
+                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=OPENAI_CACHE_EXPIRY)
 
         emoji = "✅" if meets_brief else "❌"
-        bt.logging.info(f"Brief {brief['id']} met: {meets_brief} {emoji}")
+        bt.logging.info(f"Brief {brief['id']} (v{prompt_version}) met: {meets_brief} {emoji}")
         return meets_brief, reasoning
 
     except APIError as e:

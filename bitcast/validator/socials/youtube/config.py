@@ -83,6 +83,9 @@ ADDITIONAL_DAILY_METRICS = {
     "youtubeProductMinutes": ("estimatedMinutesWatched", "youtubeProduct,day", None, None, "day"),
     "engagedViews": ("engagedViews", "day", None, None, "day"),
     "videosAddedToPlaylists": ("videosAddedToPlaylists", "day", None, None, "day"),
+    "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
+    "playbackBasedCpm": ("playbackBasedCpm", "day", None, None, "day"),
 }
 
 def get_youtube_metrics(eco_mode, for_daily=False):
