@@ -39,14 +39,15 @@ def generate_brief_evaluation_prompt_v1(brief, duration, description, transcript
 
 def generate_brief_evaluation_prompt_v2(brief, duration, description, transcript):
     """
-    Generate the enhanced (v2) prompt format with detailed evaluation criteria.
-    
-    This version includes:
-    - Structured response format
-    - Clear definitions for video types
-    - Timestamp citation requirements
-    - Additional validation gates
-    - Stricter evaluation criteria
+    Generate a prompt that forces the LLM to prove each brief item
+    with an exact quote + timestamp or mark it Not Met.
+
+    Improvements over the old version:
+    • Instructs the model to auto-number the brief items.
+    • Requires a 5-15-word quote for every Met claim.
+    • Demands the raw `start` time (seconds) from the transcript as evidence.
+    • States that uncertain or fabricated timestamps → Not Met.
+    • Re-emphasises “description-only” items.
     """
     return (
         "///// SPONSOR BRIEF /////\n"
@@ -54,35 +55,42 @@ def generate_brief_evaluation_prompt_v2(brief, duration, description, transcript
         "///// VIDEO DETAILS /////\n"
         f"VIDEO DURATION: {duration}\n"
         f"VIDEO DESCRIPTION: {description}\n"
-        f"VIDEO TRANSCRIPT (timestamps included):\n"
+        "VIDEO TRANSCRIPT (list of dicts with 'start' (s), 'dur' (s), 'text'):\n"
         f"{transcript}\n\n"
         "///// YOUR TASK /////\n"
         "You are the sponsor's review agent. Decide—objectively—whether this video **fully** satisfies the brief.\n"
-        "Information that appears **only in the written description does NOT count** toward meeting a video‑content requirement **unless the brief explicitly states the item is description‑only** (e.g., \"include link in description\").\n\n"
-        "**Key definitions**\n\n"
-        "* **Dedicated video** ➜ The bulk of the runtime is clearly focused on the sponsor/topic.\n"
-        "* **Pre‑roll ad** ➜ A brief shout‑out or segment that is not the main focus of the video.\n"
-        "* **Silent / music‑only** ➜ If roughly half or more of the runtime has no spoken or on‑screen text relevant to the brief ➜ automatic **NO**.\n\n"
-        "**Evaluation checklist**\n\n"
-        "1. Go line‑by‑line through every requirement in the brief.\n"
-        "2. For each item, mark **Met** or **Not Met** and cite key timestamp ranges (e.g. \"02:30‑03:45 explains feature X\").\n"
-        "3. After the checklist, run these extra gates:\n"
-        "   • **Video‑type check** – Dedicated, Pre‑roll, or Other? (Must match what is specified in brief).\n"
-        "   • **Silent content check** – Too much silence/music?\n"
-        "4. If **any** requirement or gate fails, final verdict = **NO**.\n\n"
-        "**Response format (exactly):**\n\n"
+        "Information that appears **only in the written description does NOT count** toward meeting a video-content "
+        "requirement **unless the brief explicitly states the item is description-only** (e.g., \"include link in "
+        "description\").\n\n"
+        "**Step-by-step instructions**\n\n"
+        "1. **Auto-number** each requirement line in the brief (1, 2, 3 …) in the order it appears.\n"
+        "2. For every numbered requirement:\n"
+        "   • Search the `transcript` field.\n"
+        "   • If you find evidence, mark **Met** and provide:\n"
+        "       – a 5-15-word quote extracted verbatim from that line, and\n"
+        "       – the corresponding `start` time (in seconds) or `start-to-start+dur` range.\n"
+        "   • If no clear evidence or you are **uncertain**, mark **Not Met**.\n"
+        "3. After the checklist, apply extra gates:\n"
+        "   • **Video-type check** – Dedicated / Pre-roll / Other (must match brief).\n"
+        "   • **Silent content check** – Is over 50% of the video silent or music-only?\n"
+        "4. **If any item or gate fails → Verdiction = NO.**\n\n"
+        "**Important accuracy rules**\n"
+        "• Do **not** invent timestamps. If a timestamp is uncertain, mark the item Not Met.\n"
+        "• Fabricated quotes or timestamps automatically fail that item.\n"
+        "• When in doubt, choose **NO**.\n\n"
+        "**Response format (exactly):**\n"
         "```\n"
-        "## Requirement‑by‑Requirement\n"
-        "- Req 1: Met / Not Met – short note (timestamp)\n"
-        "- Req 2: …\n"
+        "## Requirement-by-Requirement\n"
+        "- Req 1: Met / Not Met — \"quoted evidence\" (start-sec or range)\n"
+        "- Req 2: ...\n"
         "...\n"
         "## Additional Gates\n"
-        "- Video type: Dedicated / Pre‑roll / Other – explain briefly\n"
-        "- Silent/music‑only issue? YES/NO – explain briefly\n"
+        "- Video type: Dedicated / Pre-roll / Other — short note\n"
+        "- Silent/music-only issue? YES/NO — short note\n"
         "## Verdict\n"
         "YES or NO\n"
-        "```\n\n"
-        "Be concise, cite timestamps, and remember: when in doubt, choose **NO** (creator gets paid only for full compliance)."
+        "```\n"
+        "Be concise and remember: fabricated evidence = Not Met."
     )
 
 
