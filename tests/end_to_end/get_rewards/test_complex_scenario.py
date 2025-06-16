@@ -17,37 +17,26 @@ Technical Scoring Details:
   * Brief 2: 550 minutes (250 + 300)
 """
 
+# Set environment variable before any imports to ensure it's picked up
+import os
+os.environ['DISABLE_CONCURRENCY'] = 'True'
+
+# Patch environment variables before importing modules
+import unittest
+from unittest.mock import patch, MagicMock
+import numpy as np
 import pytest
 import logging
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
-import numpy as np
 
-# Patch environment variables before importing modules
+# Now import the rest after setting environment variable
 with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
     from bitcast.validator.socials.youtube.youtube_evaluation import (
-        vet_channel,
-        vet_videos,
-        calculate_video_score
+        vet_videos, vet_video, check_for_prompt_injection, process_video_vetting, evaluate_content_against_brief
     )
-    from bitcast.validator.socials.youtube.youtube_utils import (
-        get_channel_data,
-        get_channel_analytics,
-        get_video_data_batch,
-        get_video_analytics,
-        get_all_uploads,
-        reset_scored_videos
-    )
-    from bitcast.validator.reward import reward, get_rewards
-    from google.oauth2.credentials import Credentials
-    from bitcast.validator.utils.config import (
-        YT_MIN_SUBS,
-        YT_MIN_CHANNEL_AGE,
-        YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED,
-        YT_REWARD_DELAY,
-        YT_ROLLING_WINDOW
-    )
+    from bitcast.validator.reward import get_rewards, reward
+    import bitcast.validator.socials.youtube.youtube_utils as youtube_utils
+    from bitcast.validator.utils.config import YT_REWARD_DELAY
 
 # Set up logging
 logging.basicConfig(
@@ -572,13 +561,22 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     
     class MockResponse:
         def __init__(self, injection_detected=None, meets_brief=None):
+            # Set default reasoning based on the type of response
+            if injection_detected is not None:
+                reasoning = "Prompt injection test reasoning"
+            elif meets_brief is not None:
+                reasoning = "Brief evaluation reasoning"
+            else:
+                reasoning = "Default reasoning"
+                
             self.choices = [MagicMock(message=MagicMock(parsed=MagicMock(
                 injection_detected=injection_detected,
-                meets_brief=meets_brief
+                meets_brief=meets_brief,
+                reasoning=reasoning  # Add the missing reasoning attribute
             )))]
     
-    # Mock responses for all videos and briefs
-    mock_make_openai_request.side_effect = [
+    # Create a cycling mock that repeats the pattern for any number of calls
+    mock_responses_pattern = [
         # UID 1's videos
         # Video 1 injection check
         MockResponse(injection_detected=False),
@@ -604,7 +602,8 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
         MockResponse(meets_brief=False),
         # Video 4 brief 2 check
         MockResponse(meets_brief=True),
-        # UID 2's videos (same responses as UID 1's videos)
+        
+        # UID 2's videos (same pattern)
         # Video 1 injection check
         MockResponse(injection_detected=False),
         # Video 1 brief 1 check
@@ -631,12 +630,20 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
         MockResponse(meets_brief=True),
     ]
     
+    # Create a cycling iterator that repeats the pattern
+    import itertools
+    cycling_responses = itertools.cycle(mock_responses_pattern)
+    
+    # Set up the mock to use the cycling responses
+    mock_make_openai_request.side_effect = lambda *args, **kwargs: next(cycling_responses)
+    
     # Create a mock class instance for self parameter
     mock_self = MagicMock()
     
     # Patch get_briefs to return our test briefs
     with patch('bitcast.validator.reward.get_briefs', return_value=briefs) as mock_get_briefs, \
          patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch:
+        
         # Create a wrapper around the reward function that resets scored videos between each UID
         with patch('bitcast.validator.reward.reward', side_effect=reward_wrapper):
             # Call get_rewards
@@ -685,3 +692,12 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
         assert "brief2" in yt_stats_list[2]["scores"]
         assert yt_stats_list[2]["scores"]["brief1"] == 850  # 600 + 250 minutes watched
         assert yt_stats_list[2]["scores"]["brief2"] == 550  # 250 + 300 minutes watched
+
+# Force reload config module to pick up DISABLE_CONCURRENCY
+import importlib
+import bitcast.validator.utils.config
+importlib.reload(bitcast.validator.utils.config)
+
+# Also reload youtube_evaluation module to pick up the updated config
+import bitcast.validator.socials.youtube.youtube_evaluation
+importlib.reload(bitcast.validator.socials.youtube.youtube_evaluation)

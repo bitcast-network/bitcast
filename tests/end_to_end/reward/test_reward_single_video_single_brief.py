@@ -1,3 +1,7 @@
+# Set environment variable before any imports to ensure it's picked up
+import os
+os.environ['DISABLE_CONCURRENCY'] = 'True'
+
 """
 This test file implements an end-to-end test scenario for the YouTube content validation system.
 The test simulates a scenario where:
@@ -41,6 +45,15 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         YT_REWARD_DELAY,
         YT_ROLLING_WINDOW
     )
+
+# Force reload config module to pick up DISABLE_CONCURRENCY
+import importlib
+import bitcast.validator.utils.config
+importlib.reload(bitcast.validator.utils.config)
+
+# Also reload youtube_evaluation module to pick up the updated config
+import bitcast.validator.socials.youtube.youtube_evaluation
+importlib.reload(bitcast.validator.socials.youtube.youtube_evaluation)
 
 # Set up logging
 logging.basicConfig(
@@ -418,18 +431,32 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
     
     class MockResponse:
         def __init__(self, injection_detected=None, meets_brief=None):
+            # Set default reasoning based on the type of response
+            if injection_detected is not None:
+                reasoning = "Prompt injection test reasoning"
+            elif meets_brief is not None:
+                reasoning = "Brief evaluation reasoning"
+            else:
+                reasoning = "Default reasoning"
+                
             self.choices = [MagicMock(message=MagicMock(parsed=MagicMock(
                 injection_detected=injection_detected,
-                meets_brief=meets_brief
+                meets_brief=meets_brief,
+                reasoning=reasoning  # Add the missing reasoning attribute
             )))]
     
-    # Mock responses for both videos
-    mock_make_openai_request.side_effect = [
-        MockResponse(injection_detected=False),  # For video 1
-        MockResponse(meets_brief=True),         # For video 1
-        MockResponse(injection_detected=False),  # For video 2
-        MockResponse(meets_brief=True),         # For video 2
+    # Create a cycling mock that repeats the pattern for any number of calls
+    mock_responses_pattern = [
+        MockResponse(injection_detected=False),  # Video injection check
+        MockResponse(meets_brief=True),          # Video brief check
     ]
+    
+    # Create a cycling iterator that repeats the pattern
+    import itertools
+    cycling_responses = itertools.cycle(mock_responses_pattern)
+    
+    # Set up the mock to use the cycling responses
+    mock_make_openai_request.side_effect = lambda *args, **kwargs: next(cycling_responses)
     
     result = reward(uid, briefs, mock_response)
     

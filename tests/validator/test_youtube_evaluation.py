@@ -1,6 +1,12 @@
+# Set environment variable before any imports to ensure it's picked up
+import os
+os.environ['DISABLE_CONCURRENCY'] = 'True'
+
+import unittest
+from unittest.mock import patch, MagicMock
 import pytest
+import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
 import bittensor as bt
 from bitcast.validator.socials.youtube.youtube_evaluation import (
     vet_channel,
@@ -20,6 +26,15 @@ from bitcast.validator.utils.config import (
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER
 )
+
+# Force reload config module to pick up DISABLE_CONCURRENCY
+import importlib
+import bitcast.validator.utils.config
+importlib.reload(bitcast.validator.utils.config)
+
+# Also reload youtube_evaluation module to pick up the updated config
+import bitcast.validator.socials.youtube.youtube_evaluation
+importlib.reload(bitcast.validator.socials.youtube.youtube_evaluation)
 
 # ============================================================================
 # Channel Evaluation Tests
@@ -293,6 +308,10 @@ async def test_process_video_vetting(mock_make_openai_request, mock_get_transcri
             }
         }):
             # Process the video - pass individual video data and analytics, not dictionaries
+            import threading
+            results_lock = threading.Lock()
+            decision_details_lock = threading.Lock()
+            
             process_video_vetting(
                 video_id,
                 briefs,
@@ -301,7 +320,9 @@ async def test_process_video_vetting(mock_make_openai_request, mock_get_transcri
                 results,
                 video_data,        # Individual video data
                 video_analytics,   # Individual video analytics  
-                video_decision_details
+                video_decision_details,
+                results_lock,      # Add required lock parameter
+                decision_details_lock  # Add required lock parameter
             )
 
             # Verify results - the function should populate results and video_decision_details

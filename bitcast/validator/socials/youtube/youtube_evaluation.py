@@ -15,12 +15,14 @@ from bitcast.validator.utils.config import (
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER,
     ECO_MODE,
-    BITCAST_BLACKLIST_SOURCES_ENDPOINT
+    BITCAST_BLACKLIST_SOURCES_ENDPOINT,
+    DISABLE_CONCURRENCY
 )
 from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics
 from bitcast.validator.utils.blacklist import is_blacklisted, get_blacklist_sources
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 def vet_channel(channel_data, channel_analytics):
     bt.logging.info(f"Checking channel")
@@ -99,6 +101,10 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     video_analytics_dict = {}  # Store video analytics for all videos
     video_decision_details = {}  # Store decision details for all videos
 
+    # Thread locks for shared data structures
+    results_lock = threading.Lock()
+    decision_details_lock = threading.Lock()
+
     import time
     
     start_time = time.time()
@@ -109,12 +115,14 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     video_analytics_dict = get_video_analytics_batch(youtube_analytics_client, video_ids)
     bt.logging.info(f"Video analytics batch fetch took {time.time() - start_time:.2f} seconds")
 
-    for video_id in video_ids:
+    def process_single_video(video_id):
+        """Process a single video with thread safety."""
         try:
             # Check if video has already been scored
             if youtube_utils.is_video_already_scored(video_id):
-                results[video_id] = [False] * len(briefs)
-                continue
+                with results_lock:
+                    results[video_id] = [False] * len(briefs)
+                return
             
             # Get the video data and analytics for this specific video
             video_data = video_data_dict.get(video_id)
@@ -129,43 +137,80 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
                 results, 
                 video_data,
                 video_analytics,
-                video_decision_details
+                video_decision_details,
+                results_lock,
+                decision_details_lock
             )
             
             # Only mark the video as scored if processing was successful
             youtube_utils.mark_video_as_scored(video_id)
             
         except Exception as e:
-            bt.logging.error(f"Error evaluating video {youtube_utils._format_error(e)}")
+            bitcast_id = video_data_dict.get(video_id, {}).get('bitcastVideoId', video_id)
+            bt.logging.error(f"[{bitcast_id}] Evaluation failed: {youtube_utils._format_error(e)}")
             # Mark this video as not matching any briefs
-            results[video_id] = [False] * len(briefs)
+            with results_lock:
+                results[video_id] = [False] * len(briefs)
             # Don't mark the video as scored if there was an error
+
+    # Process videos concurrently with thread safety
+    max_workers = 1 if DISABLE_CONCURRENCY else min(3, len(video_ids))
+    bt.logging.info(f"Processing {len(video_ids)} videos {'sequentially' if DISABLE_CONCURRENCY else 'concurrently'} with {max_workers} workers")
+    
+    start_time = time.time()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all video processing tasks
+        future_to_video = {
+            executor.submit(process_single_video, video_id): video_id
+            for video_id in video_ids
+        }
+        
+        # Wait for all videos to complete
+        for future in as_completed(future_to_video):
+            video_id = future_to_video[future]
+            try:
+                future.result()  # This will re-raise any exceptions
+                # No completion log needed - final results are logged per video
+            except Exception as e:
+                bitcast_id = video_data_dict.get(video_id, {}).get('bitcastVideoId', video_id)
+                bt.logging.error(f"[{bitcast_id}] Processing failed: {youtube_utils._format_error(e)}")
+    
+    bt.logging.info(f"Concurrent video processing took {time.time() - start_time:.2f} seconds")
 
     return results, video_data_dict, video_analytics_dict, video_decision_details
 
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
-                         results, video_data, video_analytics, video_decision_details):
-    """Process the vetting of a single video."""
+                         results, video_data, video_analytics, video_decision_details,
+                         results_lock, decision_details_lock):
+    """Process the vetting of a single video with thread safety."""
 
     # Get decision details for the video
     vet_result = vet_video(video_id, briefs, video_data, video_analytics)
     decision_details = vet_result["decision_details"]
-    results[video_id] = decision_details["contentAgainstBriefCheck"]
-    video_decision_details[video_id] = decision_details
+    
+    # Thread-safe updates to shared data structures
+    with results_lock:
+        results[video_id] = decision_details["contentAgainstBriefCheck"]
+    
+    with decision_details_lock:
+        video_decision_details[video_id] = decision_details
     
     # Retrieve advanced metrics only for qualified videos when not in eco mode
     if not ECO_MODE and decision_details.get("anyBriefMatched", False):
-        bt.logging.info(f"Fetching advanced metrics.")
+        bitcast_id = video_data['bitcastVideoId']
+        bt.logging.info(f"[{bitcast_id}] Fetching advanced metrics")
         advanced_metrics = get_advanced_metrics()
         advanced_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
         video_analytics.update(advanced_analytics)
     
     valid_checks = [check for check in decision_details["contentAgainstBriefCheck"] if check is not None]
-    bt.logging.info(f"Video meets {sum(valid_checks)} briefs.")
+    bitcast_id = video_data['bitcastVideoId']
+    bt.logging.info(f"[{bitcast_id}] Matches {sum(valid_checks)}/{len(briefs)} briefs")
 
 
 def vet_video(video_id, briefs, video_data, video_analytics):
-    bt.logging.info(f"=== Evaluating video: {video_data['bitcastVideoId']} ===")
+    bitcast_id = video_data['bitcastVideoId']
+    bt.logging.info(f"[{bitcast_id}] Starting evaluation")
     
     # Initialize decision details structure
     decision_details = initialize_decision_details()
@@ -223,6 +268,7 @@ def vet_video(video_id, briefs, video_data, video_analytics):
             else:
                 # Evaluate content against briefs only if prompt injection check passed
                 met_brief_ids, brief_reasonings = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+
     else:
         # If any check failed, set all briefs to false and prompt injection to false
         decision_details["promptInjectionCheck"] = False
@@ -250,7 +296,7 @@ def initialize_decision_details():
 def check_video_privacy(video_data, decision_details):
     """Check if the video is public."""
     if video_data.get("privacyStatus") != "public":
-        bt.logging.warning(f"Video is not public")
+        bt.logging.warning(f"[{video_data['bitcastVideoId']}] Video is not public")
         decision_details["publicVideo"] = False
         return False
     else:
@@ -264,7 +310,6 @@ def check_video_publish_date(video_data, briefs, decision_details):
 
         # If no briefs, there are no date restrictions
         if not briefs:
-            print("No briefs provided - no date restrictions")
             decision_details["publishDateCheck"] = True
             return True
         
@@ -278,7 +323,7 @@ def check_video_publish_date(video_data, briefs, decision_details):
         earliest_allowed_date = earliest_brief_date - timedelta(days=YT_VIDEO_RELEASE_BUFFER)
         
         if video_publish_date < earliest_allowed_date:
-            bt.logging.warning(f"Video was published before the allowed period")
+            bt.logging.warning(f"[{video_data['bitcastVideoId']}] Published before allowed period")
             decision_details["publishDateCheck"] = False
             return False
         
@@ -293,7 +338,7 @@ def check_video_retention(video_data, video_analytics, decision_details):
     """Check if the video meets the minimum retention criteria."""
     averageViewPercentage = float(video_analytics.get("averageViewPercentage", -1))
     if averageViewPercentage < YT_MIN_VIDEO_RETENTION:
-        bt.logging.info(f"Avg retention check failed for video: {video_data['bitcastVideoId']}. {averageViewPercentage} <= {YT_MIN_VIDEO_RETENTION}%.")
+        bt.logging.warning(f"[{video_data['bitcastVideoId']}] Low retention: {averageViewPercentage}%")
         decision_details["averageViewPercentageCheck"] = False
         return False
     else:
@@ -303,7 +348,7 @@ def check_video_retention(video_data, video_analytics, decision_details):
 def check_manual_captions(video_id, video_data, decision_details):
     """Check if the video has manual captions."""
     if video_data.get("caption"):
-        bt.logging.info(f"Manual captions detected for video: {video_data['bitcastVideoId']} - skipping eval")
+        bt.logging.warning(f"[{video_data['bitcastVideoId']}] Has manual captions - skipping")
         decision_details["manualCaptionsCheck"] = False
         return False
     else:
@@ -317,11 +362,11 @@ def get_video_transcript(video_id, video_data):
         try:
             transcript = youtube_utils.get_video_transcript(video_id, RAPID_API_KEY)
         except Exception as e:
-            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {youtube_utils._format_error(e)}")
+            bt.logging.warning(f"[{video_data['bitcastVideoId']}] Transcript error: {youtube_utils._format_error(e)}")
             transcript = None
 
     if transcript is None:
-        bt.logging.warning(f"Transcript retrieval failed for video: {video_data['bitcastVideoId']}")
+        bt.logging.warning(f"[{video_data['bitcastVideoId']}] No transcript available")
         return None
         
     return str(transcript)
@@ -329,7 +374,7 @@ def get_video_transcript(video_id, video_data):
 def check_prompt_injection(video_id, video_data, transcript, decision_details):
     """Check if the video contains prompt injection."""
     if check_for_prompt_injection(video_data["description"], transcript):
-        bt.logging.warning(f"Prompt injection detected for video: {video_data['bitcastVideoId']} - skipping eval")
+        bt.logging.warning(f"[{video_data['bitcastVideoId']}] Prompt injection detected - skipping")
         decision_details["promptInjectionCheck"] = False
         return False
     else:
@@ -345,10 +390,10 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
     brief_results = [False] * len(briefs)
     brief_reasonings = [""] * len(briefs)
     
-    # Use ThreadPoolExecutor for concurrent brief evaluations
-    max_workers = min(len(briefs), 5)  # Limit to 5 concurrent workers to avoid overwhelming the API
+    # Use ThreadPoolExecutor for concurrent brief evaluations, but respect DISABLE_CONCURRENCY
+    max_workers = 1 if DISABLE_CONCURRENCY else min(len(briefs), 5)  # Limit to 5 concurrent workers to avoid overwhelming the API
     
-    bt.logging.info(f"Evaluating {len(briefs)} briefs concurrently with {max_workers} workers")
+    bt.logging.info(f"[{video_data['bitcastVideoId']}] Evaluating {len(briefs)} briefs")
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all brief evaluation tasks
@@ -358,7 +403,8 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                 brief, 
                 video_data['duration'], 
                 video_data['description'], 
-                transcript
+                transcript,
+                video_data['bitcastVideoId']  # Pass bitcast video ID for logging context
             ): (i, brief)
             for i, brief in enumerate(briefs)
         }
@@ -374,7 +420,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                     met_brief_ids.append(brief["id"])
                 # Note: Individual brief completion logs will appear from OpenaiClient
             except Exception as e:
-                bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {youtube_utils._format_error(e)}")
+                bt.logging.error(f"[{video_data['bitcastVideoId']}] Brief {brief['id']} error: {youtube_utils._format_error(e)}")
                 brief_results[brief_index] = False
                 brief_reasonings[brief_index] = f"Error during evaluation: {str(e)}"
     

@@ -21,7 +21,7 @@ YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
 BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
 OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
-__version__ = "1.5.2"
+__version__ = "1.6.1"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -69,6 +69,9 @@ VALIDATOR_WAIT = 60 # 60 seconds
 VALIDATOR_STEPS_INTERVAL = 240 # 4 hours
 
 DISCRETE_MODE = True
+
+# Optional: Disable concurrency for testing
+DISABLE_CONCURRENCY = os.getenv('DISABLE_CONCURRENCY', 'False').lower() == 'true'
 
 # Log out all non-sensitive config variables
 bt.logging.info(f"BITCAST_BRIEFS_ENDPOINT: {BITCAST_BRIEFS_ENDPOINT}")

@@ -23,11 +23,13 @@ from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt
 
 # Global counter to track the number of OpenAI API requests
 openai_request_count = 0
+_request_count_lock = Lock()
 
 def reset_openai_request_count():
     """Reset the OpenAI API request counter."""
     global openai_request_count
-    openai_request_count = 0
+    with _request_count_lock:
+        openai_request_count = 0
 
 class OpenaiClient:
     _instance = None
@@ -82,7 +84,8 @@ OpenaiClient.initialize_cache()
 def _make_openai_request(client, **kwargs):
     """Make OpenAI API request with retry logic."""
     global openai_request_count
-    openai_request_count += 1
+    with _request_count_lock:
+        openai_request_count += 1
     try:
         return client.beta.chat.completions.parse(**kwargs)
     except APIError as e:
@@ -105,7 +108,7 @@ def _get_prompt_version(brief):
     """Get the prompt version for a brief, defaulting to v1 for backwards compatibility."""
     return brief.get('prompt_version', 1)
 
-def evaluate_content_against_brief(brief, duration, description, transcript):
+def evaluate_content_against_brief(brief, duration, description, transcript, video_id):
     """
     Evaluate the transcript against the brief using OpenAI GPT-4 to determine if the content meets the brief.
     Returns a tuple of (bool, str) where bool indicates if the content meets the brief, and str is the reasoning.
@@ -113,6 +116,13 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
     Supports multiple prompt versions based on the brief's prompt_version field:
     - Version 1 (default): Original prompt format for backwards compatibility
     - Version 2: Enhanced prompt with detailed evaluation criteria and structured response
+    
+    Args:
+        brief: The brief to evaluate against
+        duration: Video duration
+        description: Video description
+        transcript: Video transcript
+        video_id: Video ID for logging context
     """
     # Prepare transcript for prompt
     transcript = _crop_transcript(transcript)
@@ -133,7 +143,7 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
                 cache.set(prompt_content, cached_result, expire=OPENAI_CACHE_EXPIRY)
             
             emoji = "✅" if meets_brief else "❌"
-            bt.logging.info(f"Meets brief '{brief['id']}' (v{prompt_version}): {meets_brief} {emoji} (cache)")
+            bt.logging.info(f"[{video_id}] Brief {brief['id']}: {emoji} (cache)")
             return meets_brief, reasoning
 
         # Define response format
@@ -159,7 +169,7 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
                 cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=OPENAI_CACHE_EXPIRY)
 
         emoji = "✅" if meets_brief else "❌"
-        bt.logging.info(f"Brief {brief['id']} (v{prompt_version}) met: {meets_brief} {emoji}")
+        bt.logging.info(f"[{video_id}] Brief {brief['id']}: {emoji}")
         return meets_brief, reasoning
 
     except APIError as e:

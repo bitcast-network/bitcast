@@ -16,6 +16,11 @@ from diskcache import Cache
 from threading import Lock
 import atexit
 
+# Thread lock for video scoring to ensure thread safety
+_scored_videos_lock = Lock()
+# Thread lock for API call counters
+_api_count_lock = Lock()
+
 class YouTubeSearchCache:
     _instance = None
     _lock = Lock()
@@ -80,25 +85,29 @@ def reset_scored_videos():
     This function is used by other modules to clear the list of scored videos.
     """
     global scored_video_ids
-    scored_video_ids = []
-    bt.logging.info("Reset scored_video_ids")
+    with _scored_videos_lock:
+        scored_video_ids = []
+        bt.logging.info("Reset scored_video_ids")
 
 def is_video_already_scored(video_id):
     """Check if a video has already been scored by another hotkey."""
-    if video_id in scored_video_ids:
-        bt.logging.info("Video already scored")
-        return True
-    return False
+    with _scored_videos_lock:
+        if video_id in scored_video_ids:
+            bt.logging.info("Video already scored")
+            return True
+        return False
 
 def mark_video_as_scored(video_id):
     """Mark a video as scored to prevent duplicate processing."""
-    scored_video_ids.append(video_id)
+    with _scored_videos_lock:
+        scored_video_ids.append(video_id)
 
 def reset_api_call_counts():
     """Reset the API call counters for YouTube Data and Analytics APIs."""
     global data_api_call_count, analytics_api_call_count
-    data_api_call_count = 0
-    analytics_api_call_count = 0
+    with _api_count_lock:
+        data_api_call_count = 0
+        analytics_api_call_count = 0
 
 # ============================================================================
 # Channel Analytics Functions
@@ -107,7 +116,8 @@ def reset_api_call_counts():
 @retry(**YT_API_RETRY_CONFIG)
 def _query(client, start_date, end_date, metric, dimensions=None, filters=None, max_results=None, sort=None):
     global analytics_api_call_count
-    analytics_api_call_count += 1
+    with _api_count_lock:
+        analytics_api_call_count += 1
     params = {
         'ids': 'channel==MINE',
         'startDate': start_date,
@@ -143,7 +153,8 @@ def _query(client, start_date, end_date, metric, dimensions=None, filters=None, 
 @retry(**YT_API_RETRY_CONFIG)
 def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensions=None, filters=None, max_results=None, sort=None):
     global analytics_api_call_count
-    analytics_api_call_count += 1
+    with _api_count_lock:
+        analytics_api_call_count += 1
     """Query multiple metrics in a single API call and return split results.
     
     Args:
@@ -209,7 +220,8 @@ def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensio
 @retry(**YT_API_RETRY_CONFIG)
 def get_channel_data(youtube_data_client, discrete_mode=False):
     global data_api_call_count
-    data_api_call_count += 1
+    with _api_count_lock:
+        data_api_call_count += 1
     """Get basic channel information."""
     resp = youtube_data_client.channels().list(
         part="snippet,contentDetails,statistics",
@@ -245,7 +257,8 @@ def _parse_analytics_response(resp, metrics_list, dimensions=""):
 @retry(**YT_API_RETRY_CONFIG) 
 def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, dimensions=""):
     global analytics_api_call_count
-    analytics_api_call_count += 1
+    with _api_count_lock:
+        analytics_api_call_count += 1
     """Get comprehensive channel analytics including traffic sources."""
     end = end_date or datetime.today().strftime('%Y-%m-%d')
     
@@ -263,7 +276,8 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
         info = _parse_analytics_response(resp, all_metrics, dimensions)
     except Exception as e:
         bt.logging.warning(f"Revenue metrics failed, retrying without them: {_format_error(e)}")
-        analytics_api_call_count += 1
+        with _api_count_lock:
+            analytics_api_call_count += 1
         core_metrics = all_metrics[:-2]  # Remove revenue metrics
         resp = youtube_analytics_client.reports().query(
             ids="channel==MINE", startDate=start_date, endDate=end,
@@ -324,7 +338,8 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
 def _get_uploads_playlist_id(youtube):
     """Return the channel's 'uploads' playlist ID (1-unit call)."""
     global data_api_call_count
-    data_api_call_count += 1
+    with _api_count_lock:
+        data_api_call_count += 1
     resp = youtube.channels().list(mine=True, part="contentDetails").execute()
     items = resp.get("items") or []
     if not items:
@@ -351,7 +366,8 @@ def _fallback_via_search(youtube, channel_id, cutoff_iso):
     max_calls = 2   # limit to most recent 100 videos because the search calls cost 100 credits
     
     while call_count < max_calls:
-        data_api_call_count += 100  # search.list() uses 100 credits per call
+        with _api_count_lock:
+            data_api_call_count += 100  # search.list() uses 100 credits per call
         resp = youtube.search().list(
             part="id",
             type="video",
@@ -403,13 +419,15 @@ def get_all_uploads(youtube, max_age_days: int = 365):
     vids = []
     while req:
         try:
-            data_api_call_count += 1  # Count each req.execute() call (1 credit each)
+            with _api_count_lock:
+                data_api_call_count += 1  # Count each req.execute() call (1 credit each)
             resp = req.execute()
         except HttpError as e:
             if e.resp.status == 404 and "playlistNotFound" in str(e):
                 bt.logging.warning("Playlist not found - switching to search method")
                 # Need channel ID for fallback
-                data_api_call_count += 1  # channels.list() call for fallback
+                with _api_count_lock:
+                    data_api_call_count += 1  # channels.list() call for fallback
                 channel_id = youtube.channels().list(mine=True, part="id").execute()[
                     "items"
                 ][0]["id"]
@@ -470,7 +488,8 @@ def get_video_data_batch(youtube_data_client, video_ids, discrete_mode=False):
     # Batch in chunks of 50 IDs
     for i in range(0, len(video_ids), 50):
         batch = video_ids[i:i+50]
-        data_api_call_count += 1
+        with _api_count_lock:
+            data_api_call_count += 1
         resp = youtube_data_client.videos().list(
             part="snippet,statistics,contentDetails,status",
             id=','.join(batch)
