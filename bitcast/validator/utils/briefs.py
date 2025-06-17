@@ -3,15 +3,18 @@ import bittensor as bt
 from datetime import datetime, timezone, timedelta
 from diskcache import Cache
 import os
-from threading import Lock
 import atexit
 from bitcast.validator.utils.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY, CACHE_DIRS
+from threading import Lock
+
+# Import SafeCacheManager for thread-safe cache operations
+from bitcast.validator.utils.safe_cache import SafeCacheManager
 
 class BriefsCache:
     _instance = None
-    _lock = Lock()
     _cache: Cache = None
     _cache_dir = CACHE_DIRS["briefs"]
+    _lock = Lock()
 
     @classmethod
     def initialize_cache(cls) -> None:
@@ -31,16 +34,16 @@ class BriefsCache:
     def cleanup(cls) -> None:
         """Clean up resources."""
         if cls._cache is not None:
-            with cls._lock:
-                if cls._cache is not None:
-                    cls._cache.close()
-                    cls._cache = None
+            cls._cache.close()
+            cls._cache = None
 
     @classmethod
     def get_cache(cls) -> Cache:
         """Thread-safe cache access."""
         if cls._cache is None:
-            cls.initialize_cache()
+            with cls._lock:
+                if cls._cache is None:
+                    cls.initialize_cache()
         return cls._cache
 
     def __del__(self):
@@ -92,14 +95,14 @@ def get_briefs(all: bool = False):
         else:
             filtered_briefs = briefs_list
 
-        # Store the successful API response in cache
-        cache.set(cache_key, filtered_briefs)
+        # Store the successful API response in cache using SafeCacheManager
+        SafeCacheManager.safe_set(cache, cache_key, filtered_briefs)
         return filtered_briefs
 
     except requests.exceptions.RequestException as e:
         bt.logging.error(f"Error fetching briefs: {e}")
-        # Try to return cached data if available
-        cached_briefs = cache.get(cache_key)
+        # Try to return cached data if available using SafeCacheManager
+        cached_briefs = SafeCacheManager.safe_get(cache, cache_key)
         if cached_briefs is not None:
             bt.logging.warning("Using cached briefs due to API error")
             return cached_briefs

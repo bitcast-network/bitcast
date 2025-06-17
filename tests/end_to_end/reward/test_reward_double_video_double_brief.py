@@ -259,7 +259,7 @@ def reset_scored_videos():
 @pytest.mark.asyncio
 @patch('bitcast.validator.socials.youtube.youtube_scoring.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
-@patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
+@patch('bitcast.validator.socials.youtube.youtube_evaluation.get_blacklist_sources')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')

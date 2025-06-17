@@ -1,12 +1,14 @@
 import os
 import shutil
 import bittensor as bt
-from diskcache import Cache
 from bitcast.validator.utils.config import CACHE_DIRS, CACHE_ROOT
 from bitcast.validator.clients.OpenaiClient import OpenaiClient
 from bitcast.validator.utils.briefs import BriefsCache
 from bitcast.validator.utils.blacklist import BlacklistCache
 from bitcast.validator.socials.youtube.youtube_utils import YouTubeSearchCache
+
+# Import SafeCacheManager for thread-safe cache operations
+from bitcast.validator.utils.safe_cache import SafeCacheManager
 
 def clear_all_caches():
     """Clear all cache directories and instances."""
@@ -45,11 +47,11 @@ def clear_openai_cache():
     """Clear OpenAI cache."""
     bt.logging.info("Clearing OpenAI cache")
     try:
-        if OpenaiClient._cache:
-            OpenaiClient._cache.clear()
+        cache = OpenaiClient.get_cache()
+        if SafeCacheManager.safe_clear(cache):
             bt.logging.info("Successfully cleared OpenAI cache")
         else:
-            bt.logging.warning("OpenAI cache not initialized")
+            bt.logging.warning("OpenAI cache not available or clearing failed")
     except Exception as e:
         bt.logging.error(f"Error clearing OpenAI cache: {str(e)}")
         raise
@@ -58,11 +60,11 @@ def clear_briefs_cache():
     """Clear Briefs cache."""
     bt.logging.info("Clearing Briefs cache")
     try:
-        if BriefsCache._cache:
-            BriefsCache._cache.clear()
+        cache = BriefsCache.get_cache()
+        if SafeCacheManager.safe_clear(cache):
             bt.logging.info("Successfully cleared Briefs cache")
         else:
-            bt.logging.warning("Briefs cache not initialized")
+            bt.logging.warning("Briefs cache not available or clearing failed")
     except Exception as e:
         bt.logging.error(f"Error clearing Briefs cache: {str(e)}")
         raise
@@ -71,11 +73,11 @@ def clear_blacklist_cache():
     """Clear Blacklist cache."""
     bt.logging.info("Clearing Blacklist cache")
     try:
-        if BlacklistCache._cache:
-            BlacklistCache._cache.clear()
+        cache = BlacklistCache.get_cache()
+        if SafeCacheManager.safe_clear(cache):
             bt.logging.info("Successfully cleared Blacklist cache")
         else:
-            bt.logging.warning("Blacklist cache not initialized")
+            bt.logging.warning("Blacklist cache not available or clearing failed")
     except Exception as e:
         bt.logging.error(f"Error clearing Blacklist cache: {str(e)}")
         raise
@@ -84,11 +86,11 @@ def clear_expired_openai_cache():
     """Clear expired OpenAI cache entries."""
     bt.logging.info("Clearing expired OpenAI cache entries")
     try:
-        if OpenaiClient._cache:
-            OpenaiClient._cache.expire()
+        cache = OpenaiClient.get_cache()
+        if SafeCacheManager.safe_expire(cache):
             bt.logging.info("Successfully cleared expired OpenAI cache entries")
         else:
-            bt.logging.warning("OpenAI cache not initialized")
+            bt.logging.warning("OpenAI cache not available or expire operation failed")
     except Exception as e:
         bt.logging.error(f"Error clearing expired OpenAI cache entries: {str(e)}")
         raise
@@ -97,11 +99,11 @@ def clear_expired_briefs_cache():
     """Clear expired Briefs cache entries."""
     bt.logging.info("Clearing expired Briefs cache entries")
     try:
-        if BriefsCache._cache:
-            BriefsCache._cache.expire()
+        cache = BriefsCache.get_cache()
+        if SafeCacheManager.safe_expire(cache):
             bt.logging.info("Successfully cleared expired Briefs cache entries")
         else:
-            bt.logging.warning("Briefs cache not initialized")
+            bt.logging.warning("Briefs cache not available or expire operation failed")
     except Exception as e:
         bt.logging.error(f"Error clearing expired Briefs cache entries: {str(e)}")
         raise
@@ -110,11 +112,11 @@ def clear_expired_blacklist_cache():
     """Clear expired Blacklist cache entries."""
     bt.logging.info("Clearing expired Blacklist cache entries")
     try:
-        if BlacklistCache._cache:
-            BlacklistCache._cache.expire()
+        cache = BlacklistCache.get_cache()
+        if SafeCacheManager.safe_expire(cache):
             bt.logging.info("Successfully cleared expired Blacklist cache entries")
         else:
-            bt.logging.warning("Blacklist cache not initialized")
+            bt.logging.warning("Blacklist cache not available or expire operation failed")
     except Exception as e:
         bt.logging.error(f"Error clearing expired Blacklist cache entries: {str(e)}")
         raise
@@ -123,11 +125,11 @@ def clear_youtube_search_cache():
     """Clear YouTube search cache."""
     bt.logging.info("Clearing YouTube search cache")
     try:
-        if YouTubeSearchCache._cache:
-            YouTubeSearchCache._cache.clear()
+        cache = YouTubeSearchCache.get_cache()
+        if SafeCacheManager.safe_clear(cache):
             bt.logging.info("Successfully cleared YouTube search cache")
         else:
-            bt.logging.warning("YouTube search cache not initialized")
+            bt.logging.warning("YouTube search cache not available or clearing failed")
     except Exception as e:
         bt.logging.error(f"Error clearing YouTube search cache: {str(e)}")
         raise
@@ -136,11 +138,11 @@ def clear_expired_youtube_search_cache():
     """Clear expired YouTube search cache entries."""
     bt.logging.info("Clearing expired YouTube search cache entries")
     try:
-        if YouTubeSearchCache._cache:
-            YouTubeSearchCache._cache.expire()
+        cache = YouTubeSearchCache.get_cache()
+        if SafeCacheManager.safe_expire(cache):
             bt.logging.info("Successfully cleared expired YouTube search cache entries")
         else:
-            bt.logging.warning("YouTube search cache not initialized")
+            bt.logging.warning("YouTube search cache not available or expire operation failed")
     except Exception as e:
         bt.logging.error(f"Error clearing expired YouTube search cache entries: {str(e)}")
         raise

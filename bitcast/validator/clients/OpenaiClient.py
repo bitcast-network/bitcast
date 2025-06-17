@@ -21,6 +21,9 @@ from bitcast.validator.utils.config import (
 )
 from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt
 
+# Import SafeCacheManager for thread-safe cache operations
+from bitcast.validator.utils.safe_cache import SafeCacheManager
+
 # Global counter to track the number of OpenAI API requests
 openai_request_count = 0
 _request_count_lock = Lock()
@@ -36,7 +39,6 @@ class OpenaiClient:
     _lock = Lock()
     _cache = None
     _cache_dir = CACHE_DIRS["openai"]
-    _cache_lock = Lock()
 
     def __new__(cls):
         if cls._instance is None:
@@ -61,16 +63,16 @@ class OpenaiClient:
     def cleanup(cls) -> None:
         """Clean up resources."""
         if cls._cache is not None:
-            with cls._cache_lock:
-                if cls._cache is not None:
-                    cls._cache.close()
-                    cls._cache = None
+            cls._cache.close()
+            cls._cache = None
 
     @classmethod
     def get_cache(cls) -> Optional[Cache]:
         """Thread-safe cache access."""
         if cls._cache is None:
-            cls.initialize_cache()
+            with cls._lock:
+                if cls._cache is None:
+                    cls.initialize_cache()
         return cls._cache
 
     def __del__(self):
@@ -133,14 +135,15 @@ def evaluate_content_against_brief(brief, duration, description, transcript, vid
 
     try:
         cache = None if DISABLE_LLM_CACHING else OpenaiClient.get_cache()
-        if cache is not None and prompt_content in cache:
-            cached_result = cache[prompt_content]
+        
+        # Check cache using SafeCacheManager
+        cached_result = SafeCacheManager.safe_get(cache, prompt_content, None)
+        if cached_result is not None:
             meets_brief = cached_result["meets_brief"]
             reasoning = cached_result["reasoning"]
             
             # Implement sliding expiration - reset the 24-hour timer on access
-            with OpenaiClient._cache_lock:
-                cache.set(prompt_content, cached_result, expire=OPENAI_CACHE_EXPIRY)
+            SafeCacheManager.safe_set(cache, prompt_content, cached_result, expire=OPENAI_CACHE_EXPIRY)
             
             emoji = "✅" if meets_brief else "❌"
             bt.logging.info(f"[{video_id}] Brief {brief['id']}: {emoji} (cache)")
@@ -164,9 +167,8 @@ def evaluate_content_against_brief(brief, duration, description, transcript, vid
         meets_brief = response.choices[0].message.parsed.meets_brief
         reasoning = response.choices[0].message.parsed.reasoning
 
-        if cache is not None:
-            with OpenaiClient._cache_lock:
-                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=OPENAI_CACHE_EXPIRY)
+        # Store in cache using SafeCacheManager
+        SafeCacheManager.safe_set(cache, prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=OPENAI_CACHE_EXPIRY)
 
         emoji = "✅" if meets_brief else "❌"
         bt.logging.info(f"[{video_id}] Brief {brief['id']}: {emoji}")
@@ -207,12 +209,12 @@ def check_for_prompt_injection(description, transcript):
 
     try:
         cache = None if DISABLE_LLM_CACHING else OpenaiClient.get_cache()
-        if cache is not None and injection_prompt_template in cache:
-            injection_detected = cache[injection_prompt_template]
-            
+        
+        # Check cache using SafeCacheManager
+        injection_detected = SafeCacheManager.safe_get(cache, injection_prompt_template, None)
+        if injection_detected is not None:
             # Implement sliding expiration - reset the 24-hour timer on access
-            with OpenaiClient._cache_lock:
-                cache.set(injection_prompt_template, injection_detected, expire=OPENAI_CACHE_EXPIRY)
+            SafeCacheManager.safe_set(cache, injection_prompt_template, injection_detected, expire=OPENAI_CACHE_EXPIRY)
             
             bt.logging.info(f"Prompt Injection: {injection_detected} (cache)")
             return injection_detected
@@ -233,9 +235,8 @@ def check_for_prompt_injection(description, transcript):
         
         injection_detected = response.choices[0].message.parsed.injection_detected
 
-        if cache is not None:
-            with OpenaiClient._cache_lock:
-                cache.set(injection_prompt_template, injection_detected, expire=OPENAI_CACHE_EXPIRY)  # 3 day cache
+        # Store in cache using SafeCacheManager
+        SafeCacheManager.safe_set(cache, injection_prompt_template, injection_detected, expire=OPENAI_CACHE_EXPIRY)
 
         bt.logging.info(f"Prompt Injection Check: {'Failed' if injection_detected else 'Passed'}")
         return injection_detected

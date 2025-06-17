@@ -473,7 +473,7 @@ def test_calculate_video_score_all_ext_url_blacklisted():
             assert "score" in result
             assert "scorableHistoryMins" in result
 
-@patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
+@patch('bitcast.validator.socials.youtube.youtube_evaluation.get_blacklist_sources')
 def test_blacklist_sources_api_fallback(mock_blacklist):
     """Test that the system falls back gracefully when blacklist sources API fails."""
     from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score

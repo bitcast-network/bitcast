@@ -2,20 +2,19 @@ import requests
 import bittensor as bt
 from diskcache import Cache
 import os
-from threading import Lock
 import atexit
 from bitcast.validator.utils.config import BITCAST_BLACKLIST_ENDPOINT, BITCAST_BLACKLIST_SOURCES_ENDPOINT, CACHE_DIRS, BLACKLIST_CACHE_EXPIRY
-from typing import Dict, List, TypedDict
+from typing import Dict, List
+from threading import Lock
 
-class BlacklistSources(TypedDict):
-    traffic_sources: List[str]
-    external_urls: List[str]
+# Import SafeCacheManager for thread-safe cache operations
+from bitcast.validator.utils.safe_cache import SafeCacheManager
 
 class BlacklistCache:
     _instance = None
-    _lock = Lock()
     _cache: Cache = None
     _cache_dir = CACHE_DIRS["blacklist"]  # Using dedicated blacklist cache directory
+    _lock = Lock()
 
     @classmethod
     def initialize_cache(cls) -> None:
@@ -35,16 +34,16 @@ class BlacklistCache:
     def cleanup(cls) -> None:
         """Clean up resources."""
         if cls._cache is not None:
-            with cls._lock:
-                if cls._cache is not None:
-                    cls._cache.close()
-                    cls._cache = None
+            cls._cache.close()
+            cls._cache = None
 
     @classmethod
     def get_cache(cls) -> Cache:
         """Thread-safe cache access."""
         if cls._cache is None:
-            cls.initialize_cache()
+            with cls._lock:
+                if cls._cache is None:
+                    cls.initialize_cache()
         return cls._cache
 
     def __del__(self):
@@ -65,8 +64,8 @@ def get_blacklist() -> list[str]:
     cache = BlacklistCache.get_cache()
     cache_key = "blacklist"
     
-    # First try to get from cache
-    cached_blacklist = cache.get(cache_key)
+    # First try to get from cache using SafeCacheManager
+    cached_blacklist = SafeCacheManager.safe_get(cache, cache_key)
     if cached_blacklist is not None:
         bt.logging.info("Using cached blacklist data")
         return cached_blacklist
@@ -81,14 +80,14 @@ def get_blacklist() -> list[str]:
         blacklist_items = blacklist_data.get("items", [])
         bt.logging.info(f"Fetched {len(blacklist_items)} blacklisted items from API.")
 
-        # Store the successful API response in cache with 10-minute expiration
-        cache.set(cache_key, blacklist_items, expire=BLACKLIST_CACHE_EXPIRY)
+        # Store the successful API response in cache using SafeCacheManager
+        SafeCacheManager.safe_set(cache, cache_key, blacklist_items, expire=BLACKLIST_CACHE_EXPIRY)
         return blacklist_items
 
     except requests.exceptions.RequestException as e:
         bt.logging.error(f"Error fetching blacklist: {e}")
-        # Try to return cached data if available (even if expired)
-        cached_blacklist = cache.get(cache_key)
+        # Try to return cached data if available (even if expired) using SafeCacheManager
+        cached_blacklist = SafeCacheManager.safe_get(cache, cache_key)
         if cached_blacklist is not None:
             bt.logging.warning("Using cached blacklist due to API error")
             return cached_blacklist
@@ -118,8 +117,8 @@ def get_blacklist_sources() -> List[str]:
     cache = BlacklistCache.get_cache()
     cache_key = "blacklist_sources"
     
-    # First try to get from cache
-    cached_sources = cache.get(cache_key)
+    # First try to get from cache using SafeCacheManager
+    cached_sources = SafeCacheManager.safe_get(cache, cache_key)
     if cached_sources is not None:
         bt.logging.info("Using cached blacklist sources data")
         return cached_sources
@@ -130,18 +129,21 @@ def get_blacklist_sources() -> List[str]:
         response.raise_for_status()
         sources_data = response.json()
         
-        # Extract items from response
-        sources = sources_data.get("items", [])
-        bt.logging.info(f"Fetched {len(sources)} blacklisted sources from API.")
+        # Combine traffic sources and external URLs into a single list
+        traffic_sources = sources_data.get("traffic_sources", [])
+        external_urls = sources_data.get("external_urls", [])
+        sources = traffic_sources + external_urls
+        
+        bt.logging.info(f"Fetched {len(traffic_sources)} traffic sources and {len(external_urls)} external URLs from API.")
 
-        # Store the successful API response in cache with 10-minute expiration
-        cache.set(cache_key, sources, expire=BLACKLIST_CACHE_EXPIRY)
+        # Store the successful API response in cache using SafeCacheManager
+        SafeCacheManager.safe_set(cache, cache_key, sources, expire=BLACKLIST_CACHE_EXPIRY)
         return sources
 
     except requests.exceptions.RequestException as e:
         bt.logging.error(f"Error fetching blacklist sources: {e}")
-        # Try to return cached data if available (even if expired)
-        cached_sources = cache.get(cache_key)
+        # Try to return cached data if available (even if expired) using SafeCacheManager
+        cached_sources = SafeCacheManager.safe_get(cache, cache_key)
         if cached_sources is not None:
             bt.logging.warning("Using cached blacklist sources due to API error")
             return cached_sources

@@ -16,6 +16,9 @@ from diskcache import Cache
 from threading import Lock
 import atexit
 
+# Import SafeCacheManager for thread-safe cache operations
+from bitcast.validator.utils.safe_cache import SafeCacheManager
+
 # Thread lock for video scoring to ensure thread safety
 _scored_videos_lock = Lock()
 # Thread lock for API call counters
@@ -23,9 +26,9 @@ _api_count_lock = Lock()
 
 class YouTubeSearchCache:
     _instance = None
-    _lock = Lock()
     _cache: Cache = None
     _cache_dir = CACHE_DIRS["youtube_search"]
+    _lock = Lock()
 
     @classmethod
     def initialize_cache(cls) -> None:
@@ -45,16 +48,16 @@ class YouTubeSearchCache:
     def cleanup(cls) -> None:
         """Clean up resources."""
         if cls._cache is not None:
-            with cls._lock:
-                if cls._cache is not None:
-                    cls._cache.close()
-                    cls._cache = None
+            cls._cache.close()
+            cls._cache = None
 
     @classmethod
     def get_cache(cls) -> Cache:
         """Thread-safe cache access."""
         if cls._cache is None:
-            cls.initialize_cache()
+            with cls._lock:
+                if cls._cache is None:
+                    cls.initialize_cache()
         return cls._cache
 
     def __del__(self):
@@ -355,8 +358,8 @@ def _fallback_via_search(youtube, channel_id, cutoff_iso):
     cache_key = f"{channel_id}"
     cache = YouTubeSearchCache.get_cache()
     
-    # Check cache first
-    cached_vids = cache.get(cache_key)
+    # Check cache first using SafeCacheManager
+    cached_vids = SafeCacheManager.safe_get(cache, cache_key)
     if cached_vids is not None:
         bt.logging.info(f"Found {len(cached_vids)} videos in search cache")
         return cached_vids
@@ -387,9 +390,9 @@ def _fallback_via_search(youtube, channel_id, cutoff_iso):
     
     bt.logging.info(f"API search found {len(vids)} videos")
     
-    # Limit to max videos per account and store in cache
+    # Limit to max videos per account and store in cache using SafeCacheManager
     vids = vids[:YT_MAX_VIDEOS]
-    cache.set(cache_key, vids, expire=YOUTUBE_SEARCH_CACHE_EXPIRY)
+    SafeCacheManager.safe_set(cache, cache_key, vids, expire=YOUTUBE_SEARCH_CACHE_EXPIRY)
     
     return vids
 

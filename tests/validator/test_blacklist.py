@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import requests
-from bitcast.validator.utils.blacklist import get_blacklist, BlacklistCache, is_blacklisted
+from bitcast.validator.utils.blacklist import get_blacklist, is_blacklisted, get_blacklist_sources, BlacklistCache
 from bitcast.validator.utils.config import BLACKLIST_CACHE_EXPIRY
+from bitcast.validator.utils.safe_cache import SafeCacheManager
 import time
 
 class MockResponse:
@@ -19,7 +22,7 @@ def test_get_blacklist_success(monkeypatch):
     """Test that get_blacklist successfully fetches and returns blacklist items."""
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     mock_data = {
         "items": ["account1", "account2", "account3"]
@@ -41,7 +44,7 @@ def test_get_blacklist_empty_response(monkeypatch):
     """Test that get_blacklist handles empty response correctly."""
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     mock_data = {
         "items": []
@@ -61,7 +64,7 @@ def test_get_blacklist_api_error(monkeypatch):
     # First, populate the cache with some data
     cache = BlacklistCache.get_cache()
     cache_data = ["cached_account1", "cached_account2"]
-    cache.set("blacklist", cache_data, expire=BLACKLIST_CACHE_EXPIRY)
+    SafeCacheManager.safe_set(cache, "blacklist", cache_data, expire=BLACKLIST_CACHE_EXPIRY)
     
     # Mock API to fail
     def mock_get(*args, **kwargs):
@@ -79,7 +82,7 @@ def test_get_blacklist_no_cache_fallback(monkeypatch):
     """Test that get_blacklist returns empty list when API fails and no cache exists."""
     # Ensure cache is empty
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     # Mock API to fail
     def mock_get(*args, **kwargs):
@@ -96,7 +99,7 @@ def test_get_blacklist_cache_expiration(monkeypatch):
     # First, populate the cache with some data
     cache = BlacklistCache.get_cache()
     cache_data = ["account1", "account2"]
-    cache.set("blacklist", cache_data, expire=1)  # Set 1 second expiration for testing
+    SafeCacheManager.safe_set(cache, "blacklist", cache_data, expire=1)  # Set 1 second expiration for testing
     
     # Wait for cache to expire
     time.sleep(1.1)
@@ -121,7 +124,7 @@ def test_get_blacklist_invalid_response(monkeypatch):
     """Test that get_blacklist handles invalid API response format."""
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     mock_data = {
         "invalid_key": ["account1", "account2"]
@@ -140,7 +143,7 @@ def test_get_blacklist_http_error(monkeypatch):
     """Test that get_blacklist handles HTTP errors correctly."""
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     def mock_get(*args, **kwargs):
         return MockResponse({}, status_code=500)
@@ -158,8 +161,8 @@ def test_blacklist_cache_cleanup():
     assert cache is not None
     
     # Add some test data
-    cache.set("test_key", "test_value")
-    assert cache.get("test_key") == "test_value"
+    SafeCacheManager.safe_set(cache, "test_key", "test_value")
+    assert SafeCacheManager.safe_get(cache, "test_key") == "test_value"
     
     # Cleanup
     BlacklistCache.cleanup()
@@ -171,7 +174,7 @@ def test_is_blacklisted_success(monkeypatch):
     """Test that is_blacklisted correctly identifies blacklisted and non-blacklisted IDs."""
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     mock_data = {
         "items": ["blacklisted1", "blacklisted2"]
@@ -207,7 +210,7 @@ def test_is_blacklisted_api_error(monkeypatch):
     # First, populate the cache with some data
     cache = BlacklistCache.get_cache()
     cache_data = ["cached_blacklisted"]
-    cache.set("blacklist", cache_data, expire=BLACKLIST_CACHE_EXPIRY)
+    SafeCacheManager.safe_set(cache, "blacklist", cache_data, expire=BLACKLIST_CACHE_EXPIRY)
     
     # Mock API to fail
     def mock_get(*args, **kwargs):
@@ -223,27 +226,27 @@ def test_cache_size_limit():
     """Test that cache respects size limit and handles full cache correctly."""
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     try:
         # Create a large string that would exceed 1MB
         large_data = ["x" * 1024 * 1024]  # 1MB string
         
         # Try to set large data
-        cache.set("blacklist", large_data, expire=BLACKLIST_CACHE_EXPIRY)
+        SafeCacheManager.safe_set(cache, "blacklist", large_data, expire=BLACKLIST_CACHE_EXPIRY)
         
         # Verify cache is empty or contains truncated data
-        cached_data = cache.get("blacklist")
+        cached_data = SafeCacheManager.safe_get(cache, "blacklist")
         assert cached_data is None or len(str(cached_data)) < 1024 * 1024
     finally:
         # Cleanup
-        cache.delete("blacklist")
+        SafeCacheManager.safe_delete(cache, "blacklist")
 
 def test_cache_update(monkeypatch):
     """Test that cache is properly updated with new data from API."""
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     try:
         # First API call
@@ -261,7 +264,7 @@ def test_cache_update(monkeypatch):
         assert "item2" in blacklist1
         
         # Clear cache to force second API call
-        cache.delete("blacklist")
+        SafeCacheManager.safe_delete(cache, "blacklist")
         
         # Second API call with different data
         mock_data2 = {
@@ -278,7 +281,7 @@ def test_cache_update(monkeypatch):
         assert "item4" in blacklist2
     finally:
         # Cleanup
-        cache.delete("blacklist")
+        SafeCacheManager.safe_delete(cache, "blacklist")
 
 def test_concurrent_access(monkeypatch):
     """Test thread safety of cache with concurrent access."""
@@ -286,7 +289,7 @@ def test_concurrent_access(monkeypatch):
     
     # Clear any existing cache
     cache = BlacklistCache.get_cache()
-    cache.delete("blacklist")
+    SafeCacheManager.safe_delete(cache, "blacklist")
     
     try:
         # Mock API response
@@ -326,4 +329,4 @@ def test_concurrent_access(monkeypatch):
         assert BlacklistCache.get_cache() is not None
     finally:
         # Cleanup
-        cache.delete("blacklist") 
+        SafeCacheManager.safe_delete(cache, "blacklist") 
