@@ -21,7 +21,7 @@ YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
 BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
 OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
-__version__ = "1.5.2"
+__version__ = "1.7.0"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -52,6 +52,7 @@ YT_MAX_VIDEOS = 50
 # youtube channel
 YT_MIN_CHANNEL_AGE = 21
 YT_MIN_SUBS = 100
+YT_MAX_SUBS = 200000
 YT_MIN_MINS_WATCHED = 1000
 YT_MIN_CHANNEL_RETENTION = 10
 
@@ -68,6 +69,9 @@ TRANSCRIPT_MAX_LENGTH = 250000
 VALIDATOR_WAIT = 60 # 60 seconds
 VALIDATOR_STEPS_INTERVAL = 240 # 4 hours
 
+# synapse limits
+MAX_ACCOUNTS_PER_SYNAPSE = 5
+
 DISCRETE_MODE = True
 
 # Log out all non-sensitive config variables
@@ -77,6 +81,7 @@ bt.logging.info(f"DISABLE_LLM_CACHING: {DISABLE_LLM_CACHING}")
 bt.logging.info(f"LANGCHAIN_TRACING_V2: {LANGCHAIN_TRACING_V2}")
 bt.logging.info(f"ECO_MODE: {ECO_MODE}")
 bt.logging.info(f"YT_MIN_SUBS: {YT_MIN_SUBS}")
+bt.logging.info(f"YT_MAX_SUBS: {YT_MAX_SUBS}")
 bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")
 bt.logging.info(f"YT_MIN_MINS_WATCHED: {YT_MIN_MINS_WATCHED}")
 bt.logging.info(f"YT_MIN_CHANNEL_RETENTION: {YT_MIN_CHANNEL_RETENTION}")
@@ -90,4 +95,5 @@ bt.logging.info(f"TRANSCRIPT_MAX_RETRY: {TRANSCRIPT_MAX_RETRY}")
 bt.logging.info(f"TRANSCRIPT_MAX_LENGTH: {TRANSCRIPT_MAX_LENGTH}")
 bt.logging.info(f"VALIDATOR_WAIT: {VALIDATOR_WAIT}")
 bt.logging.info(f"VALIDATOR_STEPS_INTERVAL: {VALIDATOR_STEPS_INTERVAL}")
+bt.logging.info(f"MAX_ACCOUNTS_PER_SYNAPSE: {MAX_ACCOUNTS_PER_SYNAPSE}")
 bt.logging.info(f"DISCRETE_MODE: {DISCRETE_MODE}")

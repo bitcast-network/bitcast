@@ -1,21 +1,5 @@
 from pathlib import Path
-
-# auth flow
-def test_run_auth_flow():
-    from bitcast.miner.token_mgmt import run_auth_flow
-    from unittest.mock import patch, MagicMock
-
-    mock_flow = MagicMock()
-    with patch('bitcast.miner.token_mgmt.InstalledAppFlow') as mock_installed_app_flow, \
-         patch('builtins.open'), \
-         patch('pickle.dump'):
-        mock_flow.run_local_server.return_value = MagicMock()
-        mock_installed_app_flow.from_client_secrets_file.return_value = mock_flow
-
-        run_auth_flow()
-
-        mock_installed_app_flow.from_client_secrets_file.assert_called_once()
-        mock_flow.run_local_server.assert_called_once()
+import sys
 
 # token loading and refresh
 def test_load_token_when_not_expired():
@@ -28,9 +12,12 @@ def test_load_token_when_not_expired():
     mock_creds.token = "not_expired_token"
 
     with patch('builtins.open'), \
-         patch('pickle.load', return_value=mock_creds):
-        token = load_token()
-        assert token == "not_expired_token"
+         patch('pickle.load', return_value=mock_creds), \
+         patch('os.path.exists', return_value=True), \
+         patch('os.listdir', return_value=['creds.pkl']):
+        tokens = load_token()
+        assert tokens == ["not_expired_token"]
+        assert len(tokens) == 1
 
 def test_load_token_when_expired_and_has_refresh():
     from bitcast.miner.token_mgmt import load_token
@@ -44,22 +31,30 @@ def test_load_token_when_expired_and_has_refresh():
     with patch('builtins.open'), \
          patch('pickle.load', return_value=mock_creds), \
          patch('bitcast.miner.token_mgmt.Request'), \
-         patch.object(mock_creds, 'refresh'):
-        token = load_token()
-        assert token == "refreshed_token"
+         patch.object(mock_creds, 'refresh'), \
+         patch('os.path.exists', return_value=True), \
+         patch('os.listdir', return_value=['creds.pkl']):
+        tokens = load_token()
+        assert tokens == ["refreshed_token"]
+        assert len(tokens) == 1
 
 # init function
-def test_init():
-    from bitcast.miner.token_mgmt import init, run_auth_flow
+def test_init_when_creds_exist():
+    from bitcast.miner.token_mgmt import init
     from unittest.mock import patch
-    import os
 
+    # Test that init() succeeds when credentials exist
+    with patch('os.path.exists', return_value=True):
+        # Should not raise SystemExit
+        init()
+
+def test_init_when_creds_missing():
+    from bitcast.miner.token_mgmt import init
+    from unittest.mock import patch
+    import pytest
+
+    # Test that init() exits when credentials are missing
     with patch('os.path.exists', return_value=False), \
-         patch('bitcast.miner.token_mgmt.run_auth_flow') as mock_run_auth_flow:
-        init(force_auth=False)
-        mock_run_auth_flow.assert_called_once()
-
-    with patch('os.path.exists', return_value=True), \
-         patch('bitcast.miner.token_mgmt.run_auth_flow') as mock_run_auth_flow:
-        init(force_auth=True)
-        mock_run_auth_flow.assert_called_once()
+         patch('bitcast.miner.token_mgmt.bt.logging.error'):
+        with pytest.raises(SystemExit):
+            init()
