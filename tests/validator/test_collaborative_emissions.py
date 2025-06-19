@@ -6,16 +6,18 @@ from bitcast.validator.rewards_scaling import calculate_brief_emissions_scalar, 
 def test_calculate_brief_emissions_scalar():
     # Test case 1: Basic curve test with single brief
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -34,16 +36,18 @@ def test_calculate_brief_emissions_scalar():
 def test_calculate_brief_emissions_scalar_zero_minutes():
     # Test case 2: Zero minutes watched should return 0
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 0
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 0
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -61,16 +65,18 @@ def test_calculate_brief_emissions_scalar_zero_minutes():
 def test_calculate_brief_emissions_scalar_high_minutes():
     # Test case 3: Very high minutes (approaching asymptote)
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 1000
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 1000
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -87,16 +93,18 @@ def test_calculate_brief_emissions_scalar_high_minutes():
 def test_calculate_brief_emissions_scalar_multiple_briefs():
     # Test case 4: Multiple briefs with different parameters
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 50
-                },
-                "matching_brief_ids": ["brief1", "brief2"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 50
+                    },
+                    "matching_brief_ids": ["brief1", "brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -122,23 +130,25 @@ def test_calculate_brief_emissions_scalar_multiple_briefs():
 def test_calculate_brief_emissions_scalar_multiple_videos():
     # Test case 5: Multiple videos contributing to same brief
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 30
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
             },
-            "video2": {
-                "analytics": {
-                    "scorableHistoryMins": 20
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 30
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
                 },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+                "video2": {
+                    "analytics": {
+                        "scorableHistoryMins": 20
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -156,12 +166,12 @@ def test_calculate_brief_emissions_scalar_multiple_videos():
 def test_calculate_brief_emissions_scalar_invalid_stats():
     # Test case 6: Handle invalid stats gracefully
     yt_stats_list = [
-        {"invalid_key": "value"},  # Missing videos key
+        {"invalid_key": "value"},  # Missing account keys
         None,  # None value
-        {"videos": None},  # None videos
-        {"videos": "invalid"},  # Invalid videos type
-        {"yt_account": {"channel_vet_result": False}},  # Non-vetted channel
-        {"yt_account": {"channel_vet_result": True}, "videos": {}}  # Vetted but no videos
+        {"account_1": None},  # None account
+        {"account_1": "invalid"},  # Invalid account type
+        {"account_1": {"yt_account": {"channel_vet_result": False}}},  # Non-vetted channel
+        {"account_1": {"yt_account": {"channel_vet_result": True}, "videos": {}}}  # Vetted but no videos
     ]
     briefs = [{
         "id": "brief1",
@@ -177,16 +187,18 @@ def test_calculate_brief_emissions_scalar_invalid_stats():
 def test_calculate_brief_emissions_scalar_burn_decay_zero():
     # Test case: burn_decay is 0
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -202,16 +214,18 @@ def test_calculate_brief_emissions_scalar_burn_decay_zero():
 def test_calculate_brief_emissions_scalar_max_burn_zero():
     # Test case: max_burn is 0, should follow normal formula
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -233,23 +247,25 @@ def test_scale_rewards_basic():
     ]
     
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
             },
-            "video2": {
-                "scorableHistoryMins": 50,
-                "analytics": {
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
                 },
-                "matching_brief_ids": ["brief2"],
-                "decision_details": {"video_vet_result": True}
+                "video2": {
+                    "scorableHistoryMins": 50,
+                    "analytics": {
+                    },
+                    "matching_brief_ids": ["brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -283,16 +299,18 @@ def test_scale_rewards_invalid_sum():
     ]
     
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1", "brief2"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1", "brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -319,16 +337,18 @@ def test_scale_rewards_nonzero_first_row():
     ]
     
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1", "brief2"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1", "brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -355,16 +375,18 @@ def test_scale_rewards_zero_scalars():
     ]
     
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 0
-                },
-                "matching_brief_ids": ["brief1", "brief2"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 0
+                    },
+                    "matching_brief_ids": ["brief1", "brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -391,16 +413,18 @@ def test_scale_rewards_max_burn_zero():
     ]
     
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1", "brief2"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1", "brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -426,16 +450,18 @@ def test_scale_rewards_burn_decay_zero():
     ]
     
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1", "brief2"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1", "brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -464,16 +490,18 @@ def test_scale_rewards_all_zeros():
     ]
     
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 100
-                },
-                "matching_brief_ids": ["brief1", "brief2"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 100
+                    },
+                    "matching_brief_ids": ["brief1", "brief2"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -499,16 +527,18 @@ def test_scale_rewards_all_zeros():
 def test_calculate_brief_emissions_scalar_partial_scorable():
     # Test case: Minutes watched already exclude advertising traffic (no scorable_proportion needed)
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 50  # Already filtered to exclude advertising traffic
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
+            },
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 50  # Already filtered to exclude advertising traffic
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]
@@ -527,23 +557,25 @@ def test_calculate_brief_emissions_scalar_partial_scorable():
 def test_calculate_brief_emissions_scalar_mixed_scorable():
     # Test case: Multiple videos with minutes already filtered to exclude advertising traffic
     yt_stats_list = [{
-        "yt_account": {
-            "channel_vet_result": True
-        },
-        "videos": {
-            "video1": {
-                "analytics": {
-                    "scorableHistoryMins": 45  # Already filtered (was 60 * 0.75)
-                },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+        "account_1": {
+            "yt_account": {
+                "channel_vet_result": True
             },
-            "video2": {
-                "analytics": {
-                    "scorableHistoryMins": 20  # Already filtered (was 80 * 0.25)
+            "videos": {
+                "video1": {
+                    "analytics": {
+                        "scorableHistoryMins": 45  # Already filtered (was 60 * 0.75)
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
                 },
-                "matching_brief_ids": ["brief1"],
-                "decision_details": {"video_vet_result": True}
+                "video2": {
+                    "analytics": {
+                        "scorableHistoryMins": 20  # Already filtered (was 80 * 0.25)
+                    },
+                    "matching_brief_ids": ["brief1"],
+                    "decision_details": {"video_vet_result": True}
+                }
             }
         }
     }]

@@ -13,6 +13,7 @@ from bitcast.validator.socials.youtube.youtube_evaluation import (
 )
 from bitcast.validator.utils.config import (
     YT_MIN_SUBS,
+    YT_MAX_SUBS,
     YT_MIN_CHANNEL_AGE,
     YT_MIN_CHANNEL_RETENTION,
     YT_MIN_VIDEO_RETENTION,
@@ -78,6 +79,11 @@ def test_check_channel_criteria():
     # Test case 5: Insufficient minutes watched
     channel_analytics["averageViewPercentage"] = YT_MIN_CHANNEL_RETENTION + 5
     channel_analytics["estimatedMinutesWatched"] = YT_MIN_MINS_WATCHED - 100
+    assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == False
+
+    # Test case 6: Too many subscribers (exceeds maximum)
+    channel_analytics["estimatedMinutesWatched"] = YT_MIN_MINS_WATCHED + 1000
+    channel_data["subCount"] = str(YT_MAX_SUBS + 1000)  # 201k subscribers
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == False
 
 def test_vet_channel_blacklisted(mock_blacklist):

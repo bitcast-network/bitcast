@@ -20,27 +20,35 @@ def calculate_brief_emissions_scalar(yt_stats_list: List[dict], briefs: List[dic
     brief_total_minutes = {}
     for stats in yt_stats_list:
         try:
-            # Only process stats from vetted channels
-            if not isinstance(stats, dict) or not stats.get("yt_account", {}).get("channel_vet_result", False):
+            if not isinstance(stats, dict):
                 continue
-                
-            if "videos" in stats:
-                videos = stats["videos"]
-                if isinstance(videos, dict):
-                    # Handle case where videos is a dictionary
-                    for video_id, video_data in videos.items():
-                        if isinstance(video_data, dict):
+            
+            # Process nested account structure (account_1, account_2, etc.)
+            for key, value in stats.items():
+                if key.startswith("account_") and isinstance(value, dict):
+                    if "yt_account" in value and "videos" in value:
+                        account_stats = value
+                        
+                        # Only process stats from vetted channels
+                        if not account_stats.get("yt_account", {}).get("channel_vet_result", False):
+                            continue
                             
-                            # Only include videos that passed individual vetting
-                            decision_details = video_data.get("decision_details", {})
-                            if not decision_details.get("video_vet_result", False):
-                                continue
+                        videos = account_stats["videos"]
+                        if isinstance(videos, dict):
+                            # Handle case where videos is a dictionary
+                            for video_id, video_data in videos.items():
+                                if isinstance(video_data, dict):
+                                    
+                                    # Only include videos that passed individual vetting
+                                    decision_details = video_data.get("decision_details", {})
+                                    if not decision_details.get("video_vet_result", False):
+                                        continue
 
-                            minutes = float(video_data.get("analytics", {}).get("scorableHistoryMins", 0))
-                            
-                            matching_briefs = video_data.get("matching_brief_ids", [])
-                            for brief_id in matching_briefs:
-                                brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + (minutes)
+                                    minutes = float(video_data.get("analytics", {}).get("scorableHistoryMins", 0))
+                                    
+                                    matching_briefs = video_data.get("matching_brief_ids", [])
+                                    for brief_id in matching_briefs:
+                                        brief_total_minutes[brief_id] = brief_total_minutes.get(brief_id, 0) + (minutes)
         except Exception as e:
             bt.logging.warning(f"Error processing stats: {e}")
             continue

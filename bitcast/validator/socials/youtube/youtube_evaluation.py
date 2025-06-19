@@ -4,6 +4,7 @@ from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
 from bitcast.validator.utils.config import (
     YT_MIN_SUBS, 
+    YT_MAX_SUBS,
     YT_MIN_CHANNEL_AGE, 
     YT_MIN_CHANNEL_RETENTION, 
     YT_MIN_VIDEO_RETENTION, 
@@ -63,6 +64,10 @@ def check_channel_criteria(channel_data, channel_analytics, channel_age_days):
 
     if int(channel_data["subCount"]) < YT_MIN_SUBS:
         bt.logging.warning(f"Subscriber count check failed: {channel_data['bitcastChannelId']}. {channel_data['subCount']} < {YT_MIN_SUBS}.")
+        criteria_met = False
+
+    if int(channel_data["subCount"]) > YT_MAX_SUBS:
+        bt.logging.warning(f"Subscriber count check failed: {channel_data['bitcastChannelId']}. {channel_data['subCount']} > {YT_MAX_SUBS}.")
         criteria_met = False
 
     if float(channel_analytics["averageViewPercentage"]) < YT_MIN_CHANNEL_RETENTION:

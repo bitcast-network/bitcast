@@ -38,8 +38,8 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-        # Initialize token management; adjust force_auth as needed.
-        token_mgmt.init(force_auth=False)
+        # Initialize token management
+        token_mgmt.init()
 
         if self.config.dev_mode:
             bt.logging.info("DEV MODE ENABLED")
@@ -48,16 +48,16 @@ class Miner(BaseMinerNeuron):
         self, synapse: AccessTokenSynapse
     ) -> AccessTokenSynapse:
         """
-        Processes the incoming AccessTokenSynapse by loading an access token using token management logic.
+        Processes the incoming AccessTokenSynapse by loading access tokens using token management logic.
         
         Args:
             synapse (template.protocol.AccessTokenSynapse): The synapse object representing the token request.
         
         Returns:
-            template.protocol.AccessTokenSynapse: The same synapse object with the access token set.
+            template.protocol.AccessTokenSynapse: The same synapse object with the access tokens set.
         """
-        # Use token_mgmt logic to load (and refresh if needed) the access token.
-        synapse.YT_access_token = token_mgmt.load_token()
+        # Use token_mgmt logic to load (and refresh if needed) all access tokens.
+        synapse.YT_access_tokens = token_mgmt.load_token()
         return synapse
 
     async def blacklist(
