@@ -49,7 +49,7 @@ def manual_auth_flow():
         flow = InstalledAppFlow.from_client_secrets_file(client_secrets_path, SCOPES)
         
         # Set redirect URI to the echo service
-        flow.redirect_uri = 'https://echo.free.beeceptor.com/hi'
+        flow.redirect_uri = 'https://dashboard.bitcast.network/echo'
         
         # Generate the authorization URL
         auth_url, _ = flow.authorization_url(prompt='consent')
@@ -60,13 +60,10 @@ def manual_auth_flow():
         print("📋 INSTRUCTIONS:")
         print("1. Copy the URL above and open it in ANY browser (on any device)")
         print("2. Sign in to Google and grant the requested permissions")
-        print("3. You'll be redirected to a page showing JSON data")
-        print("4. Look for this section in the JSON:")
-        print('   "parsedQueryParams": {')
-        print('     "code": "4/0AVMBsJj...",')
-        print('     ...')
-        print('   }')
-        print("5. Copy ONLY the code value (the long string starting with '4/0')")
+        print("3. You'll be redirected to the BitCast echo service")
+        print("4. Look for the authorization code in the URL or on the page")
+        print("   The code will be a long string starting with '4/0' (e.g., '4/0AVMBsJj...')")
+        print("5. Copy ONLY the authorization code")
         print("6. Paste it below when prompted")
         print()
         

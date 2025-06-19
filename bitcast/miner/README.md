@@ -84,7 +84,7 @@ Make sure your server meets these before you start.
    - Name it **bitcast-miner**  
    - Under **Authorized redirect URIs**, add:  
      ```
-     https://echo.free.beeceptor.com/hi
+     https://dashboard.bitcast.network/echo
      ```  
    - Click **Create**.  
    - Download the JSON and save as  
