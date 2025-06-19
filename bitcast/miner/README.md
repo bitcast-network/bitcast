@@ -126,7 +126,6 @@ Make sure your server meets these before you start.
    ```bash
    bash scripts/run_miner.sh
    ```
-   Since you've already authenticated in step 1, the miner will start immediately using your saved credentials.
 
 5. **pm2 Launch & Health Check**  
    The `run_miner.sh` script uses **pm2** to manage the miner process.  
@@ -158,6 +157,19 @@ If you revoke access, you'll need to re-authenticate using `bash scripts/run_aut
 
 ---
 
+## 🏢 Agency Operations (Multiple YouTube Accounts)
+
+You can run a single miner with **up to 5 YouTube accounts** to operate as an agency:
+
+- The `run_auth.sh` script only authenticates **one** account at a time
+- To add more accounts, place additional `.pkl` credential files in `bitcast/miner/secrets/`
+- All `.pkl` files in the secrets directory will be included in miner responses
+- Use our open-source [agency web template](https://github.com/bitcast-network/bitcast-agency) to accept credentials from other creators
+
+This allows you to aggregate multiple creators under a single mining UID while maintaining separate YouTube account credentials.
+
+---
+
 ## 🚀 Miner Registration
 
 1. **Activate the virtual environment**  
@@ -184,7 +196,7 @@ If you revoke access, you'll need to re-authenticate using `bash scripts/run_aut
 
 ## ℹ️ General Notes
 
-- **2-day emissions delay:** You'll begin receiving miner emissions **2 days** after the miner starts.  
+- **3-day emissions delay:** You'll begin receiving miner emissions **3 days** after the miner starts.  
 - **Validator polling:** Each validator sends a request roughly every **4 hours**.  
 - **Video processing limit:** A maximum of **50 recent videos** will be processed per YouTube account.  
 - **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)  

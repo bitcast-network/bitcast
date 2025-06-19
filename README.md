@@ -33,6 +33,9 @@ Bitcast is a decentralized platform that incentivizes content creators to connec
 3. **Earn Rewards**  
    Videos that satisfy briefs are ranked by **total minutes watched**, and rewards are distributed evenly across briefs.
 
+4. **Agency Operations**  
+   Run a single miner with up to 5 YouTube accounts to operate as a content agency, aggregating multiple creators under one mining operation.
+
 See the [Miner Setup Guide](bitcast/miner/README.md) for:
 - Installation and configuration  
 - OAuth and account integration  
