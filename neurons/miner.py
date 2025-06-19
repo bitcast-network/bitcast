@@ -38,8 +38,8 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-        # Initialize token management; adjust force_auth as needed.
-        token_mgmt.init(force_auth=False)
+        # Initialize token management
+        token_mgmt.init()
 
         if self.config.dev_mode:
             bt.logging.info("DEV MODE ENABLED")
