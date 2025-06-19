@@ -156,8 +156,11 @@ async def get_rewards(
         
         # Process the response immediately
         yt_stats = reward(uid, briefs, miner_response)
-        yt_stats_list.append(yt_stats)
+
+        add_metagraph_info_to_stats(self.metagraph, uid, yt_stats)
     
+        yt_stats_list.append(yt_stats)
+
     # Convert dictionary scores to matrix format for normalization
     scores_matrix = []
     for yt_stats in yt_stats_list:
@@ -229,3 +232,28 @@ def sum_scores(scores_matrix):
     if scores_matrix.size == 0:
         return np.array([])
     return scores_matrix.sum(axis=1)
+
+def add_metagraph_info_to_stats(metagraph, uid: int, yt_stats: dict) -> None:
+    """
+    Add metagraph information to the yt_stats dictionary for a given UID.
+    
+    Args:
+        metagraph: The bittensor metagraph object
+        uid: The UID to get metagraph information for
+        yt_stats: The stats dictionary to add metagraph information to
+    """
+    try:
+        # Stake information
+        stake = float(metagraph.S[uid])
+        alpha_stake = float(metagraph.alpha_stake[uid]) if hasattr(metagraph, 'alpha_stake') else 0.0
+        coldkey = str(metagraph.coldkeys[uid]) if hasattr(metagraph, 'coldkeys') and uid < len(metagraph.coldkeys) else ""
+
+        yt_stats["metagraph"] = {
+            # Stake information
+            "stake": stake,
+            "alpha_stake": alpha_stake,
+            "coldkey": coldkey,
+        }
+
+    except Exception as e:
+        bt.logging.error(f"Error getting metagraph info for UID {uid}: {e}")
