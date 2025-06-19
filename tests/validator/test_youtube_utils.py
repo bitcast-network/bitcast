@@ -6,8 +6,7 @@ import os
 import shutil
 import time
 
-@pytest.mark.asyncio
-async def test_get_video_transcript_retry_logic():
+def test_get_video_transcript_retry_logic():
     video_id = "mock_video_id"
     rapid_api_key = "mock_rapid_api_key"
     mock_response = MagicMock()

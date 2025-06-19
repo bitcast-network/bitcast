@@ -3,13 +3,13 @@
 A YouTube token server which enables mining on the Bitcast subnet. Responds to validator requests with a temporary read access token for the YouTube APIs.
 
 > **Notice**  
-> Your YouTube channel is a valuable asset. Bitcast aims to create meaningful opportunities for creators but early-stage Bittensor subnets can be unpredictable environments. We encourage you to participate thoughtfully, as we will not take any responsibility for unexpected changes to your channel’s performance.
+> Your YouTube channel is a valuable asset. Bitcast aims to create meaningful opportunities for creators but early-stage Bittensor subnets can be unpredictable environments. We encourage you to participate thoughtfully, as we will not take any responsibility for unexpected changes to your channel's performance.
 
 ---
 
 ## 🎥 Content Requirements
 
-> **Don’t register until you hit these!**  
+> **Don't register until you hit these!**  
 > **Note: Content requirements are likely to increase over time**
 
 1. **YouTube account**  
@@ -75,13 +75,17 @@ Make sure your server meets these before you start.
    - Support email: *your email*  
    - Audience: **External**  
    - Contact email: *your email*  
-   - Agree to Google’s data policy and terms  
+   - Agree to Google's data policy and terms  
    - Click **Create**.
 
 4. **Create OAuth credentials**  
    - Go to **Overview → Metrics → Create OAuth client**  
-   - Application type: **Desktop app**  
+   - Application type: **Web application**  
    - Name it **bitcast-miner**  
+   - Under **Authorized redirect URIs**, add:  
+     ```
+     https://echo.free.beeceptor.com/hi
+     ```  
    - Click **Create**.  
    - Download the JSON and save as  
      ```
@@ -96,9 +100,18 @@ Make sure your server meets these before you start.
 
 ## 🚀 Run Miner
 
-**Important:** The OAuth consent screen requires a browser environment. Run the miner from a terminal capable of launching your default web browser (e.g., VS Code). Headless or minimal terminals (PuTTY, Terminus, mobaXterm) will not work.
+1. **Authenticate with YouTube**  
+   Run the authentication setup script:
+   ```bash
+   bash scripts/run_auth.sh
+   ```
+   This will:
+   - Set up your environment if needed
+   - Guide you through YouTube OAuth authentication  
+   - Work in all environments (headless, SSH, Docker, etc.)
+   - Provide a URL to copy/paste into any browser
 
-3. **Configure Environment**
+2. **Configure Environment**
    ```bash
    cp bitcast/miner/.env.example bitcast/miner/.env
    ```
@@ -106,19 +119,16 @@ Make sure your server meets these before you start.
    - `WALLET_NAME`: Your Bittensor wallet name
    - `HOTKEY_NAME`: Your validator hotkey name
 
-2. **Open port 8091**  
+3. **Open port 8091**  
    Ensure your firewall or cloud security group allows inbound on **8091**.
 
-3. **Start miner**  
+4. **Start miner**  
    ```bash
-   chmod +x scripts/run_miner.sh
-   ./scripts/run_miner.sh
+   bash scripts/run_miner.sh
    ```
-   - The first run will open an OAuth screen in your browser.  
-   - Authorize **all** requested YouTube access scopes for the account you wish to connect.  
-   - If it hangs or doesn’t appear, rerun `./scripts/run_miner.sh`.  
+   Since you've already authenticated in step 1, the miner will start immediately using your saved credentials.
 
-4. **pm2 Launch & Health Check**  
+5. **pm2 Launch & Health Check**  
    The `run_miner.sh` script uses **pm2** to manage the miner process.  
    - List running processes:  
      ```bash
@@ -132,10 +142,19 @@ Make sure your server meets these before you start.
      ```bash
      pm2 show bitcast_miner
      ```  
-   - If the miner isn’t running, you can restart it:  
+   - If the miner isn't running, you can restart it:  
      ```bash
      pm2 restart bitcast_miner
      ```
+
+---
+
+## 🔧 Managing Permissions
+
+To view or revoke the permissions you've granted to your miner application, visit:
+[Google Account Connections](https://myaccount.google.com/connections?continue=https%3A%2F%2Fmyaccount.google.com%2Fdata-and-privacy)
+
+If you revoke access, you'll need to re-authenticate using `bash scripts/run_auth.sh`.
 
 ---
 
@@ -165,7 +184,7 @@ Make sure your server meets these before you start.
 
 ## ℹ️ General Notes
 
-- **2-day emissions delay:** You’ll begin receiving miner emissions **2 days** after the miner starts.  
+- **2-day emissions delay:** You'll begin receiving miner emissions **2 days** after the miner starts.  
 - **Validator polling:** Each validator sends a request roughly every **4 hours**.  
 - **Video processing limit:** A maximum of **50 recent videos** will be processed per YouTube account.  
 - **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)  
