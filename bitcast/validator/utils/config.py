@@ -69,6 +69,9 @@ TRANSCRIPT_MAX_LENGTH = 250000
 VALIDATOR_WAIT = 60 # 60 seconds
 VALIDATOR_STEPS_INTERVAL = 240 # 4 hours
 
+# synapse limits
+MAX_ACCOUNTS_PER_SYNAPSE = 5
+
 DISCRETE_MODE = True
 
 # Log out all non-sensitive config variables
@@ -92,4 +95,5 @@ bt.logging.info(f"TRANSCRIPT_MAX_RETRY: {TRANSCRIPT_MAX_RETRY}")
 bt.logging.info(f"TRANSCRIPT_MAX_LENGTH: {TRANSCRIPT_MAX_LENGTH}")
 bt.logging.info(f"VALIDATOR_WAIT: {VALIDATOR_WAIT}")
 bt.logging.info(f"VALIDATOR_STEPS_INTERVAL: {VALIDATOR_STEPS_INTERVAL}")
+bt.logging.info(f"MAX_ACCOUNTS_PER_SYNAPSE: {MAX_ACCOUNTS_PER_SYNAPSE}")
 bt.logging.info(f"DISCRETE_MODE: {DISCRETE_MODE}")

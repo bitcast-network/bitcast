@@ -25,6 +25,7 @@ from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.socials.youtube.youtube_scoring import eval_youtube
 from bitcast.validator.socials.youtube import youtube_utils
 from bitcast.validator.rewards_scaling import scale_rewards
+from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE
 from bitcast.protocol import AccessTokenSynapse
 
 def reward(uid, briefs, response) -> dict:
@@ -54,10 +55,15 @@ def reward(uid, briefs, response) -> dict:
         yt_access_tokens = response.YT_access_tokens
 
         if yt_access_tokens and isinstance(yt_access_tokens, list):
-            bt.logging.info(f"Processing {len(yt_access_tokens)} YouTube access tokens for UID {uid}")
+            bt.logging.info(f"Received {len(yt_access_tokens)} YouTube access tokens for UID {uid}")
             
-            # Limit to maximum 10 tokens
-            tokens_to_process = yt_access_tokens[:10]
+            # Limit to maximum configured number of accounts per synapse
+            tokens_to_process = yt_access_tokens[:MAX_ACCOUNTS_PER_SYNAPSE]
+            
+            if len(yt_access_tokens) > MAX_ACCOUNTS_PER_SYNAPSE:
+                bt.logging.info(f"Limiting to {MAX_ACCOUNTS_PER_SYNAPSE} accounts per synapse (received {len(yt_access_tokens)})")
+            
+            bt.logging.info(f"Processing {len(tokens_to_process)} YouTube access tokens for UID {uid}")
             
             for i, yt_access_token in enumerate(tokens_to_process):
                 if yt_access_token:

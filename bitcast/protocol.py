@@ -48,7 +48,7 @@ class AccessTokenSynapse(bt.Synapse):
     Attributes:
     - YT_access_tokens: A list of string values representing YouTube access tokens. 
       Initially None for requests, and set to the actual tokens for responses.
-      Maximum of 10 tokens allowed.
+      Maximum number of tokens is configurable.
     """
     YT_access_tokens: typing.Optional[typing.List[str]] = None
 
