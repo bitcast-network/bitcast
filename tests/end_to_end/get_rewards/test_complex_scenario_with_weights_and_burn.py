@@ -36,9 +36,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
     )
     from bitcast.validator.socials.youtube.youtube_utils import (
         get_video_analytics,
-        get_all_uploads,
-        reset_scored_videos
+        get_all_uploads
     )
+    from bitcast.validator.socials.youtube.utils import reset_scored_videos
     from bitcast.validator.reward import reward, get_rewards
     from google.oauth2.credentials import Credentials
     from bitcast.validator.utils.config import (
@@ -245,7 +245,7 @@ def mock_credentials():
 
 @pytest.fixture(autouse=True)
 def reset_scored_videos():
-    from bitcast.validator.socials.youtube.youtube_utils import reset_scored_videos as reset_func
+    from bitcast.validator.socials.youtube.utils import reset_scored_videos as reset_func
     reset_func()
     yield
 
@@ -330,7 +330,7 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     def reward_wrapper(uid, briefs, response):
         set_current_uid(uid)
         if uid > 0:  # Don't reset for UID 0 since it's first
-            from bitcast.validator.socials.youtube.youtube_utils import reset_scored_videos as reset_func
+            from bitcast.validator.socials.youtube.utils import reset_scored_videos as reset_func
             reset_func()
         return original_reward(uid, briefs, response)
     

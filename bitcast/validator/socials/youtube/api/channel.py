@@ -5,6 +5,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 
 # Import global state from the main module
 from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.socials.youtube.utils import _format_error
 
 # Retry configuration for YouTube API calls
 YT_API_RETRY_CONFIG = {
@@ -13,13 +14,7 @@ YT_API_RETRY_CONFIG = {
     'reraise': True
 }
 
-def _format_error(e):
-    """Format error message to include only error type and brief summary.
-    
-    This function is imported/used by channel API functions to format errors.
-    It maintains the same signature as the one in youtube_utils.py for compatibility.
-    """
-    return youtube_utils._format_error(e)
+# _format_error function now imported from utils.helpers
 
 @retry(**YT_API_RETRY_CONFIG)
 def _query(client, start_date, end_date, metric, dimensions=None, filters=None, max_results=None, sort=None):

@@ -170,7 +170,8 @@ async def get_rewards(
     
     scores_matrix = np.array(scores_matrix)
     
-    youtube_utils.reset_scored_videos()
+    from bitcast.validator.socials.youtube.utils import reset_scored_videos
+    reset_scored_videos()
     rewards = normalise_scores(scores_matrix, yt_stats_list, briefs)
 
     return rewards, yt_stats_list

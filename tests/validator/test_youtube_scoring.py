@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from bitcast.validator.socials.youtube.youtube_scoring import update_video_score, check_video_brief_matches, channel_briefs_filter, check_subscriber_range
+from bitcast.validator.socials.youtube.youtube_scoring import update_video_score, check_video_brief_matches
+from bitcast.validator.socials.youtube.utils import channel_briefs_filter, check_subscriber_range
 
 def test_update_video_score():
     # Setup

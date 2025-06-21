@@ -18,9 +18,17 @@ import atexit
 from .cache.search import YouTubeSearchCache
 from .api.channel import _query_multiple_metrics
 
-# Global list to track which videos have already been scored
-# This list is shared between youtube_scoring.py and youtube_evaluation.py
-scored_video_ids = []
+# Import global state and helper functions from utils modules
+from .utils import (
+    scored_video_ids,
+    data_api_call_count,
+    analytics_api_call_count,
+    reset_scored_videos,
+    is_video_already_scored,
+    mark_video_as_scored,
+    reset_api_call_counts,
+    _format_error
+)
 
 # Retry configuration for YouTube API calls
 YT_API_RETRY_CONFIG = {
@@ -28,36 +36,6 @@ YT_API_RETRY_CONFIG = {
     'wait': wait_fixed(0.5),
     'reraise': True
 }
-
-# API call counters to track usage of YouTube Data and Analytics APIs for each token
-data_api_call_count = 0
-analytics_api_call_count = 0
-
-def reset_scored_videos():
-    """Reset the global scored_video_ids list.
-    
-    This function is used by other modules to clear the list of scored videos.
-    """
-    global scored_video_ids
-    scored_video_ids = []
-    bt.logging.info("Reset scored_video_ids")
-
-def is_video_already_scored(video_id):
-    """Check if a video has already been scored by another hotkey."""
-    if video_id in scored_video_ids:
-        bt.logging.info("Video already scored")
-        return True
-    return False
-
-def mark_video_as_scored(video_id):
-    """Mark a video as scored to prevent duplicate processing."""
-    scored_video_ids.append(video_id)
-
-def reset_api_call_counts():
-    """Reset the API call counters for YouTube Data and Analytics APIs."""
-    global data_api_call_count, analytics_api_call_count
-    data_api_call_count = 0
-    analytics_api_call_count = 0
 
 # Channel Analytics Functions have been moved to api/channel.py
 
@@ -68,8 +46,8 @@ def reset_api_call_counts():
 @retry(**YT_API_RETRY_CONFIG)
 def _get_uploads_playlist_id(youtube):
     """Return the channel's 'uploads' playlist ID (1-unit call)."""
-    global data_api_call_count
-    data_api_call_count += 1
+    from .utils import state
+    state.data_api_call_count += 1
     resp = youtube.channels().list(mine=True, part="contentDetails").execute()
     items = resp.get("items") or []
     if not items:
@@ -79,7 +57,7 @@ def _get_uploads_playlist_id(youtube):
 
 def _fallback_via_search(youtube, channel_id, cutoff_iso):
     """Quota-heavy fallback path (100 units per request). Uses caching to reduce API calls."""
-    global data_api_call_count
+    from .utils.state import data_api_call_count
     
     # Create cache key from channel_id and cutoff_iso
     cache_key = f"{channel_id}"
@@ -96,7 +74,8 @@ def _fallback_via_search(youtube, channel_id, cutoff_iso):
     max_calls = 2   # limit to most recent 100 videos because the search calls cost 100 credits
     
     while call_count < max_calls:
-        data_api_call_count += 100  # search.list() uses 100 credits per call
+        from .utils import state
+        state.data_api_call_count += 100  # search.list() uses 100 credits per call
         resp = youtube.search().list(
             part="id",
             type="video",
@@ -131,7 +110,7 @@ def get_all_uploads(youtube, max_age_days: int = 365):
       1. Use playlistItems.list (cheap) and bail out early when items get old.
       2. If we hit the rare invalidPageToken bug, fall back to search.list.
     """
-    global data_api_call_count
+    from .utils import state
     cutoff = datetime.utcnow() - timedelta(days=max_age_days)
     cutoff_iso = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -148,13 +127,13 @@ def get_all_uploads(youtube, max_age_days: int = 365):
     vids = []
     while req:
         try:
-            data_api_call_count += 1  # Count each req.execute() call (1 credit each)
+            state.data_api_call_count += 1  # Count each req.execute() call (1 credit each)
             resp = req.execute()
         except HttpError as e:
             if e.resp.status == 404 and "playlistNotFound" in str(e):
                 bt.logging.warning("Playlist not found - switching to search method")
                 # Need channel ID for fallback
-                data_api_call_count += 1  # channels.list() call for fallback
+                state.data_api_call_count += 1  # channels.list() call for fallback
                 channel_id = youtube.channels().list(mine=True, part="id").execute()[
                     "items"
                 ][0]["id"]
@@ -210,12 +189,12 @@ def get_all_uploads(youtube, max_age_days: int = 365):
 @retry(**YT_API_RETRY_CONFIG)
 def get_video_data_batch(youtube_data_client, video_ids, discrete_mode=False):
     """Fetch basic video information for up to 50 IDs per API call, batching to reduce calls."""
-    global data_api_call_count
+    from .utils import state
     result = {}
     # Batch in chunks of 50 IDs
     for i in range(0, len(video_ids), 50):
         batch = video_ids[i:i+50]
-        data_api_call_count += 1
+        state.data_api_call_count += 1
         resp = youtube_data_client.videos().list(
             part="snippet,statistics,contentDetails,status",
             id=','.join(batch)
@@ -452,13 +431,4 @@ def get_video_transcript(video_id, rapid_api_key):
     except RetryError:
         return None
 
-def _format_error(e):
-    """Format error message to include only error type and brief summary."""
-    et = type(e).__name__
-    if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
-        return f"{et} ({e.response.status_code})"
-    if hasattr(e, 'error') and isinstance(e.error, dict):
-        details = e.error.get('details', [{}])[0].get('message', 'unknown error')
-        return f"{et} ({details})"
-    msg = re.sub(r'https?://\S+', '', str(e)).split('\n')[0].strip()
-    return f"{et} ({msg})"
+# _format_error function now imported from utils.helpers

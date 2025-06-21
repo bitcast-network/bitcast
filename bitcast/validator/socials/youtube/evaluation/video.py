@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.socials.youtube.utils import _format_error
 from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
 from bitcast.validator.utils.config import (
     YT_MIN_VIDEO_RETENTION,
@@ -44,7 +45,7 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids):
             video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
             video_analytics_dict[video_id] = video_analytics
         except Exception as e:
-            bt.logging.error(f"Error getting analytics for video {video_id}: {youtube_utils._format_error(e)}")
+            bt.logging.error(f"Error getting analytics for video {video_id}: {_format_error(e)}")
             video_analytics_dict[video_id] = {}
     
     return video_analytics_dict
@@ -105,7 +106,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
             youtube_utils.mark_video_as_scored(video_id)
             
         except Exception as e:
-            bt.logging.error(f"Error evaluating video {youtube_utils._format_error(e)}")
+            bt.logging.error(f"Error evaluating video {_format_error(e)}")
             # Mark this video as not matching any briefs
             results[video_id] = [False] * len(briefs)
             # Don't mark the video as scored if there was an error
@@ -369,7 +370,7 @@ def get_video_transcript(video_id, video_data):
         try:
             transcript = youtube_utils.get_video_transcript(video_id, RAPID_API_KEY)
         except Exception as e:
-            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {youtube_utils._format_error(e)}")
+            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {_format_error(e)}")
             transcript = None
 
     if transcript is None:
@@ -450,7 +451,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                     met_brief_ids.append(brief["id"])
                 # Note: Individual brief completion logs will appear from OpenaiClient
             except Exception as e:
-                bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {youtube_utils._format_error(e)}")
+                bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {_format_error(e)}")
                 brief_results[brief_index] = False
                 brief_reasonings[brief_index] = f"Error during evaluation: {str(e)}"
     

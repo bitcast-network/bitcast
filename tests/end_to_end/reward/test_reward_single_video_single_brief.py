@@ -30,9 +30,9 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
     )
     from bitcast.validator.socials.youtube.youtube_utils import (
         get_video_analytics,
-        get_all_uploads,
-        reset_scored_videos
+        get_all_uploads
     )
+    from bitcast.validator.socials.youtube.utils import reset_scored_videos
     from bitcast.validator.reward import reward
     from google.oauth2.credentials import Credentials
     from bitcast.validator.utils.config import (
@@ -239,7 +239,7 @@ def mock_credentials():
 
 @pytest.fixture(autouse=True)
 def reset_scored_videos():
-    from bitcast.validator.socials.youtube.youtube_utils import reset_scored_videos as reset_func
+    from bitcast.validator.socials.youtube.utils import reset_scored_videos as reset_func
     reset_func()
     yield
 
