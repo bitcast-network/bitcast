@@ -56,8 +56,8 @@ class Mocks:
 
 
 # Test ECO_MODE enabled with early return
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', True)
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', Mocks.mock_check_video_privacy_fail)
+@patch('bitcast.validator.socials.youtube.evaluation.video.ECO_MODE', True)
+@patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', Mocks.mock_check_video_privacy_fail)
 def test_eco_mode_enabled_early_return():
     """Test that ECO_MODE causes early return when a check fails."""
     # Setup
@@ -70,12 +70,12 @@ def test_eco_mode_enabled_early_return():
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
     # Create patches for all subsequent checks
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date') as mock_publish_date, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention') as mock_retention, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions') as mock_captions, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript') as mock_transcript, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection') as mock_prompt_injection, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs') as mock_evaluate:
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date') as mock_publish_date, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention') as mock_retention, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_manual_captions') as mock_captions, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript') as mock_transcript, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_prompt_injection') as mock_prompt_injection, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs') as mock_evaluate:
         
         # Call the function
         result = vet_video(video_id, briefs, video_data, video_analytics)
@@ -97,8 +97,8 @@ def test_eco_mode_enabled_early_return():
 
 
 # Test ECO_MODE disabled with early return flag set
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', False)
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', Mocks.mock_check_video_privacy_fail)
+@patch('bitcast.validator.socials.youtube.evaluation.video.ECO_MODE', False)
+@patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', Mocks.mock_check_video_privacy_fail)
 def test_eco_mode_disabled_continues_despite_early_return():
     """Test that when ECO_MODE is disabled, the function continues execution through all checks."""
     # Setup
@@ -112,12 +112,12 @@ def test_eco_mode_disabled_continues_despite_early_return():
     
     # The key difference with ECO_MODE is that we continue through all checks
     # even after a failure, but all_checks_passed will be False
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date') as mock_publish_date, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention') as mock_retention, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions') as mock_captions, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript') as mock_transcript, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection') as mock_prompt_injection, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs') as mock_evaluate:
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date') as mock_publish_date, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention') as mock_retention, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_manual_captions') as mock_captions, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript') as mock_transcript, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_prompt_injection') as mock_prompt_injection, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs') as mock_evaluate:
         
         # Call the function
         result = vet_video(video_id, briefs, video_data, video_analytics)
@@ -146,7 +146,7 @@ def test_eco_mode_disabled_continues_despite_early_return():
 
 
 # Test early return at each stage of the pipeline with ECO_MODE enabled
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', True)
+@patch('bitcast.validator.socials.youtube.evaluation.video.ECO_MODE', True)
 def test_eco_mode_early_return_at_each_stage():
     """Test early return at each stage of the validation pipeline with ECO_MODE enabled."""
     video_id = "test_video_1"
@@ -155,52 +155,52 @@ def test_eco_mode_early_return_at_each_stage():
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
     # Test 1: Fail at privacy check
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', 
                return_value=False), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date') as mock_publish_date, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs') as mock_evaluate:
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date') as mock_publish_date, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs') as mock_evaluate:
         
         result = vet_video(video_id, briefs, video_data, video_analytics)
         mock_publish_date.assert_not_called()
         mock_evaluate.assert_not_called()
     
     # Test 2: Pass privacy check, fail at publish date
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date', 
                return_value=False), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention') as mock_retention, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs') as mock_evaluate:
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention') as mock_retention, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs') as mock_evaluate:
         
         result = vet_video(video_id, briefs, video_data, video_analytics)
         mock_retention.assert_not_called()
         mock_evaluate.assert_not_called()
     
     # Test 3: Pass privacy and publish date, fail at retention
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention', 
                return_value=False), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions') as mock_captions, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs') as mock_evaluate:
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_manual_captions') as mock_captions, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs') as mock_evaluate:
         
         result = vet_video(video_id, briefs, video_data, video_analytics)
         mock_captions.assert_not_called()
         mock_evaluate.assert_not_called()
     
     # Test 4: Pass through retention, fail at manual captions
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_manual_captions', 
                return_value=False), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript') as mock_transcript, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs') as mock_evaluate:
+         patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript') as mock_transcript, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs') as mock_evaluate:
         
         result = vet_video(video_id, briefs, video_data, video_analytics)
         mock_transcript.assert_not_called()
@@ -208,7 +208,7 @@ def test_eco_mode_early_return_at_each_stage():
 
 
 # Test full pipeline execution with ECO_MODE disabled
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', False)
+@patch('bitcast.validator.socials.youtube.evaluation.video.ECO_MODE', False)
 def test_eco_mode_disabled_full_pipeline():
     """Test the full validation pipeline executes with ECO_MODE disabled."""
     video_id = "test_video_1"
@@ -217,19 +217,19 @@ def test_eco_mode_disabled_full_pipeline():
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
     # Set up all checks to pass
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', 
                return_value=True) as mock_privacy, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date', 
                return_value=True) as mock_publish_date, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention', 
                return_value=True) as mock_retention, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_manual_captions', 
                return_value=True) as mock_captions, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript', 
                return_value="Mock transcript") as mock_transcript, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_prompt_injection', 
                return_value=True) as mock_prompt_injection, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs', 
                return_value=(["brief1"], ["Test reasoning"])) as mock_evaluate:
         
         result = vet_video(video_id, briefs, video_data, video_analytics)
@@ -250,7 +250,7 @@ def test_eco_mode_disabled_full_pipeline():
 
 
 # Test that the early_return flag is properly set when checks fail
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', True)
+@patch('bitcast.validator.socials.youtube.evaluation.video.ECO_MODE', True)
 def test_early_return_flag():
     """Test that the early_return flag is properly set when checks fail."""
     video_id = "test_video_1"
@@ -259,18 +259,18 @@ def test_early_return_flag():
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
     # Set up a spy on check_prompt_injection to verify early_return value
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_manual_captions', 
                return_value=True), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.get_video_transcript', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript', 
                return_value="Mock transcript"), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_prompt_injection') as mock_prompt_injection, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs',
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_prompt_injection') as mock_prompt_injection, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs',
                return_value=([], [])) as mock_evaluate:
         
         # Set up mock to capture early_return value by storing it
@@ -290,7 +290,7 @@ def test_early_return_flag():
 
 
 # Test for multiple failures in different checks with ECO_MODE
-@patch('bitcast.validator.socials.youtube.youtube_evaluation.ECO_MODE', True)
+@patch('bitcast.validator.socials.youtube.evaluation.video.ECO_MODE', True)
 def test_eco_mode_multiple_failures():
     """Test for multiple failures in different checks with ECO_MODE enabled."""
     video_id = "test_video_1"
@@ -299,14 +299,14 @@ def test_eco_mode_multiple_failures():
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION - 5}  # This would fail retention
     
     # Set up privacy and publish date to pass, but retention to fail
-    with patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_privacy', 
+    with patch('bitcast.validator.socials.youtube.evaluation.video.check_video_privacy', 
                side_effect=Mocks.mock_check_video_privacy), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_publish_date', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_publish_date', 
                side_effect=Mocks.mock_check_video_publish_date), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_video_retention', 
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_video_retention', 
                return_value=False), \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.check_manual_captions') as mock_captions, \
-         patch('bitcast.validator.socials.youtube.youtube_evaluation.evaluate_content_against_briefs') as mock_evaluate:
+         patch('bitcast.validator.socials.youtube.evaluation.video.check_manual_captions') as mock_captions, \
+         patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_briefs') as mock_evaluate:
         
         result = vet_video(video_id, briefs, video_data, video_analytics)
         
