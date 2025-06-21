@@ -1,10 +1,10 @@
 import asyncio
 import bittensor as bt
 from datetime import datetime, timedelta
-from googleapiclient.discovery import build
 import time
 
 from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.socials.youtube.api import initialize_youtube_clients, get_channel_data, get_channel_analytics
 from bitcast.validator.socials.youtube.youtube_evaluation import (
     vet_channel,
     vet_videos,
@@ -102,24 +102,19 @@ def initialize_youtube_evaluation(creds, briefs):
         "scores": scores
     }
     
-    try:
-        youtube_data_client = build("youtube", "v3", credentials=creds)
-        youtube_analytics_client = build("youtubeAnalytics", "v2", credentials=creds)
-        return result, youtube_data_client, youtube_analytics_client
-    except Exception as e:
-        bt.logging.warning(f"An error occurred while initializing YouTube clients: {e}")
-        return result, None, None
+    youtube_data_client, youtube_analytics_client = initialize_youtube_clients(creds)
+    return result, youtube_data_client, youtube_analytics_client
 
 def get_channel_information(youtube_data_client, youtube_analytics_client):
     """Retrieve channel data and analytics."""
     try:
-        channel_data = youtube_utils.get_channel_data(youtube_data_client, DISCRETE_MODE)
+        channel_data = get_channel_data(youtube_data_client, DISCRETE_MODE)
         
         # Calculate date range for the last YT_LOOKBACK days
         end_date = datetime.now().strftime('%Y-%m-%d')
         start_date = (datetime.now() - timedelta(days=YT_LOOKBACK)).strftime('%Y-%m-%d')
         
-        channel_analytics = youtube_utils.get_channel_analytics(youtube_analytics_client, start_date=start_date, end_date=end_date)
+        channel_analytics = get_channel_analytics(youtube_analytics_client, start_date=start_date, end_date=end_date)
         return channel_data, channel_analytics
     except Exception as e:
         bt.logging.warning(f"An error occurred while retrieving YouTube data: {youtube_utils._format_error(e)}")

@@ -29,9 +29,11 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         vet_videos,
         calculate_video_score
     )
-    from bitcast.validator.socials.youtube.youtube_utils import (
+    from bitcast.validator.socials.youtube.api.channel import (
         get_channel_data,
-        get_channel_analytics,
+        get_channel_analytics
+    )
+    from bitcast.validator.socials.youtube.youtube_utils import (
         get_video_analytics,
         get_all_uploads,
         reset_scored_videos
@@ -95,6 +97,8 @@ class MockYouTubeDataClient:
                         },
                         "statistics": {
                             "subscriberCount": str(YT_MIN_SUBS + 1000),
+                            "viewCount": "50000",
+                            "videoCount": "25"
                         },
                         "contentDetails": {
                             "relatedPlaylists": {
@@ -245,11 +249,11 @@ def reset_scored_videos():
     yield
 
 @pytest.mark.asyncio
-@patch('bitcast.validator.socials.youtube.youtube_scoring.build')
+@patch('bitcast.validator.socials.youtube.api.clients.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
 @patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
+@patch('bitcast.validator.socials.youtube.api.channel.get_channel_data')
+@patch('bitcast.validator.socials.youtube.api.channel.get_channel_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data_batch')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')

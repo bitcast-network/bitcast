@@ -249,7 +249,7 @@ def test_check_video_retention():
     assert decision_details["averageViewPercentageCheck"] == False
 
 @pytest.mark.asyncio
-@patch('bitcast.validator.socials.youtube.youtube_scoring.build')
+@patch('bitcast.validator.socials.youtube.api.clients.build')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data_batch')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
 @patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
