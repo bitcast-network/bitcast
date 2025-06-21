@@ -15,49 +15,7 @@ import re
 from diskcache import Cache
 from threading import Lock
 import atexit
-
-class YouTubeSearchCache:
-    _instance = None
-    _lock = Lock()
-    _cache: Cache = None
-    _cache_dir = CACHE_DIRS["youtube_search"]
-
-    @classmethod
-    def initialize_cache(cls) -> None:
-        """Initialize the cache if it hasn't been initialized yet."""
-        if cls._cache is None:
-            os.makedirs(cls._cache_dir, exist_ok=True)
-            cls._cache = Cache(
-                directory=cls._cache_dir,
-                size_limit=1e8,  # 100MB - search results can be sizable
-                disk_min_file_size=0,
-                disk_pickle_protocol=4,
-            )
-            # Register cleanup on program exit
-            atexit.register(cls.cleanup)
-
-    @classmethod
-    def cleanup(cls) -> None:
-        """Clean up resources."""
-        if cls._cache is not None:
-            with cls._lock:
-                if cls._cache is not None:
-                    cls._cache.close()
-                    cls._cache = None
-
-    @classmethod
-    def get_cache(cls) -> Cache:
-        """Thread-safe cache access."""
-        if cls._cache is None:
-            cls.initialize_cache()
-        return cls._cache
-
-    def __del__(self):
-        """Ensure cleanup on object destruction."""
-        self.cleanup()
-
-# Initialize cache
-YouTubeSearchCache.initialize_cache()
+from .cache.search import YouTubeSearchCache
 
 # Global list to track which videos have already been scored
 # This list is shared between youtube_scoring.py and youtube_evaluation.py
