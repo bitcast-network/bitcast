@@ -10,8 +10,9 @@ import bittensor as bt
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from bitcast.validator.socials.youtube import youtube_utils
-from bitcast.validator.socials.youtube.utils import _format_error
+from bitcast.validator.socials.youtube.utils import state, _format_error
+from bitcast.validator.socials.youtube.api.video import get_video_data_batch, get_video_analytics
+from bitcast.validator.socials.youtube.api.transcript import get_video_transcript
 from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
 from bitcast.validator.utils.config import (
     YT_MIN_VIDEO_RETENTION,
@@ -42,7 +43,7 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids):
     for video_id in video_ids:
         try:
             # Get all analytics in a single call
-            video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
+            video_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
             video_analytics_dict[video_id] = video_analytics
         except Exception as e:
             bt.logging.error(f"Error getting analytics for video {video_id}: {_format_error(e)}")
@@ -72,7 +73,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     import time
     
     start_time = time.time()
-    video_data_dict = youtube_utils.get_video_data_batch(youtube_data_client, video_ids, DISCRETE_MODE)
+    video_data_dict = get_video_data_batch(youtube_data_client, video_ids, DISCRETE_MODE)
     bt.logging.info(f"Video data batch fetch took {time.time() - start_time:.2f} seconds")
 
     start_time = time.time()
@@ -82,7 +83,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     for video_id in video_ids:
         try:
             # Check if video has already been scored
-            if youtube_utils.is_video_already_scored(video_id):
+            if state.is_video_already_scored(video_id):
                 results[video_id] = [False] * len(briefs)
                 continue
             
@@ -103,7 +104,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
             )
             
             # Only mark the video as scored if processing was successful
-            youtube_utils.mark_video_as_scored(video_id)
+            state.mark_video_as_scored(video_id)
             
         except Exception as e:
             bt.logging.error(f"Error evaluating video {_format_error(e)}")
@@ -139,7 +140,7 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     if not ECO_MODE and decision_details.get("anyBriefMatched", False):
         bt.logging.info(f"Fetching advanced metrics.")
         advanced_metrics = get_advanced_metrics()
-        advanced_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
+        advanced_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
         video_analytics.update(advanced_analytics)
     
     valid_checks = [check for check in decision_details["contentAgainstBriefCheck"] if check is not None]
@@ -368,7 +369,7 @@ def get_video_transcript(video_id, video_data):
     transcript = video_data.get("transcript") # transcript will only be in video_data for test runs
     if transcript is None:
         try:
-            transcript = youtube_utils.get_video_transcript(video_id, RAPID_API_KEY)
+            transcript = get_video_transcript(video_id, RAPID_API_KEY)
         except Exception as e:
             bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {_format_error(e)}")
             transcript = None

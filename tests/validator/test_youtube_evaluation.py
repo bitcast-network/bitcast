@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 import bittensor as bt
-from bitcast.validator.socials.youtube.youtube_evaluation import (
+from bitcast.validator.socials.youtube.evaluation import (
     vet_channel,
     calculate_channel_age,
     check_channel_criteria,
@@ -250,11 +250,11 @@ def test_check_video_retention():
 
 @pytest.mark.asyncio
 @patch('bitcast.validator.socials.youtube.api.clients.build')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data_batch')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
-@patch('bitcast.validator.socials.youtube.youtube_utils.is_video_already_scored')
-@patch('bitcast.validator.socials.youtube.youtube_utils.mark_video_as_scored')
+@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_data_batch')
+@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_analytics')
+@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript')
+@patch('bitcast.validator.socials.youtube.evaluation.video.state.is_video_already_scored')
+@patch('bitcast.validator.socials.youtube.evaluation.video.state.mark_video_as_scored')
 @patch('bitcast.validator.socials.youtube.evaluation.video.check_for_prompt_injection')
 @patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_brief')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)

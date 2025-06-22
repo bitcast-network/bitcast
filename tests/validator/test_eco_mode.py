@@ -2,7 +2,7 @@ import pytest
 import bittensor as bt
 from unittest.mock import MagicMock, patch
 
-from bitcast.validator.socials.youtube.youtube_evaluation import (
+from bitcast.validator.socials.youtube.evaluation import (
     vet_video,
     check_video_privacy,
     check_video_publish_date,

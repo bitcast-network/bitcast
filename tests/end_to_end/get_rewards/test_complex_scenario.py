@@ -22,10 +22,11 @@ import logging
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 import numpy as np
+import asyncio
 
 # Patch environment variables before importing modules
 with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
-    from bitcast.validator.socials.youtube.youtube_evaluation import (
+    from bitcast.validator.socials.youtube.evaluation import (
         vet_channel,
         vet_videos,
         calculate_video_score
@@ -34,22 +35,22 @@ with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
         get_channel_data,
         get_channel_analytics
     )
-    from bitcast.validator.socials.youtube.youtube_utils import (
+    from bitcast.validator.socials.youtube.api.video import (
         get_video_data_batch,
         get_video_analytics,
         get_all_uploads
     )
-    from bitcast.validator.socials.youtube.utils import reset_scored_videos
+    from bitcast.validator.socials.youtube.utils.state import reset_scored_videos
     from bitcast.validator.reward import reward, get_rewards
     from google.oauth2.credentials import Credentials
-    from bitcast.validator.utils.config import (
-        YT_MIN_SUBS,
-        YT_MIN_CHANNEL_AGE,
-        YT_MIN_CHANNEL_RETENTION,
-        YT_MIN_MINS_WATCHED,
-        YT_REWARD_DELAY,
-        YT_ROLLING_WINDOW
-    )
+from bitcast.validator.utils.config import (
+    YT_MIN_CHANNEL_RETENTION,
+    YT_MIN_MINS_WATCHED,
+    YT_ROLLING_WINDOW,
+    YT_REWARD_DELAY,
+    YT_MIN_CHANNEL_AGE,
+    YT_MIN_SUBS
+)
 
 # Set up logging
 logging.basicConfig(
@@ -75,6 +76,7 @@ class MockYouTubeDataClient:
         self._channels = self._create_channels()
         self._playlist_items = self._create_playlist_items()
         self._videos = self._create_videos()
+        self.current_uid_tracker = None  # Will be set by test
 
     def channels(self):
         return self._channels
@@ -112,32 +114,65 @@ class MockYouTubeDataClient:
         return Channels()
 
     def _create_playlist_items(self):
+        outer_self = self  # Capture reference to access current_uid_tracker
+        
         class PlaylistItems:
-            def list(self, playlistId=None, part=None, maxResults=None, pageToken=None):
+            def __init__(self):
+                self.call_count = 0
+                
+            def list(self, playlistId=None, part=None, maxResults=None, pageToken=None, fields=None, **kwargs):
+                # Determine which UID we're processing based on the current_uid_tracker
+                current_uid = getattr(outer_self.current_uid_tracker, 'current_uid', 0) if outer_self.current_uid_tracker else 0
+                
+                # Return multiple UID-specific videos to match the test design
+                if current_uid == 1:
+                    video_items = [
+                        {"contentDetails": {"videoId": "test_video_1_uid1"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}},
+                        {"contentDetails": {"videoId": "test_video_2_uid1"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')}},
+                        {"contentDetails": {"videoId": "test_video_3_uid1"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%dT%H:%M:%SZ')}},
+                        {"contentDetails": {"videoId": "test_video_4_uid1"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=4)).strftime('%Y-%m-%dT%H:%M:%SZ')}}
+                    ]
+                elif current_uid == 2:
+                    video_items = [
+                        {"contentDetails": {"videoId": "test_video_1_uid2"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}},
+                        {"contentDetails": {"videoId": "test_video_2_uid2"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')}},
+                        {"contentDetails": {"videoId": "test_video_3_uid2"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%dT%H:%M:%SZ')}},
+                        {"contentDetails": {"videoId": "test_video_4_uid2"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=4)).strftime('%Y-%m-%dT%H:%M:%SZ')}}
+                    ]
+                else:
+                    # Default for UID 0  
+                    video_items = [
+                        {"contentDetails": {"videoId": "test_video_1"}, "snippet": {"publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}}
+                    ]
+                
                 return MockResponse({
-                    "items": [
-                        {
-                            "snippet": {
-                                "publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                "resourceId": {
-                                    "videoId": "test_video_1"
-                                }
-                            }
-                        }
-                    ],
+                    "items": video_items,
                     "nextPageToken": None
                 })
+                
+            def list_next(self, previous_request, previous_response):
+                """Handle pagination - return None to indicate no more pages"""
+                return None
         return PlaylistItems()
 
     def _create_videos(self):
         class Videos:
-            def list(self, part=None, id=None):
-                return MockResponse({
-                    "items": [{
-                        "id": "mock_video_1",
+            def list(self, part=None, id=None, **kwargs):
+                items = []
+                if isinstance(id, str):
+                    # Handle comma-separated IDs for batch requests
+                    video_ids = id.split(',') if ',' in id else [id]
+                elif isinstance(id, list):
+                    video_ids = id
+                else:
+                    video_ids = []
+
+                for vid_id in video_ids:
+                    items.append({
+                        "id": vid_id.strip(),  # Strip whitespace from comma-separated IDs
                         "snippet": {
-                            "title": "Mock Video",
-                            "description": "Mock Description",
+                            "title": f"Mock Video {vid_id.strip()}",
+                            "description": f"Mock Description for {vid_id.strip()}",
                             "publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
                         },
                         "statistics": {
@@ -151,70 +186,85 @@ class MockYouTubeDataClient:
                         },
                         "status": {
                             "privacyStatus": "public"
-                        }
-                    }]
-                })
+                        },
+                        "transcript": f"This is a test transcript for {vid_id.strip()}"
+                    })
+
+                return MockResponse({"items": items})
         return Videos()
 
 class MockYouTubeAnalyticsClient:
     def __init__(self):
         logger.debug("Initializing MockYouTubeAnalyticsClient")
         self._reports = self._create_reports()
+        self.current_uid_tracker = None  # Will be set by test
 
     def reports(self):
         return self._reports
 
     def _create_reports(self):
+        outer_self = self  # Capture reference to access current_uid_tracker
+        
         class Reports:
-            def query(self, ids=None, startDate=None, endDate=None, dimensions=None, metrics=None, filters=None):
-                # Static base metrics
-                base_metrics = [
-                    10000,                          # views
-                    100,                            # comments
-                    500,                            # likes
-                    10,                             # dislikes
-                    50,                             # shares
-                    180,                            # averageViewDuration
-                    YT_MIN_CHANNEL_RETENTION + 5,   # averageViewPercentage
-                    100,                            # subscribersGained
-                    10,                             # subscribersLost
-                    YT_MIN_MINS_WATCHED + 10        # estimatedMinutesWatched
-                ]
-
-                if dimensions == "country":
-                    return MockResponse({
-                        "rows": [
-                            ["US", 3000],
-                            ["UK", 1500],
-                            ["CA", 800]
-                        ]
-                    })
-                elif dimensions == "day":
-                    days = []
-                    start = datetime.strptime(startDate, '%Y-%m-%d')
-                    end = datetime.strptime(endDate, '%Y-%m-%d')
-                    current = start
-                    while current <= end:
-                        day_data = [
-                            current.strftime('%Y-%m-%d'),
-                            300,  # estimatedMinutesWatched
-                            250,  # views
-                            10,   # subscribersGained
-                            2     # subscribersLost
-                        ]
-                        days.append(day_data)
-                        current += timedelta(days=1)
-                    return MockResponse({"rows": days})
-                elif dimensions == "insightTrafficSourceType":
-                    return MockResponse({
-                        "rows": [
-                            ["EXT_URL", 3000],
-                            ["YT_CHANNEL", 1500],
-                            ["YT_OTHER_PAGE", 800]
-                        ]
-                    })
-                else:
-                    return MockResponse({"rows": [base_metrics]})
+            def query(self, ids=None, startDate=None, endDate=None, dimensions=None, metrics=None, filters=None, **kwargs):
+                # Get current UID being processed
+                current_uid = getattr(outer_self.current_uid_tracker, 'current_uid', 0) if outer_self.current_uid_tracker else 0
+                
+                # Check if this is a video-specific query (has a video filter)
+                if filters and 'video==' in filters:
+                    # Extract video ID from filter
+                    video_id = filters.split('video==')[1].split(';')[0]
+                    logger.info(f"🎯 Analytics query for video {video_id}, UID {current_uid}")
+                    
+                    # UID-specific video analytics data
+                    video_analytics_data = {
+                        # UID 1's videos (50% more watch time)
+                        "test_video_1_uid1": 900,  # 600 * 1.5
+                        "test_video_2_uid1": 375,  # 250 * 1.5
+                        "test_video_3_uid1": 150,  # 100 * 1.5
+                        "test_video_4_uid1": 450,  # 300 * 1.5
+                        # UID 2's videos (original watch time)
+                        "test_video_1_uid2": 600,
+                        "test_video_2_uid2": 250,
+                        "test_video_3_uid2": 100,
+                        "test_video_4_uid2": 300
+                    }
+                    
+                    total_minutes = video_analytics_data.get(video_id, 0)
+                    logger.info(f"📊 Video {video_id} analytics: total_minutes={total_minutes}")
+                    
+                    # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+                    from datetime import datetime, timedelta
+                    
+                    today = datetime.now()
+                    day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
+                    day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+                    half_minutes = total_minutes / 2
+                    
+                    # Return day-specific data
+                    if dimensions == 'day':
+                        data = {
+                            "rows": [
+                                [day1, half_minutes, half_minutes/2, 10, 2],
+                                [day2, half_minutes, half_minutes/2, 10, 2]
+                            ]
+                        }
+                    else:
+                        # Return overall metrics
+                        data = {
+                            "rows": [[total_minutes, 100, 500, 10, 50, 180, 15, 100, 10, 1010]]
+                        }
+                    
+                    logger.info(f"📈 Returning video analytics: {data}")
+                    return MockResponse(data)
+                
+                # Static base metrics for channel-level queries
+                data = {
+                    "rows": [[10000, 100, 500, 10, 50, 180, 15, 100, 10, 1010]]
+                }
+                logger.debug(f"Created MockResponse with data: {data}")
+                return MockResponse(data)
+        
         return Reports()
 
 def get_mock_youtube_clients():
@@ -246,7 +296,7 @@ def mock_credentials():
 
 @pytest.fixture(autouse=True)
 def reset_scored_videos():
-    from bitcast.validator.socials.youtube.utils import reset_scored_videos as reset_func
+    from bitcast.validator.socials.youtube.utils.state import reset_scored_videos as reset_func
     reset_func()
     yield
 
@@ -256,10 +306,10 @@ def reset_scored_videos():
 @patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
 @patch('bitcast.validator.socials.youtube.api.channel.get_channel_data')
 @patch('bitcast.validator.socials.youtube.api.channel.get_channel_analytics')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data_batch')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
+@patch("bitcast.validator.socials.youtube.api.video.get_all_uploads")
+@patch("bitcast.validator.socials.youtube.api.video.get_video_data_batch")
+@patch("bitcast.validator.socials.youtube.api.video.get_video_analytics")
+@patch("bitcast.validator.socials.youtube.api.transcript.get_video_transcript")
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_transcript,
@@ -317,15 +367,25 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     
     youtube_data_client, youtube_analytics_client = get_mock_youtube_clients()
     
+    # Track which UID we're currently evaluating  
+    current_uid = [0]  # Use a list so we can modify it inside functions
+    
+    # Create a simple object to track current UID for the mock clients
+    class UIDTracker:
+        def __init__(self):
+            self.current_uid = 0
+            
+    uid_tracker = UIDTracker()
+    youtube_data_client.current_uid_tracker = uid_tracker
+    youtube_analytics_client.current_uid_tracker = uid_tracker
+    
     mock_build.side_effect = lambda service, version, credentials=None: (
         youtube_data_client if service == "youtube" else youtube_analytics_client
     )
     
-    # Track which UID we're currently evaluating
-    current_uid = [0]  # Use a list so we can modify it inside functions
-    
     def set_current_uid(uid):
         current_uid[0] = uid
+        uid_tracker.current_uid = uid  # Update the tracker for mock clients
         logger.info(f"Setting current UID to {uid}")
     
     # Maintain a reference to the original reward function
@@ -335,7 +395,7 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     def reward_wrapper(uid, briefs, response):
         set_current_uid(uid)
         if uid > 0:  # Don't reset for UID 0 since it's first
-            from bitcast.validator.socials.youtube.utils import reset_scored_videos as reset_func
+            from bitcast.validator.socials.youtube.utils.state import reset_scored_videos as reset_func
             reset_func()
         return original_reward(uid, briefs, response)
     
@@ -403,7 +463,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-15T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_1_uid1",
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             "test_video_2_uid1": {
                 "bitcastVideoId": "test_video_2_uid1",
@@ -412,7 +482,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-16T00:00:00Z",
                 "duration": "PT15M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_2_uid1",
+                "contentDetails": {
+                    "duration": "PT15M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             "test_video_3_uid1": {
                 "bitcastVideoId": "test_video_3_uid1",
@@ -421,7 +501,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-17T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_3_uid1",
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             "test_video_4_uid1": {
                 "bitcastVideoId": "test_video_4_uid1",
@@ -430,7 +520,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-18T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_4_uid1",
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             # UID 2's videos
             "test_video_1_uid2": {
@@ -440,7 +540,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-15T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_1_uid2",
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             "test_video_2_uid2": {
                 "bitcastVideoId": "test_video_2_uid2",
@@ -449,7 +559,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-16T00:00:00Z",
                 "duration": "PT15M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_2_uid2",
+                "contentDetails": {
+                    "duration": "PT15M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             "test_video_3_uid2": {
                 "bitcastVideoId": "test_video_3_uid2",
@@ -458,7 +578,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-17T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_3_uid2",
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             "test_video_4_uid2": {
                 "bitcastVideoId": "test_video_4_uid2",
@@ -467,7 +597,17 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "publishedAt": "2023-01-18T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for test_video_4_uid2",
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             }
         }
         return video_data[video_id]
@@ -478,7 +618,7 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     mock_get_video_data_batch.side_effect = mock_get_video_data_batch_side_effect
     
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, dimensions=None, metric_dims=None):
-        logger.info(f"get_video_analytics called with video_id: {video_id}, dimensions: {dimensions}, metric_dims: {metric_dims}")
+        logger.info(f"🎯 get_video_analytics called with video_id: {video_id}, dimensions: {dimensions}, metric_dims: {metric_dims}")
         
         # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
         today = datetime.now()
@@ -500,6 +640,8 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
         }
         total_minutes = video_day_metrics.get(video_id, 0)
         half_minutes = total_minutes / 2
+        
+        logger.info(f"📊 Video {video_id} analytics: total_minutes={total_minutes}, half_minutes={half_minutes}")
         
         # Create day_metrics structure (all traffic is organic)
         day_metrics = {
@@ -544,7 +686,7 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                             day2: half_minutes / 2
                         }
             
-            logger.info(f"Returning day metrics structure for {video_id}: {result}")
+            logger.info(f"📈 Returning day metrics structure for {video_id}: {result}")
             return result
             
         # Legacy format support for backward compatibility (dimensions parameter)
@@ -567,7 +709,7 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
                 "estimatedMinutesWatched": total_minutes,
                 "trafficSourceMinutes": traffic_source_minutes
             }
-            logger.info(f"Returning overall metrics for {video_id}: {result}")
+            logger.info(f"📊 Returning overall metrics for {video_id}: {result}")
             return result
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect

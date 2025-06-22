@@ -8,7 +8,7 @@ handling blacklisted traffic sources, and computing scorable minutes.
 import bittensor as bt
 from datetime import datetime, timedelta
 
-from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.socials.youtube.api.video import get_video_analytics
 from bitcast.validator.utils.config import (
     YT_REWARD_DELAY,
     YT_ROLLING_WINDOW,
@@ -45,7 +45,7 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
 
     # Get daily metrics from config
     metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=True)    
-    analytics_result = youtube_utils.get_video_analytics(
+    analytics_result = get_video_analytics(
         youtube_analytics_client, 
         video_id, 
         query_start_date,

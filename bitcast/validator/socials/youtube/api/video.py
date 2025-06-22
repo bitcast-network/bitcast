@@ -168,6 +168,9 @@ def get_video_data_batch(youtube_data_client, video_ids, discrete_mode=False):
                 "caption": info['contentDetails'].get('caption', 'false').lower() == 'true',
                 "privacyStatus": info['status'].get('privacyStatus', 'private')
             }
+            # Preserve transcript field for test runs
+            if 'transcript' in info:
+                result[vid]['transcript'] = info['transcript']
     return result
 
 # Provide single-video get_video_data for compatibility with tests

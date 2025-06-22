@@ -22,8 +22,8 @@ import bittensor as bt
 import json
 from google.oauth2.credentials import Credentials
 from bitcast.validator.utils.briefs import get_briefs
-from bitcast.validator.socials.youtube.youtube_scoring import eval_youtube
-from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.socials.youtube.main import eval_youtube
+from bitcast.validator.socials.youtube.utils import state
 from bitcast.validator.rewards_scaling import scale_rewards
 from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE
 from bitcast.protocol import AccessTokenSynapse
@@ -170,8 +170,7 @@ async def get_rewards(
     
     scores_matrix = np.array(scores_matrix)
     
-    from bitcast.validator.socials.youtube.utils import reset_scored_videos
-    reset_scored_videos()
+    state.reset_scored_videos()
     rewards = normalise_scores(scores_matrix, yt_stats_list, briefs)
 
     return rewards, yt_stats_list

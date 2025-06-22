@@ -3,9 +3,8 @@ import hashlib
 from datetime import datetime, timedelta
 from tenacity import retry, stop_after_attempt, wait_fixed
 
-# Import global state from the main module
-from bitcast.validator.socials.youtube import youtube_utils
-from bitcast.validator.socials.youtube.utils import _format_error
+# Import global state and helper functions from utils modules  
+from bitcast.validator.socials.youtube.utils import state, _format_error
 
 # Retry configuration for YouTube API calls
 YT_API_RETRY_CONFIG = {
@@ -33,7 +32,7 @@ def _query(client, start_date, end_date, metric, dimensions=None, filters=None, 
     Returns:
         Query result - list for non-dimensional, dict for dimensional queries
     """
-    youtube_utils.analytics_api_call_count += 1
+    state.analytics_api_call_count += 1
     params = {
         'ids': 'channel==MINE',
         'startDate': start_date,
@@ -83,7 +82,7 @@ def _query_multiple_metrics(client, start_date, end_date, metrics_list, dimensio
     Returns:
         Dictionary with metric names as keys and their respective results as values
     """
-    youtube_utils.analytics_api_call_count += 1
+    state.analytics_api_call_count += 1
     metrics_str = ",".join(metrics_list)
     params = {
         'ids': 'channel==MINE',
@@ -142,7 +141,7 @@ def get_channel_data(youtube_data_client, discrete_mode=False):
     Returns:
         Dictionary containing channel information
     """
-    youtube_utils.data_api_call_count += 1
+    state.data_api_call_count += 1
     resp = youtube_data_client.channels().list(
         part="snippet,contentDetails,statistics",
         mine=True
@@ -196,7 +195,7 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     Returns:
         Dictionary containing comprehensive channel analytics
     """
-    youtube_utils.analytics_api_call_count += 1
+    state.analytics_api_call_count += 1
     end = end_date or datetime.today().strftime('%Y-%m-%d')
     
     all_metrics = ["views","comments","likes","dislikes","shares",
@@ -213,7 +212,7 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
         info = _parse_analytics_response(resp, all_metrics, dimensions)
     except Exception as e:
         bt.logging.warning(f"Revenue metrics failed, retrying without them: {_format_error(e)}")
-        youtube_utils.analytics_api_call_count += 1
+        state.analytics_api_call_count += 1
         core_metrics = all_metrics[:-2]  # Remove revenue metrics
         resp = youtube_analytics_client.reports().query(
             ids="channel==MINE", startDate=start_date, endDate=end,

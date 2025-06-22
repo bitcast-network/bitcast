@@ -3,10 +3,11 @@ import bittensor as bt
 from datetime import datetime, timedelta
 import time
 
-from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.socials.youtube.utils import state
+from bitcast.validator.socials.youtube.api.video import get_all_uploads
 from bitcast.validator.socials.youtube.api import initialize_youtube_clients, get_channel_data, get_channel_analytics
 from bitcast.validator.socials.youtube.utils import channel_briefs_filter, check_subscriber_range, _format_error
-from bitcast.validator.socials.youtube.youtube_evaluation import (
+from bitcast.validator.socials.youtube.evaluation import (
     vet_channel,
     vet_videos,
     calculate_video_score
@@ -34,7 +35,7 @@ def eval_youtube(creds, briefs):
     # Initialize the result structure and get API clients
     result, youtube_data_client, youtube_analytics_client = initialize_youtube_evaluation(creds, briefs)
     # Reset API call counters for this token evaluation
-    youtube_utils.reset_api_call_counts()
+    state.reset_api_call_counts()
     openai_client_module.reset_openai_request_count()
     start = time.perf_counter()
     
@@ -44,8 +45,8 @@ def eval_youtube(creds, briefs):
         # Attach API call counts on early exit
         elapsed = time.perf_counter() - start
         result["performance_stats"] = {
-            "data_api_calls": youtube_utils.data_api_call_count,
-            "analytics_api_calls": youtube_utils.analytics_api_call_count,
+            "data_api_calls": state.data_api_call_count,
+            "analytics_api_calls": state.analytics_api_call_count,
             "openai_requests": openai_client_module.openai_request_count,
             "evaluation_time": elapsed
         }
@@ -65,8 +66,8 @@ def eval_youtube(creds, briefs):
         # Attach API call counts on early exit
         elapsed = time.perf_counter() - start
         result["performance_stats"] = {
-            "data_api_calls": youtube_utils.data_api_call_count,
-            "analytics_api_calls": youtube_utils.analytics_api_call_count,
+            "data_api_calls": state.data_api_call_count,
+            "analytics_api_calls": state.analytics_api_call_count,
             "openai_requests": openai_client_module.openai_request_count,
             "evaluation_time_s": elapsed
         }
@@ -79,8 +80,8 @@ def eval_youtube(creds, briefs):
     # Attach performance stats to result after full evaluation
     elapsed = time.perf_counter() - start
     result["performance_stats"] = {
-        "data_api_calls": youtube_utils.data_api_call_count,
-        "analytics_api_calls": youtube_utils.analytics_api_call_count,
+        "data_api_calls": state.data_api_call_count,
+        "analytics_api_calls": state.analytics_api_call_count,
         "openai_requests": openai_client_module.openai_request_count,
         "evaluation_time_s": elapsed
     }
@@ -124,7 +125,7 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
 def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
     """Process videos, calculate scores, and update the result structure."""
     try:
-        video_ids = youtube_utils.get_all_uploads(youtube_data_client, YT_LOOKBACK)
+        video_ids = get_all_uploads(youtube_data_client, YT_LOOKBACK)
         
         # Vet videos and store the results
         video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
@@ -213,6 +214,4 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         if match:
             brief_id = briefs[i]["id"]
             result["scores"][brief_id] += video_score
-            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}")
-
-# check_subscriber_range and channel_briefs_filter functions now imported from utils.filters
+            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}") 
