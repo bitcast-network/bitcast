@@ -1,4 +1,3 @@
-import asyncio
 import bittensor as bt
 from datetime import datetime, timedelta
 import time
@@ -6,7 +5,7 @@ import time
 from bitcast.validator.socials.youtube.utils import state
 from bitcast.validator.socials.youtube.api.video import get_all_uploads
 from bitcast.validator.socials.youtube.api import initialize_youtube_clients, get_channel_data, get_channel_analytics
-from bitcast.validator.socials.youtube.utils import channel_briefs_filter, check_subscriber_range, _format_error
+from bitcast.validator.socials.youtube.utils import channel_briefs_filter, _format_error
 from bitcast.validator.socials.youtube.evaluation import (
     vet_channel,
     vet_videos,
@@ -21,9 +20,7 @@ from bitcast.validator.utils.config import (
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
     YT_LOOKBACK,
-    ECO_MODE
-)
-from bitcast.validator.utils.config import (
+    ECO_MODE,
     RAPID_API_KEY
 )
 

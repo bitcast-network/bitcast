@@ -1,6 +1,6 @@
 import bittensor as bt
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 from tenacity import retry, stop_after_attempt, wait_fixed
 from googleapiclient.errors import HttpError
@@ -89,7 +89,7 @@ def get_all_uploads(youtube, max_age_days: int = 365):
       2. If we hit the rare invalidPageToken bug, fall back to search.list.
     """
     from ..utils import state
-    cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
     cutoff_iso = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # 1) cheap path ----------------------------------------------------------
@@ -121,7 +121,7 @@ def get_all_uploads(youtube, max_age_days: int = 365):
         for item in resp["items"]:
             pub = datetime.strptime(
                 item["snippet"]["publishedAt"], "%Y-%m-%dT%H:%M:%SZ"
-            )
+            ).replace(tzinfo=timezone.utc)
             if pub < cutoff:
                 bt.logging.info(
                     f"Found {len(vids)} uploads in last {max_age_days} days (playlist)"
