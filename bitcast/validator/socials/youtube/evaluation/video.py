@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from bitcast.validator.socials.youtube.utils import state, _format_error
 from bitcast.validator.socials.youtube.api.video import get_video_data_batch, get_video_analytics
-from bitcast.validator.socials.youtube.api.transcript import get_video_transcript
+from bitcast.validator.socials.youtube.api.transcript import get_video_transcript as fetch_video_transcript_api
 from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
 from bitcast.validator.utils.config import (
     YT_MIN_VIDEO_RETENTION,
@@ -369,7 +369,7 @@ def get_video_transcript(video_id, video_data):
     transcript = video_data.get("transcript") # transcript will only be in video_data for test runs
     if transcript is None:
         try:
-            transcript = get_video_transcript(video_id, RAPID_API_KEY)
+            transcript = fetch_video_transcript_api(video_id, RAPID_API_KEY)
         except Exception as e:
             bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {_format_error(e)}")
             transcript = None
