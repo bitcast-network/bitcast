@@ -6,6 +6,8 @@ venv_bitcast/
 *.pkl
 cache_directory/
 cache/
+# But we want to include the YouTube cache source code (not the data)
+!bitcast/validator/socials/youtube/cache/
 client_secret.json
 nodes.json
 wandb/
