@@ -257,12 +257,14 @@ def add_metagraph_info_to_stats(metagraph, uid: int, yt_stats: dict) -> None:
         stake = float(metagraph.S[uid])
         alpha_stake = float(metagraph.alpha_stake[uid]) if hasattr(metagraph, 'alpha_stake') else 0.0
         coldkey = str(metagraph.coldkeys[uid]) if hasattr(metagraph, 'coldkeys') and uid < len(metagraph.coldkeys) else ""
+        emission = float(metagraph.emission[uid]) if hasattr(metagraph, 'emission') else 0.0
 
         yt_stats["metagraph"] = {
             # Stake information
             "stake": stake,
             "alpha_stake": alpha_stake,
             "coldkey": coldkey,
+            "emission": emission
         }
 
     except Exception as e:
