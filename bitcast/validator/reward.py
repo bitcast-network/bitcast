@@ -78,7 +78,8 @@ def reward(uid, briefs, response) -> dict:
                         yt_stats[account_id] = {
                             "yt_account": account_stats.get("yt_account", {}),
                             "videos": account_stats.get("videos", {}),
-                            "scores": account_stats.get("scores", {brief["id"]: 0.0 for brief in briefs})
+                            "scores": account_stats.get("scores", {brief["id"]: 0.0 for brief in briefs}),
+                            "performance_stats": account_stats.get("performance_stats", {})
                         }
                         
                         # Aggregate scores across accounts
@@ -91,7 +92,8 @@ def reward(uid, briefs, response) -> dict:
                         yt_stats[account_id] = {
                             "yt_account": {},
                             "videos": {},
-                            "scores": {brief["id"]: 0.0 for brief in briefs}
+                            "scores": {brief["id"]: 0.0 for brief in briefs},
+                            "performance_stats": {}
                         }
                 else:
                     bt.logging.warning(f"Empty token found at index {i} for UID {uid}")
