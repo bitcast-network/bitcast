@@ -11,3 +11,4 @@ nodes.json
 wandb/
 *.egg-info/
 build/
+.cursor/
