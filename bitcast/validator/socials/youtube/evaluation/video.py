@@ -1,87 +1,40 @@
+"""
+Video evaluation logic for YouTube validation.
+
+This module contains functions for vetting YouTube videos against various criteria
+including privacy status, publish date, retention rates, captions, prompt injection,
+and brief matching.
+"""
+
 import bittensor as bt
 from datetime import datetime, timedelta
-from bitcast.validator.socials.youtube import youtube_utils
-from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
-from bitcast.validator.utils.config import (
-    YT_MIN_SUBS, 
-    YT_MAX_SUBS,
-    YT_MIN_CHANNEL_AGE, 
-    YT_MIN_CHANNEL_RETENTION, 
-    YT_MIN_VIDEO_RETENTION, 
-    YT_REWARD_DELAY,
-    YT_ROLLING_WINDOW,
-    DISCRETE_MODE,
-    RAPID_API_KEY,
-    YT_MIN_MINS_WATCHED,
-    YT_LOOKBACK,
-    YT_VIDEO_RELEASE_BUFFER,
-    ECO_MODE,
-    BITCAST_BLACKLIST_SOURCES_ENDPOINT
-)
-from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics
-from bitcast.validator.utils.blacklist import is_blacklisted, get_blacklist_sources
-import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def vet_channel(channel_data, channel_analytics):
-    bt.logging.info(f"Checking channel")
+from bitcast.validator.socials.youtube.utils import state, _format_error
+from bitcast.validator.socials.youtube.api.video import get_video_data_batch, get_video_analytics
+from bitcast.validator.socials.youtube.api.transcript import get_video_transcript as fetch_video_transcript_api
+from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
+from bitcast.validator.utils.config import (
+    YT_MIN_VIDEO_RETENTION,
+    YT_VIDEO_RELEASE_BUFFER,
+    ECO_MODE,
+    DISCRETE_MODE,
+    RAPID_API_KEY
+)
+from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics
 
-    # Check if channel is blacklisted
-    if is_blacklisted(channel_data["bitcastChannelId"]):
-        bt.logging.warning(f"Channel is blacklisted: {channel_data['bitcastChannelId']}")
-        return False, True  # Return (vet_result, blacklisted)
-
-    # Calculate channel age
-    channel_age_days = calculate_channel_age(channel_data)
-    
-    # Check if channel meets the criteria
-    criteria_met = check_channel_criteria(channel_data, channel_analytics, channel_age_days)
-    
-    if criteria_met:
-        bt.logging.info(f"Channel Evaluation Passed")
-        return True, False  # Return (vet_result, blacklisted)
-    else:
-        bt.logging.info(f"Channel Evaluation Failed")
-        return False, False  # Return (vet_result, blacklisted)
-
-def calculate_channel_age(channel_data):
-    """Calculate the age of the channel in days."""
-    # youtube returns inconsistent date formats
-    try:
-        channel_start_date = datetime.strptime(channel_data["channel_start"], '%Y-%m-%dT%H:%M:%S.%fZ')
-    except ValueError:
-        channel_start_date = datetime.strptime(channel_data["channel_start"], '%Y-%m-%dT%H:%M:%SZ')
-
-    return (datetime.now() - channel_start_date).days
-
-def check_channel_criteria(channel_data, channel_analytics, channel_age_days):
-    """Check if the channel meets all the required criteria."""
-    criteria_met = True
-
-    if channel_age_days < YT_MIN_CHANNEL_AGE:
-        bt.logging.warning(f"Channel age check failed: {channel_data['bitcastChannelId']}. {channel_age_days} < {YT_MIN_CHANNEL_AGE}")
-        criteria_met = False
-
-    if int(channel_data["subCount"]) < YT_MIN_SUBS:
-        bt.logging.warning(f"Subscriber count check failed: {channel_data['bitcastChannelId']}. {channel_data['subCount']} < {YT_MIN_SUBS}.")
-        criteria_met = False
-
-    if int(channel_data["subCount"]) > YT_MAX_SUBS:
-        bt.logging.warning(f"Subscriber count check failed: {channel_data['bitcastChannelId']}. {channel_data['subCount']} > {YT_MAX_SUBS}.")
-        criteria_met = False
-
-    if float(channel_analytics["averageViewPercentage"]) < YT_MIN_CHANNEL_RETENTION:
-        bt.logging.warning(f"Avg retention check failed (last {YT_LOOKBACK} days): {channel_data['bitcastChannelId']}. {channel_analytics['averageViewPercentage']} < {YT_MIN_CHANNEL_RETENTION}%.")
-        criteria_met = False
-        
-    if float(channel_analytics["estimatedMinutesWatched"]) < YT_MIN_MINS_WATCHED:
-        bt.logging.warning(f"Minutes watched check failed (last {YT_LOOKBACK} days): {channel_data['bitcastChannelId']}. {channel_analytics['estimatedMinutesWatched']} < {YT_MIN_MINS_WATCHED}.")
-        criteria_met = False
-
-    return criteria_met
 
 def get_video_analytics_batch(youtube_analytics_client, video_ids):
-    """Get analytics data for all videos in batch."""
+    """
+    Get analytics data for all videos in batch.
+    
+    Args:
+        youtube_analytics_client: YouTube Analytics API client
+        video_ids (list): List of video IDs to get analytics for
+        
+    Returns:
+        dict: Dictionary mapping video_id to analytics data
+    """
     video_analytics_dict = {}
     
     # Get all metrics from config using the helper function
@@ -90,15 +43,28 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids):
     for video_id in video_ids:
         try:
             # Get all analytics in a single call
-            video_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
+            video_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
             video_analytics_dict[video_id] = video_analytics
         except Exception as e:
-            bt.logging.error(f"Error getting analytics for video {video_id}: {youtube_utils._format_error(e)}")
+            bt.logging.error(f"Error getting analytics for video {video_id}: {_format_error(e)}")
             video_analytics_dict[video_id] = {}
     
     return video_analytics_dict
 
+
 def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client):
+    """
+    Vet multiple videos against briefs and return results.
+    
+    Args:
+        video_ids (list): List of video IDs to evaluate
+        briefs (list): List of brief dictionaries to evaluate against
+        youtube_data_client: YouTube Data API client
+        youtube_analytics_client: YouTube Analytics API client
+        
+    Returns:
+        tuple: (results, video_data_dict, video_analytics_dict, video_decision_details)
+    """
     results = {}
     video_data_dict = {}  # Store video data for all videos
     video_analytics_dict = {}  # Store video analytics for all videos
@@ -107,7 +73,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     import time
     
     start_time = time.time()
-    video_data_dict = youtube_utils.get_video_data_batch(youtube_data_client, video_ids, DISCRETE_MODE)
+    video_data_dict = get_video_data_batch(youtube_data_client, video_ids, DISCRETE_MODE)
     bt.logging.info(f"Video data batch fetch took {time.time() - start_time:.2f} seconds")
 
     start_time = time.time()
@@ -117,7 +83,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     for video_id in video_ids:
         try:
             # Check if video has already been scored
-            if youtube_utils.is_video_already_scored(video_id):
+            if state.is_video_already_scored(video_id):
                 results[video_id] = [False] * len(briefs)
                 continue
             
@@ -138,20 +104,32 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
             )
             
             # Only mark the video as scored if processing was successful
-            youtube_utils.mark_video_as_scored(video_id)
+            state.mark_video_as_scored(video_id)
             
         except Exception as e:
-            bt.logging.error(f"Error evaluating video {youtube_utils._format_error(e)}")
+            bt.logging.error(f"Error evaluating video {_format_error(e)}")
             # Mark this video as not matching any briefs
             results[video_id] = [False] * len(briefs)
             # Don't mark the video as scored if there was an error
 
     return results, video_data_dict, video_analytics_dict, video_decision_details
 
+
 def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analytics_client, 
                          results, video_data, video_analytics, video_decision_details):
-    """Process the vetting of a single video."""
-
+    """
+    Process the vetting of a single video.
+    
+    Args:
+        video_id (str): Video ID to process
+        briefs (list): List of brief dictionaries
+        youtube_data_client: YouTube Data API client
+        youtube_analytics_client: YouTube Analytics API client
+        results (dict): Results dictionary to update
+        video_data (dict): Video metadata
+        video_analytics (dict): Video analytics data
+        video_decision_details (dict): Decision details dictionary to update
+    """
     # Get decision details for the video
     vet_result = vet_video(video_id, briefs, video_data, video_analytics)
     decision_details = vet_result["decision_details"]
@@ -162,7 +140,7 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
     if not ECO_MODE and decision_details.get("anyBriefMatched", False):
         bt.logging.info(f"Fetching advanced metrics.")
         advanced_metrics = get_advanced_metrics()
-        advanced_analytics = youtube_utils.get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
+        advanced_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=advanced_metrics)
         video_analytics.update(advanced_analytics)
     
     valid_checks = [check for check in decision_details["contentAgainstBriefCheck"] if check is not None]
@@ -170,6 +148,18 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
 
 
 def vet_video(video_id, briefs, video_data, video_analytics):
+    """
+    Vet a single video against all criteria and briefs.
+    
+    Args:
+        video_id (str): Video ID
+        briefs (list): List of brief dictionaries to evaluate against
+        video_data (dict): Video metadata
+        video_analytics (dict): Video analytics data
+        
+    Returns:
+        dict: Dictionary containing met_brief_ids, decision_details, and brief_reasonings
+    """
     bt.logging.info(f"=== Evaluating video: {video_data['bitcastVideoId']} ===")
     
     # Initialize decision details structure
@@ -240,8 +230,14 @@ def vet_video(video_id, briefs, video_data, video_analytics):
     # Return the final result
     return {"met_brief_ids": met_brief_ids, "decision_details": decision_details, "brief_reasonings": brief_reasonings}
 
+
 def initialize_decision_details():
-    """Initialize the decision details structure."""
+    """
+    Initialize the decision details structure.
+    
+    Returns:
+        dict: Empty decision details structure
+    """
     return {
         "averageViewPercentageCheck": None,
         "manualCaptionsCheck": None,
@@ -252,8 +248,18 @@ def initialize_decision_details():
         "video_vet_result": True
     }
 
+
 def check_video_privacy(video_data, decision_details):
-    """Check if the video is public."""
+    """
+    Check if the video is public.
+    
+    Args:
+        video_data (dict): Video metadata
+        decision_details (dict): Decision details to update
+        
+    Returns:
+        bool: True if video is public, False otherwise
+    """
     if video_data.get("privacyStatus") != "public":
         bt.logging.warning(f"Video is not public")
         decision_details["publicVideo"] = False
@@ -262,8 +268,19 @@ def check_video_privacy(video_data, decision_details):
         decision_details["publicVideo"] = True
         return True
 
+
 def check_video_publish_date(video_data, briefs, decision_details):
-    """Check if the video was published after the earliest brief's start date (minus buffer days)."""
+    """
+    Check if the video was published after the earliest brief's start date (minus buffer days).
+    
+    Args:
+        video_data (dict): Video metadata containing publishedAt
+        briefs (list): List of brief dictionaries with start_date
+        decision_details (dict): Decision details to update
+        
+    Returns:
+        bool: True if publish date is valid, False otherwise
+    """
     try:
         video_publish_date = datetime.strptime(video_data["publishedAt"], '%Y-%m-%dT%H:%M:%SZ').date()
 
@@ -294,8 +311,19 @@ def check_video_publish_date(video_data, briefs, decision_details):
         decision_details["publishDateCheck"] = False
         return False
 
+
 def check_video_retention(video_data, video_analytics, decision_details):
-    """Check if the video meets the minimum retention criteria."""
+    """
+    Check if the video meets the minimum retention criteria.
+    
+    Args:
+        video_data (dict): Video metadata
+        video_analytics (dict): Video analytics data
+        decision_details (dict): Decision details to update
+        
+    Returns:
+        bool: True if retention is sufficient, False otherwise
+    """
     averageViewPercentage = float(video_analytics.get("averageViewPercentage", -1))
     if averageViewPercentage < YT_MIN_VIDEO_RETENTION:
         bt.logging.info(f"Avg retention check failed for video: {video_data['bitcastVideoId']}. {averageViewPercentage} <= {YT_MIN_VIDEO_RETENTION}%.")
@@ -305,8 +333,19 @@ def check_video_retention(video_data, video_analytics, decision_details):
         decision_details["averageViewPercentageCheck"] = True
         return True
 
+
 def check_manual_captions(video_id, video_data, decision_details):
-    """Check if the video has manual captions."""
+    """
+    Check if the video has manual captions.
+    
+    Args:
+        video_id (str): Video ID
+        video_data (dict): Video metadata
+        decision_details (dict): Decision details to update
+        
+    Returns:
+        bool: True if no manual captions (passes check), False if has manual captions
+    """
     if video_data.get("caption"):
         bt.logging.info(f"Manual captions detected for video: {video_data['bitcastVideoId']} - skipping eval")
         decision_details["manualCaptionsCheck"] = False
@@ -315,14 +354,24 @@ def check_manual_captions(video_id, video_data, decision_details):
         decision_details["manualCaptionsCheck"] = True
         return True
 
+
 def get_video_transcript(video_id, video_data):
-    """Get the video transcript."""
+    """
+    Get the video transcript.
+    
+    Args:
+        video_id (str): Video ID
+        video_data (dict): Video metadata
+        
+    Returns:
+        str or None: Video transcript if available, None otherwise
+    """
     transcript = video_data.get("transcript") # transcript will only be in video_data for test runs
     if transcript is None:
         try:
-            transcript = youtube_utils.get_video_transcript(video_id, RAPID_API_KEY)
+            transcript = fetch_video_transcript_api(video_id, RAPID_API_KEY)
         except Exception as e:
-            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {youtube_utils._format_error(e)}")
+            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {_format_error(e)}")
             transcript = None
 
     if transcript is None:
@@ -331,8 +380,20 @@ def get_video_transcript(video_id, video_data):
         
     return str(transcript)
 
+
 def check_prompt_injection(video_id, video_data, transcript, decision_details):
-    """Check if the video contains prompt injection."""
+    """
+    Check if the video contains prompt injection.
+    
+    Args:
+        video_id (str): Video ID
+        video_data (dict): Video metadata
+        transcript (str): Video transcript
+        decision_details (dict): Decision details to update
+        
+    Returns:
+        bool: True if no prompt injection detected, False otherwise
+    """
     if check_for_prompt_injection(video_data["description"], transcript):
         bt.logging.warning(f"Prompt injection detected for video: {video_data['bitcastVideoId']} - skipping eval")
         decision_details["promptInjectionCheck"] = False
@@ -341,8 +402,20 @@ def check_prompt_injection(video_id, video_data, transcript, decision_details):
         decision_details["promptInjectionCheck"] = True
         return True
 
+
 def evaluate_content_against_briefs(briefs, video_data, transcript, decision_details):
-    """Evaluate the video content against each brief concurrently."""
+    """
+    Evaluate the video content against each brief concurrently.
+    
+    Args:
+        briefs (list): List of brief dictionaries
+        video_data (dict): Video metadata
+        transcript (str): Video transcript
+        decision_details (dict): Decision details to update
+        
+    Returns:
+        tuple: (met_brief_ids, reasonings)
+    """
     met_brief_ids = []
     reasonings = []
     
@@ -379,7 +452,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                     met_brief_ids.append(brief["id"])
                 # Note: Individual brief completion logs will appear from OpenaiClient
             except Exception as e:
-                bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {youtube_utils._format_error(e)}")
+                bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {_format_error(e)}")
                 brief_results[brief_index] = False
                 brief_reasonings[brief_index] = f"Error during evaluation: {str(e)}"
     
@@ -387,98 +460,4 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
     decision_details["contentAgainstBriefCheck"].extend(brief_results)
     reasonings = brief_reasonings
             
-    return met_brief_ids, reasonings
-
-def calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources, ext_url_lifetime_data):
-    """Calculate what proportion of lifetime EXT_URL traffic comes from blacklisted sources."""    
-    
-    if not ext_url_lifetime_data:
-        return 0.0
-
-    # Sum up all EXT_URL minutes across all days from the daily traffic source data
-    traffic_source_minutes = analytics_result.get("trafficSourceMinutes", {})
-    total_ext_url_minutes = sum(
-        minutes for key, minutes in traffic_source_minutes.items() 
-        if key.startswith("EXT_URL|")
-    )
-    
-    blacklisted_ext_url_minutes = sum(
-        ext_url_lifetime_data.get(url, 0)
-        for url in blacklisted_sources
-    )
-    
-    blacklisted_ext_url_proportion = blacklisted_ext_url_minutes / total_ext_url_minutes if total_ext_url_minutes > 0 else 0.0
-
-    if blacklisted_ext_url_proportion > 0:
-        bt.logging.info(f"Blacklisted EXT_URL proportion: {blacklisted_ext_url_proportion}")
-        
-    return blacklisted_ext_url_proportion
-
-def get_scorable_minutes(day_data, blacklisted_sources, blacklisted_ext_url_proportion):
-    """Calculate minutes watched excluding blacklisted sources for a given day."""
-    traffic_source_minutes = day_data.get('trafficSourceMinutes', {})
-    
-    if not traffic_source_minutes:
-        return day_data.get('estimatedMinutesWatched', 0)
-    
-    total_minutes = sum(traffic_source_minutes.values())
-    
-    # Calculate minutes from blacklisted traffic sources (excluding EXT_URL for now)
-    blacklisted_traffic_minutes = sum(
-        traffic_source_minutes.get(source, 0) 
-        for source in blacklisted_sources
-        if source != "EXT_URL"  # Handle EXT_URL separately
-    )
-    
-    # Handle EXT_URL traffic using the calculated proportion
-    ext_url_daily_minutes = traffic_source_minutes.get('EXT_URL', 0)
-    blacklisted_ext_url_daily_minutes = ext_url_daily_minutes * blacklisted_ext_url_proportion
-    
-    return max(0, total_minutes - blacklisted_traffic_minutes - blacklisted_ext_url_daily_minutes)
-
-def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, existing_analytics):
-    """Calculate the score for a video based on analytics data."""
-    # Use video publish date as query start date if provided, otherwise use default
-    try:
-        publish_datetime = datetime.strptime(video_publish_date, '%Y-%m-%dT%H:%M:%SZ')
-        query_start_date = publish_datetime.strftime('%Y-%m-%d')
-    except (ValueError, TypeError):
-        bt.logging.warning(f"Failed to parse video publish date: {video_publish_date}, using default")
-        query_start_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
-    
-    start_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1)).strftime('%Y-%m-%d')
-    end_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY)).strftime('%Y-%m-%d')
-    today = datetime.now().strftime('%Y-%m-%d')
-
-    # Get daily metrics from config
-    metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=True)    
-    analytics_result = youtube_utils.get_video_analytics(
-        youtube_analytics_client, 
-        video_id, 
-        query_start_date,
-        today, 
-        metric_dims=metric_dims
-    )
-    
-    daily_analytics = sorted(analytics_result.get("day_metrics", {}).values(), key=lambda x: x.get("day", ""))
-    
-    # Get blacklist sources once and reuse
-    blacklisted_sources = get_blacklist_sources()
-    
-    # Get EXT_URL lifetime data from existing analytics and calculate the proportion
-    ext_url_lifetime_data = existing_analytics.get("insightTrafficSourceDetail_EXT_URL", {})
-    blacklisted_ext_url_proportion = calculate_blacklisted_ext_url_proportion(analytics_result, blacklisted_sources, ext_url_lifetime_data)
-
-    # Compute scorableMins once per day
-    for item in daily_analytics:
-        item['scorableMins'] = get_scorable_minutes(item, blacklisted_sources, blacklisted_ext_url_proportion)
-
-    # Calculate score and history using pre-computed scorableMins
-    score = sum(item['scorableMins'] for item in daily_analytics if start_date <= item.get('day', '') <= end_date)
-    scorableHistoryMins = sum(item['scorableMins'] for item in daily_analytics if item.get('day', '') <= end_date)
-
-    return {
-        "score": score,
-        "scorableHistoryMins": scorableHistoryMins,
-        "daily_analytics": daily_analytics
-    } 
+    return met_brief_ids, reasonings 

@@ -19,18 +19,20 @@ from unittest.mock import patch, MagicMock
 
 # Patch environment variables before importing modules
 with patch.dict('os.environ', {'DISABLE_LLM_CACHING': 'true'}):
-    from bitcast.validator.socials.youtube.youtube_evaluation import (
+    from bitcast.validator.socials.youtube.evaluation import (
         vet_channel,
         vet_videos,
         calculate_video_score
     )
-    from bitcast.validator.socials.youtube.youtube_utils import (
+    from bitcast.validator.socials.youtube.api.channel import (
         get_channel_data,
-        get_channel_analytics,
-        get_video_analytics,
-        get_all_uploads,
-        reset_scored_videos
+        get_channel_analytics
     )
+    from bitcast.validator.socials.youtube.api.video import (
+        get_video_analytics,
+        get_all_uploads
+    )
+    from bitcast.validator.socials.youtube.utils.state import reset_scored_videos
     from bitcast.validator.reward import reward
     from google.oauth2.credentials import Credentials
     from bitcast.validator.utils.config import (
@@ -90,6 +92,8 @@ class MockYouTubeDataClient:
                         },
                         "statistics": {
                             "subscriberCount": str(YT_MIN_SUBS + 1000),
+                            "viewCount": "50000",
+                            "videoCount": "25"
                         },
                         "contentDetails": {
                             "relatedPlaylists": {
@@ -102,47 +106,66 @@ class MockYouTubeDataClient:
 
     def _create_playlist_items(self):
         class PlaylistItems:
-            def list(self, playlistId=None, part=None, maxResults=None, pageToken=None):
+            def list(self, playlistId=None, part=None, maxResults=None, pageToken=None, fields=None, **kwargs):
                 return MockResponse({
                     "items": [
                         {
                             "snippet": {
-                                "publishedAt": (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                                "resourceId": {
-                                    "videoId": f"mock_video_{i}"
-                                }
+                                "publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                            },
+                            "contentDetails": {
+                                "videoId": "test_video_1"
                             }
-                        } for i in range(5)
+                        },
+                        {
+                            "snippet": {
+                                "publishedAt": (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                            },
+                            "contentDetails": {
+                                "videoId": "test_video_2"
+                            }
+                        }
                     ],
                     "nextPageToken": None
                 })
+            
+            def list_next(self, request, previous_response):
+                return None  # No more pages
+                
         return PlaylistItems()
 
     def _create_videos(self):
         class Videos:
             def list(self, part=None, id=None):
-                return MockResponse({
-                    "items": [{
-                        "id": "mock_video_1",
-                        "snippet": {
-                            "title": "Mock Video",
-                            "description": "Mock Description",
-                            "publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
-                        },
-                        "statistics": {
-                            "viewCount": "1000",
-                            "likeCount": "100",
-                            "commentCount": "50"
-                        },
-                        "contentDetails": {
-                            "duration": "PT10M",
-                            "caption": "false"
-                        },
-                        "status": {
-                            "privacyStatus": "public"
-                        }
-                    }]
-                })
+                # Handle batch requests with multiple IDs
+                video_ids = id.split(',') if id else ["test_video_1", "test_video_2"]
+                items = []
+                
+                for vid_id in video_ids:
+                    if vid_id in ["test_video_1", "test_video_2"]:
+                        items.append({
+                            "id": vid_id,
+                            "snippet": {
+                                "title": f"Mock Video {vid_id}",
+                                "description": f"Mock Description for {vid_id}",
+                                "publishedAt": (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+                            },
+                            "statistics": {
+                                "viewCount": "1000",
+                                "likeCount": "100",
+                                "commentCount": "50"
+                            },
+                            "contentDetails": {
+                                "duration": "PT10M",
+                                "caption": "false"
+                            },
+                            "status": {
+                                "privacyStatus": "public"
+                            },
+                            "transcript": f"This is a test transcript for {vid_id}"
+                        })
+                
+                return MockResponse({"items": items})
         return Videos()
 
 class MockYouTubeAnalyticsClient:
@@ -155,7 +178,7 @@ class MockYouTubeAnalyticsClient:
 
     def _create_reports(self):
         class Reports:
-            def query(self, ids=None, startDate=None, endDate=None, dimensions=None, metrics=None, filters=None):
+            def query(self, ids=None, startDate=None, endDate=None, dimensions=None, metrics=None, filters=None, maxResults=None, sort=None, **kwargs):
                 # Static base metrics
                 base_metrics = [
                     10000,                          # views
@@ -180,19 +203,21 @@ class MockYouTubeAnalyticsClient:
                     })
                 elif dimensions == "day":
                     days = []
-                    start = datetime.strptime(startDate, '%Y-%m-%d')
-                    end = datetime.strptime(endDate, '%Y-%m-%d')
-                    current = start
-                    while current <= end:
+                    # Generate dates within the scoring window for better test results
+                    today = datetime.now()
+                    # Use dates that will be within scoring window (today-4 and today-5)
+                    scoring_day1 = today - timedelta(days=YT_REWARD_DELAY + 1)  # today-4
+                    scoring_day2 = today - timedelta(days=YT_REWARD_DELAY + 2)  # today-5
+                    
+                    for day in [scoring_day2, scoring_day1]:  # Add in chronological order
                         day_data = [
-                            current.strftime('%Y-%m-%d'),
+                            day.strftime('%Y-%m-%d'),
                             500,  # estimatedMinutesWatched
                             250,  # views
                             10,   # subscribersGained
                             2     # subscribersLost
                         ]
                         days.append(day_data)
-                        current += timedelta(days=1)
                     return MockResponse({"rows": days})
                 elif dimensions == "insightTrafficSourceType":
                     return MockResponse({
@@ -235,20 +260,20 @@ def mock_credentials():
 
 @pytest.fixture(autouse=True)
 def reset_scored_videos():
-    from bitcast.validator.socials.youtube.youtube_utils import reset_scored_videos as reset_func
+    from bitcast.validator.socials.youtube.utils.state import reset_scored_videos as reset_func
     reset_func()
     yield
 
 @pytest.mark.asyncio
-@patch('bitcast.validator.socials.youtube.youtube_scoring.build')
+@patch('bitcast.validator.socials.youtube.api.clients.build')
 @patch('bitcast.validator.utils.blacklist.get_blacklist')
 @patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_data')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_channel_analytics')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_all_uploads')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_data_batch')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics')
-@patch('bitcast.validator.socials.youtube.youtube_utils.get_video_transcript')
+@patch('bitcast.validator.socials.youtube.api.channel.get_channel_data')
+@patch('bitcast.validator.socials.youtube.api.channel.get_channel_analytics')
+@patch('bitcast.validator.socials.youtube.api.video.get_all_uploads')
+@patch('bitcast.validator.socials.youtube.api.video.get_video_data_batch')
+@patch('bitcast.validator.socials.youtube.api.video.get_video_analytics')
+@patch('bitcast.validator.socials.youtube.api.transcript.get_video_transcript')
 @patch('bitcast.validator.clients.OpenaiClient._make_openai_request')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 async def test_reward_function(mock_make_openai_request, mock_get_transcript,
@@ -293,6 +318,7 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
     }
     
     mock_get_all_uploads.return_value = ["test_video_1", "test_video_2"]
+    logger.debug(f"DEBUG: mock_get_all_uploads will return: {['test_video_1', 'test_video_2']}")
     
     # Use single-video helper to build batch results
     def mock_get_video_data_side_effect(client, video_id, discrete_mode=False):
@@ -305,7 +331,17 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 "publishedAt": "2023-01-15T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for video 1",
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             },
             "test_video_2": {
                 "bitcastVideoId": "test_video_2",
@@ -314,22 +350,40 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 "publishedAt": "2023-01-16T00:00:00Z",
                 "duration": "PT10M",
                 "caption": False,
-                "privacyStatus": "public"
+                "privacyStatus": "public",
+                "transcript": "This is a test transcript for video 2", 
+                "contentDetails": {
+                    "duration": "PT10M",
+                    "caption": "false"
+                },
+                "statistics": {
+                    "viewCount": "1000",
+                    "likeCount": "100",
+                    "commentCount": "50"
+                }
             }
         }
+        logger.debug(f"DEBUG: mock_get_video_data_side_effect returning for {video_id}: {video_data[video_id]}")
         return video_data[video_id]
     
     def mock_get_video_data_batch_side_effect(client, video_ids, discrete_mode=False):
-        return {vid: mock_get_video_data_side_effect(client, vid) for vid in video_ids}
+        logger.debug(f"DEBUG: mock_get_video_data_batch_side_effect called with video_ids: {video_ids}")
+        result = {vid: mock_get_video_data_side_effect(client, vid) for vid in video_ids}
+        logger.debug(f"DEBUG: mock_get_video_data_batch_side_effect returning: {result}")
+        return result
     
     mock_get_video_data_batch.side_effect = mock_get_video_data_batch_side_effect
     
     # Note: The hardcoded dates (2023-01-15, 2023-01-16) in the mock data are not significant.
     def mock_get_video_analytics_side_effect(client, video_id, start_date=None, end_date=None, metric_dims=None, dimensions=None):
-        # Use dates relative to today to work with YT_REWARD_DELAY and YT_ROLLING_WINDOW from config
+        logger.debug(f"DEBUG: mock_get_video_analytics_side_effect called with video_id={video_id}, metric_dims={metric_dims}, dimensions={dimensions}")
+        # Use dates WITHIN the scoring window to ensure videos get scored
         today = datetime.now()
-        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')
-        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')
+        # Scoring window: start_date = today - (YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1) = today - 9
+        #                 end_date = today - YT_REWARD_DELAY = today - 3
+        # So we need dates between today-9 and today-3
+        day1 = (today - timedelta(days=YT_REWARD_DELAY + 1)).strftime('%Y-%m-%d')  # today-4 (within window)
+        day2 = (today - timedelta(days=YT_REWARD_DELAY + 2)).strftime('%Y-%m-%d')  # today-5 (within window)
         
         # Handle the new metric_dims parameter
         if metric_dims:
@@ -372,6 +426,7 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 
                 # Add the day_metrics structure
                 result["day_metrics"] = day_metrics
+                logger.debug(f"DEBUG: mock_get_video_analytics_side_effect returning (day_metrics): {result}")
                 return result
             
             # Check if this video meets briefs for non-day dimension case
@@ -393,6 +448,7 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                     else:
                         result[key] = 100  # Default value for other non-day metrics
             
+            logger.debug(f"DEBUG: mock_get_video_analytics_side_effect returning (non-day_metrics): {result}")
             return result
         
         # Legacy format support for backward compatibility
@@ -408,13 +464,18 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
                 }
             ]
         else:
-            return {
+            result = {
                 "averageViewPercentage": 50,
                 "estimatedMinutesWatched": 1000
             }
+            logger.debug(f"DEBUG: mock_get_video_analytics_side_effect returning (legacy): {result}")
+            return result
     
     mock_get_video_analytics.side_effect = mock_get_video_analytics_side_effect
-    mock_get_transcript.return_value = "This is a test transcript"
+    mock_get_transcript.return_value = {
+        "text": "This is a test transcript",
+        "language": "en"
+    }
     
     class MockResponse:
         def __init__(self, injection_detected=None, meets_brief=None):

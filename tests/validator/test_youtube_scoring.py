@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from bitcast.validator.socials.youtube.youtube_scoring import update_video_score, check_video_brief_matches, channel_briefs_filter, check_subscriber_range
+from bitcast.validator.socials.youtube.main import update_video_score, check_video_brief_matches
+from bitcast.validator.socials.youtube.utils import channel_briefs_filter, check_subscriber_range
 
 def test_update_video_score():
     # Setup
@@ -12,7 +13,7 @@ def test_update_video_score():
     video_matches = {}
     
     # Mock calculate_video_score to return different scores
-    with patch('bitcast.validator.socials.youtube.youtube_scoring.calculate_video_score') as mock_calculate:
+    with patch('bitcast.validator.socials.youtube.main.calculate_video_score') as mock_calculate:
         # Test case 1: First video with score 2, no advertising traffic (equivalent to scorable_proportion: 1.0)
         video_id_1 = "test_video_id_1"
         video_matches[video_id_1] = [True]  # Add to video_matches
@@ -235,8 +236,8 @@ def test_process_videos_empty_briefs():
     }
     
     # Mock the necessary functions
-    with patch('bitcast.validator.socials.youtube.youtube_scoring.youtube_utils.get_all_uploads') as mock_get_uploads, \
-         patch('bitcast.validator.socials.youtube.youtube_scoring.vet_videos') as mock_vet_videos:
+    with patch('bitcast.validator.socials.youtube.main.get_all_uploads') as mock_get_uploads, \
+         patch('bitcast.validator.socials.youtube.main.vet_videos') as mock_vet_videos:
         
         # Setup mock return values
         mock_get_uploads.return_value = ["video1", "video2"]
@@ -248,7 +249,7 @@ def test_process_videos_empty_briefs():
         )
         
         # Call the function
-        from bitcast.validator.socials.youtube.youtube_scoring import process_videos
+        from bitcast.validator.socials.youtube.main import process_videos
         result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
         
         # Verify the results
@@ -273,7 +274,7 @@ def test_update_video_score_with_blacklist_sources():
     result = {"videos": {}, "scores": {"test_brief": 0}}
     video_matches = {}
     
-    with patch('bitcast.validator.socials.youtube.youtube_scoring.calculate_video_score') as mock_calculate, \
+    with patch('bitcast.validator.socials.youtube.main.calculate_video_score') as mock_calculate, \
          patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
         
         # Test case 1: Multiple blacklisted traffic sources
@@ -305,8 +306,8 @@ def test_update_video_score_with_blacklist_sources():
 
 def test_calculate_video_score_ext_url_proportion():
     """Test the EXT_URL proportion calculation logic."""
-    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
-    
+    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+
     # Mock dependencies
     youtube_analytics_client = MagicMock()
     video_publish_date = "2023-01-01T00:00:00Z"
@@ -316,8 +317,8 @@ def test_calculate_video_score_ext_url_proportion():
             "spam-site.com": 60   # Blacklisted - 50% of total EXT_URL traffic
         }
     }
-    
-    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+
+    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
          patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
         
         # Test case 1: 50% of EXT_URL traffic is blacklisted
@@ -356,13 +357,13 @@ def test_calculate_video_score_ext_url_proportion():
 
 def test_calculate_video_score_no_ext_url_data():
     """Test EXT_URL proportion calculation when there's no EXT_URL lifetime data."""
-    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
-    
+    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+
     youtube_analytics_client = MagicMock()
     video_publish_date = "2023-01-01T00:00:00Z"
     existing_analytics = {}  # No EXT_URL data
-    
-    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+
+    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
          patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
         
         mock_blacklist.return_value = ["ADVERTISING", "spam-site.com"]
@@ -393,8 +394,8 @@ def test_calculate_video_score_no_ext_url_data():
 
 def test_calculate_video_score_empty_blacklist():
     """Test scoring when blacklist sources is empty."""
-    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
-    
+    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+
     youtube_analytics_client = MagicMock()
     video_publish_date = "2023-01-01T00:00:00Z"
     existing_analytics = {
@@ -403,8 +404,8 @@ def test_calculate_video_score_empty_blacklist():
             "site2.com": 20
         }
     }
-    
-    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+
+    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
          patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
         
         mock_blacklist.return_value = []  # Empty blacklist
@@ -434,8 +435,8 @@ def test_calculate_video_score_empty_blacklist():
 
 def test_calculate_video_score_all_ext_url_blacklisted():
     """Test scoring when all EXT_URL sources are blacklisted."""
-    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
-    
+    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+
     youtube_analytics_client = MagicMock()
     video_publish_date = "2023-01-01T00:00:00Z"
     existing_analytics = {
@@ -444,8 +445,8 @@ def test_calculate_video_score_all_ext_url_blacklisted():
             "spam2.com": 20   # Blacklisted - 100% of EXT_URL traffic is blacklisted
         }
     }
-    
-    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics, \
+
+    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
          patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist:
         
         mock_blacklist.return_value = ["ADVERTISING", "spam1.com", "spam2.com"]
@@ -476,7 +477,7 @@ def test_calculate_video_score_all_ext_url_blacklisted():
 @patch('bitcast.validator.utils.blacklist.get_blacklist_sources')
 def test_blacklist_sources_api_fallback(mock_blacklist):
     """Test that the system falls back gracefully when blacklist sources API fails."""
-    from bitcast.validator.socials.youtube.youtube_evaluation import calculate_video_score
+    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
     
     # Simulate API failure - should fall back to ["ADVERTISING"]
     mock_blacklist.return_value = ["ADVERTISING"]
@@ -485,7 +486,7 @@ def test_blacklist_sources_api_fallback(mock_blacklist):
     video_publish_date = "2023-01-01T00:00:00Z"
     existing_analytics = {}  # No EXT_URL data
     
-    with patch('bitcast.validator.socials.youtube.youtube_utils.get_video_analytics') as mock_analytics:
+    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics:
         mock_analytics.return_value = {
             "day_metrics": {
                 "2023-01-01": {
