@@ -173,7 +173,10 @@ async def get_rewards(
     scores_matrix = np.array(scores_matrix)
     
     state.reset_scored_videos()
-    rewards = normalise_scores(scores_matrix, yt_stats_list, briefs)
+    rewards, scaled_matrix = normalise_scores(scores_matrix, yt_stats_list, briefs)
+    
+    # Add scaled scores to each miner's stats
+    add_scaled_scores_to_stats(yt_stats_list, scaled_matrix, briefs)
 
     return rewards, yt_stats_list
 
@@ -184,11 +187,16 @@ def normalise_scores(scores_matrix, yt_stats_list, briefs):
     2. Normalize each miner's scores by the weighted number of briefs. Matrix should now sum to 1.
     3. Scale rewards to determine burn portions.
     4. Sum each miner's normalized and scaled scores to produce a final reward per miner.
+    
+    Returns:
+        tuple: (final_rewards, scaled_matrix_before_summing)
     """
     res = normalize_across_miners(scores_matrix)
     res = normalize_across_briefs(res, briefs)
-    res = scale_rewards(res, yt_stats_list, briefs)  # Apply scaling after normalization but before summing
-    return sum_scores(res)
+    scaled_matrix = scale_rewards(res, yt_stats_list, briefs)  # Apply scaling after normalization but before summing
+    final_rewards = sum_scores(scaled_matrix)
+    
+    return final_rewards, scaled_matrix
 
 def normalize_across_miners(scores_matrix):
     """
@@ -259,3 +267,21 @@ def add_metagraph_info_to_stats(metagraph, uid: int, yt_stats: dict) -> None:
 
     except Exception as e:
         bt.logging.error(f"Error getting metagraph info for UID {uid}: {e}")
+
+def add_scaled_scores_to_stats(yt_stats_list, scaled_matrix, briefs):
+    """
+    Add scaled scores per brief to each miner's stats.
+    
+    Args:
+        yt_stats_list: List of miner statistics dictionaries
+        scaled_matrix: Matrix from scale_rewards (miners x briefs)
+        briefs: List of brief dictionaries with IDs
+    """
+    for i, yt_stats in enumerate(yt_stats_list):
+        if i < len(scaled_matrix):  # Ensure we don't go out of bounds
+            scaled_scores_for_miner = scaled_matrix[i]
+            yt_stats["rewards"] = {
+                brief["id"]: float(scaled_scores_for_miner[j]) 
+                for j, brief in enumerate(briefs) 
+                if j < len(scaled_scores_for_miner)
+            }
