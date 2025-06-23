@@ -5,6 +5,8 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 
 # Import global state and helper functions from utils modules  
 from bitcast.validator.socials.youtube.utils import state, _format_error
+from bitcast.validator.utils.config import ECO_MODE
+from bitcast.validator.socials.youtube.config import get_channel_metrics, REVENUE_METRICS
 
 # Retry configuration for YouTube API calls
 YT_API_RETRY_CONFIG = {
@@ -183,14 +185,13 @@ def _parse_analytics_response(resp, metrics_list, dimensions=""):
     return dict(zip(metrics_list, rows[0]))
 
 @retry(**YT_API_RETRY_CONFIG) 
-def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, dimensions=""):
-    """Get comprehensive channel analytics including traffic sources.
+def get_channel_analytics(youtube_analytics_client, start_date, end_date=None):
+    """Get comprehensive channel analytics using configurable metrics.
     
     Args:
         youtube_analytics_client: YouTube Analytics API client
         start_date: Start date for analytics (YYYY-MM-DD)
         end_date: End date for analytics (YYYY-MM-DD), defaults to today
-        dimensions: Optional dimensions for grouping data
         
     Returns:
         Dictionary containing comprehensive channel analytics
@@ -198,69 +199,61 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None, d
     state.analytics_api_call_count += 1
     end = end_date or datetime.today().strftime('%Y-%m-%d')
     
-    all_metrics = ["views","comments","likes","dislikes","shares",
-                   "averageViewDuration","averageViewPercentage", 
-                   "subscribersGained","subscribersLost","estimatedMinutesWatched",
-                   "estimatedAdRevenue","playbackBasedCpm"]
+    # Get core metrics from config
+    metrics_config = get_channel_metrics(ECO_MODE)
+    core_metrics = [metric for _, (metric, dims, _, _, _) in metrics_config.items() if not dims]
     
-    # Try all metrics first, fallback to core metrics if revenue metrics fail
+    # Try all core metrics first, fallback to non-revenue if needed
     try:
         resp = youtube_analytics_client.reports().query(
             ids="channel==MINE", startDate=start_date, endDate=end,
-            dimensions=dimensions, metrics=",".join(all_metrics)
+            metrics=",".join(core_metrics)
         ).execute()
-        info = _parse_analytics_response(resp, all_metrics, dimensions)
+        info = _parse_analytics_response(resp, core_metrics)
     except Exception as e:
         bt.logging.warning(f"Revenue metrics failed, retrying without them: {_format_error(e)}")
         state.analytics_api_call_count += 1
-        core_metrics = all_metrics[:-2]  # Remove revenue metrics
+        
+        # Filter out revenue metrics and retry
+        revenue_metric_names = {metric for key, (metric, _, _, _, _) in metrics_config.items() if key in REVENUE_METRICS}
+        non_revenue_metrics = [m for m in core_metrics if m not in revenue_metric_names]
+        
         resp = youtube_analytics_client.reports().query(
             ids="channel==MINE", startDate=start_date, endDate=end,
-            dimensions=dimensions, metrics=",".join(core_metrics)
+            metrics=",".join(non_revenue_metrics)
         ).execute()
-        info = _parse_analytics_response(resp, core_metrics, dimensions)
+        info = _parse_analytics_response(resp, non_revenue_metrics)
+        
         # Add missing revenue metrics with default values
-        revenue_defaults = {"estimatedAdRevenue": 0, "playbackBasedCpm": 0}
-        if dimensions:
-            for entry in info:
-                entry.update(revenue_defaults)
-        else:
-            info.update(revenue_defaults)
+        for key in REVENUE_METRICS:
+            if key in [k for k, _ in metrics_config.items()]:
+                info[key] = 0
     
     if not info:
         raise Exception("No channel analytics data found.")
 
-    # Consolidate API calls for traffic source data
-    traffic_data = _query_multiple_metrics(
-        youtube_analytics_client, start_date, end, 
-        ["views", "estimatedMinutesWatched"], 
-        "insightTrafficSourceType"
-    )
+    # Add dimensional data if not in ECO_MODE
+    if not ECO_MODE:
+        # Traffic source data
+        traffic_data = _query_multiple_metrics(
+            youtube_analytics_client, start_date, end, 
+            ["views", "estimatedMinutesWatched"], 
+            "insightTrafficSourceType"
+        )
+        info.update({
+            "trafficSourceViews": traffic_data["views"],
+            "trafficSourceMinutes": traffic_data["estimatedMinutesWatched"]
+        })
+        
+        # Country data
+        country_data = _query_multiple_metrics(
+            youtube_analytics_client, start_date, end,
+            ["views", "estimatedMinutesWatched"],
+            "country"
+        )
+        info.update({
+            "countryViews": country_data["views"],
+            "countryMinutes": country_data["estimatedMinutesWatched"]
+        })
     
-    # Consolidate API calls for country data
-    country_data = _query_multiple_metrics(
-        youtube_analytics_client, start_date, end,
-        ["views", "estimatedMinutesWatched"],
-        "country"
-    )
-    
-    # Keep subscriber data separate due to different date range
-    past = (
-        (datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=30)).strftime('%Y-%m-%d')
-        if dimensions == "day" else start_date
-    )
-    subs = _query(youtube_analytics_client, past, end, "subscribersGained", "day")
-
-    extras = {
-        "trafficSourceViews":   traffic_data["views"],
-        "trafficSourceMinutes": traffic_data["estimatedMinutesWatched"],
-        "countryViews":         country_data["views"],
-        "countryMinutes":       country_data["estimatedMinutesWatched"],
-        "subscribersGained":    subs
-    }
-    if isinstance(info, dict):
-        info.update(extras)
-    else:
-        for entry in info:
-            entry.update(extras)
     return info 
