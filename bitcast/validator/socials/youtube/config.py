@@ -129,7 +129,7 @@ CHANNEL_ADDITIONAL_METRICS = {
     "shares": ("shares", "", None, None, None),
     "subscribersGained": ("subscribersGained", "day", None, None, "day"),
     "subscribersLost": ("subscribersLost", "", None, None, None),
-    "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
+    "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
     "playbackBasedCpm": ("playbackBasedCpm", "", None, None, None),
     "trafficSourceViews": ("views", "insightTrafficSourceType", None, None, None),
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
