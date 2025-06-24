@@ -118,20 +118,17 @@ def get_youtube_metrics(eco_mode, for_daily=False):
 
 # Channel metrics for channel-level analytics
 CHANNEL_CORE_METRICS = {
-    "views": ("views", "", None, None, None),
-    "comments": ("comments", "", None, None, None),
-    "likes": ("likes", "", None, None, None),
-    "dislikes": ("dislikes", "", None, None, None),
-    "shares": ("shares", "", None, None, None),
-    "averageViewDuration": ("averageViewDuration", "", None, None, None),
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
-    "subscribersGained": ("subscribersGained", "", None, None, None),
-    "subscribersLost": ("subscribersLost", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
 }
 
 # Additional channel metrics for non-ECO mode
 CHANNEL_ADDITIONAL_METRICS = {
+    "comments": ("comments", "", None, None, None),
+    "likes": ("likes", "", None, None, None),
+    "shares": ("shares", "", None, None, None),
+    "subscribersGained": ("subscribersGained", "day", None, None, "day"),
+    "subscribersLost": ("subscribersLost", "", None, None, None),
     "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
     "playbackBasedCpm": ("playbackBasedCpm", "", None, None, None),
     "trafficSourceViews": ("views", "insightTrafficSourceType", None, None, None),

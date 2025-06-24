@@ -202,6 +202,7 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None):
     # Get core metrics from config
     metrics_config = get_channel_metrics(ECO_MODE)
     core_metrics = [metric for _, (metric, dims, _, _, _) in metrics_config.items() if not dims]
+    daily_metrics = [metric for _, (metric, dims, _, _, _) in metrics_config.items() if dims == "day"]
     
     # Try all core metrics first, fallback to non-revenue if needed
     try:
@@ -231,6 +232,23 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None):
     
     if not info:
         raise Exception("No channel analytics data found.")
+
+    # Handle daily metrics separately if they exist
+    if daily_metrics:
+        try:
+            daily_data = _query_multiple_metrics(
+                youtube_analytics_client, start_date, end,
+                daily_metrics, "day"
+            )
+            # Add daily metrics to the main info dict
+            for metric in daily_metrics:
+                if metric in daily_data:
+                    info[metric] = daily_data[metric]
+        except Exception as e:
+            bt.logging.warning(f"Daily metrics failed: {_format_error(e)}")
+            # Add default values for failed daily metrics
+            for metric in daily_metrics:
+                info[metric] = {}
 
     # Add dimensional data if not in ECO_MODE
     if not ECO_MODE:
