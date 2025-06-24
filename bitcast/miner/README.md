@@ -98,9 +98,41 @@ Make sure your server meets these before you start.
 
 ---
 
+## 🚀 Miner Registration
+
+1. **Activate the virtual environment**  
+   ```bash
+   source ../venv_bitcast/bin/activate
+   ```
+
+2. **Register Bittensor Wallet & Subnet**  
+   > **Run these from within the activated venv.**  
+   1. **Create wallets**  
+      ```bash
+      btcli wallet new_coldkey --wallet.name <WALLET_NAME>
+      btcli wallet new_hotkey  --wallet.name <WALLET_NAME> --wallet.hotkey <HOTKEY_NAME>
+      ```  
+   2. **Register on subnet**  
+      ```bash
+      btcli subnet register \
+        --netuid 93 \
+        --wallet.name <WALLET_NAME> \
+        --hotkey <HOTKEY_NAME>
+      ```
+
+---
+
 ## 🚀 Run Miner
 
-1. **Authenticate with YouTube**  
+1. **Configure Environment**
+   ```bash
+   cp bitcast/miner/.env.example bitcast/miner/.env
+   ```
+   Edit `.env` with your wallet information:
+   - `WALLET_NAME`: Your Bittensor wallet name (coldkey)
+   - `HOTKEY_NAME`: Your Bittensor hotkey name
+
+2. **Authenticate with YouTube**  
    Run the authentication setup script:
    ```bash
    bash scripts/run_auth.sh
@@ -110,14 +142,6 @@ Make sure your server meets these before you start.
    - Guide you through YouTube OAuth authentication  
    - Work in all environments (headless, SSH, Docker, etc.)
    - Provide a URL to copy/paste into any browser
-
-2. **Configure Environment**
-   ```bash
-   cp bitcast/miner/.env.example bitcast/miner/.env
-   ```
-   Edit `.env` with your wallet information:
-   - `WALLET_NAME`: Your Bittensor wallet name
-   - `HOTKEY_NAME`: Your validator hotkey name
 
 3. **Open port 8091**  
    Ensure your firewall or cloud security group allows inbound on **8091**.
@@ -167,30 +191,6 @@ You can run a single miner with **up to 5 YouTube accounts** to operate as an ag
 - Use our open-source [agency web template](https://github.com/bitcast-network/bitcast-agency) to accept credentials from other creators
 
 This allows you to aggregate multiple creators under a single mining UID while maintaining separate YouTube account credentials.
-
----
-
-## 🚀 Miner Registration
-
-1. **Activate the virtual environment**  
-   ```bash
-   source ../venv_bitcast/bin/activate
-   ```
-
-2. **Register Bittensor Wallet & Subnet**  
-   > **Run these from within the activated venv.**  
-   1. **Create wallets**  
-      ```bash
-      btcli wallet new_coldkey --wallet.name <WALLET_NAME>
-      btcli wallet new_hotkey  --wallet.name <WALLET_NAME> --wallet.hotkey <HOTKEY_NAME>
-      ```  
-   2. **Register on subnet**  
-      ```bash
-      btcli subnet register \
-        --netuid 93 \
-        --wallet.name <WALLET_NAME> \
-        --hotkey <HOTKEY_NAME>
-      ```
 
 ---
 
