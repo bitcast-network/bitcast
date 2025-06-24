@@ -116,6 +116,49 @@ def get_youtube_metrics(eco_mode, for_daily=False):
     else:
         return {**CORE_METRICS, **ADDITIONAL_METRICS}
 
+# Channel metrics for channel-level analytics
+CHANNEL_CORE_METRICS = {
+    "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
+    "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
+}
+
+# Additional channel metrics for non-ECO mode
+CHANNEL_ADDITIONAL_METRICS = {
+    "comments": ("comments", "", None, None, None),
+    "likes": ("likes", "", None, None, None),
+    "shares": ("shares", "", None, None, None),
+    "subscribersGained": ("subscribersGained", "day", None, None, "day"),
+    "subscribersLost": ("subscribersLost", "", None, None, None),
+    "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
+    "playbackBasedCpm": ("playbackBasedCpm", "", None, None, None),
+    "trafficSourceViews": ("views", "insightTrafficSourceType", None, None, None),
+    "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
+    "countryViews": ("views", "country", None, None, None),
+    "countryMinutes": ("estimatedMinutesWatched", "country", None, None, None),
+}
+
+# Revenue metrics that commonly fail for accounts without monetization
+REVENUE_METRICS = {"estimatedAdRevenue", "playbackBasedCpm", "estimatedRedPartnerRevenue"}
+
+def get_channel_metrics(eco_mode=False):
+    """
+    Get the appropriate channel metrics configuration based on ECO_MODE.
+    
+    Args:
+        eco_mode: Whether to use ECO_MODE metrics (reduced set)
+        
+    Returns:
+        Dictionary of metric configurations in format: {key: (metric, dimensions, filter, maxResults, sort)}
+        
+    Example:
+        metrics = get_channel_metrics(eco_mode=True)
+        analytics = get_channel_analytics(client, start_date, end_date, metric_dims=metrics)
+    """
+    if eco_mode:
+        return CHANNEL_CORE_METRICS
+    else:
+        return {**CHANNEL_CORE_METRICS, **CHANNEL_ADDITIONAL_METRICS}
+
 def get_advanced_metrics():
     """
     Get only the advanced YouTube metrics configuration.

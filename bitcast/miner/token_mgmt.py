@@ -7,9 +7,15 @@ import sys
 current_dir = os.path.dirname(__file__)
 
 def init():
-    creds_path = os.path.join(current_dir, 'secrets/creds.pkl')
+    secrets_dir = os.path.join(current_dir, 'secrets')
     
-    if not os.path.exists(creds_path):
+    # Check if secrets directory exists and has any .pkl files
+    if not os.path.exists(secrets_dir):
+        pkl_files = []
+    else:
+        pkl_files = [f for f in os.listdir(secrets_dir) if f.endswith('.pkl')]
+    
+    if not pkl_files:
         bt.logging.error("❌ Authentication required.")
         bt.logging.error("")
         bt.logging.error("🔧 PLEASE RUN:")

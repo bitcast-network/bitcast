@@ -5,9 +5,10 @@ venv/
 venv_bitcast/
 *.pkl
 cache_directory/
-cache/
+bitcast/cache/
 client_secret.json
 nodes.json
 wandb/
 *.egg-info/
 build/
+.cursor/
