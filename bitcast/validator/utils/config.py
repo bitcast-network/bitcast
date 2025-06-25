@@ -59,6 +59,9 @@ YT_MIN_CHANNEL_RETENTION = 10
 # youtube video
 YT_MIN_VIDEO_RETENTION = 10
 
+# acceptance filter
+YT_MIN_ALPHA_STAKE_THRESHOLD = 10000  # Minimum alpha_stake required if YouTube Partner Program (YPP) check fails
+
 # transcript api
 TRANSCRIPT_MAX_RETRY = 10
 
@@ -87,6 +90,7 @@ bt.logging.info(f"YT_MIN_MINS_WATCHED: {YT_MIN_MINS_WATCHED}")
 bt.logging.info(f"YT_MIN_CHANNEL_RETENTION: {YT_MIN_CHANNEL_RETENTION}")
 bt.logging.info(f"YT_MAX_VIDEOS: {YT_MAX_VIDEOS}")
 bt.logging.info(f"YT_MIN_VIDEO_RETENTION: {YT_MIN_VIDEO_RETENTION}")
+bt.logging.info(f"YT_MIN_ALPHA_STAKE_THRESHOLD: {YT_MIN_ALPHA_STAKE_THRESHOLD}")
 bt.logging.info(f"YT_VIDEO_RELEASE_BUFFER: {YT_VIDEO_RELEASE_BUFFER}")
 bt.logging.info(f"YT_ROLLING_WINDOW: {YT_ROLLING_WINDOW}")
 bt.logging.info(f"YT_REWARD_DELAY: {YT_REWARD_DELAY}")

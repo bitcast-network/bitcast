@@ -252,7 +252,7 @@ class MockYouTubeAnalyticsClient:
                     else:
                         # Return overall metrics
                         data = {
-                            "rows": [[total_minutes, 100, 500, 10, 50, 180, 15, 100, 10, 1010]]
+                            "rows": [[50, total_minutes, 2.5]]  # [averageViewPercentage, estimatedMinutesWatched, playbackBasedCpm]
                         }
                     
                     logger.info(f"📈 Returning video analytics: {data}")
@@ -260,7 +260,7 @@ class MockYouTubeAnalyticsClient:
                 
                 # Static base metrics for channel-level queries
                 data = {
-                    "rows": [[10000, 100, 500, 10, 50, 180, 15, 100, 10, 1010]]
+                    "rows": [[50, 10000, 2.5]]  # [averageViewPercentage, estimatedMinutesWatched, playbackBasedCpm]
                 }
                 logger.debug(f"Created MockResponse with data: {data}")
                 return MockResponse(data)
@@ -392,12 +392,12 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
     original_reward = reward
     
     # Create a wrapper around the reward function to track which UID is being evaluated
-    def reward_wrapper(uid, briefs, response):
+    def reward_wrapper(uid, briefs, response, metagraph=None):
         set_current_uid(uid)
         if uid > 0:  # Don't reset for UID 0 since it's first
             from bitcast.validator.socials.youtube.utils.state import reset_scored_videos as reset_func
             reset_func()
-        return original_reward(uid, briefs, response)
+        return original_reward(uid, briefs, response, metagraph)
     
     # Helper to get channel data for the current UID
     def mock_get_channel_data_side_effect(client, discrete_mode=False):
@@ -430,7 +430,8 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
         return {
             "averageViewPercentage": 50,
             "estimatedMinutesWatched": 10000,
-            "subCount": "1000"
+            "subCount": "1000",
+            "playbackBasedCpm": 2.5  # Add YPP membership indicator
         }
     
     mock_get_channel_analytics.side_effect = mock_get_channel_analytics_side_effect

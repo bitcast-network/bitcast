@@ -17,6 +17,7 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
    - ≥ 100 subscribers
    - ≥ 10% average retention (over the last 90 days)
    - ≥ 1000 minutes watched (over the last 90 days)
+   - **YouTube Partner Program (YPP) membership OR sufficient alpha stake** (see note below)
 
 2. **Videos**  
    - Public  
@@ -26,6 +27,14 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
    - Published no more than **3 days** before the brief content window starts
 
 **Tip:** Test your script against any brief in our [dashboard tool](http://dashboard.bitcast.network/).
+
+> **Note: YouTube Partner Program (YPP) Requirement**  
+> Channels must either:
+> - Be enrolled in the YouTube Partner Program (with CPM > 0 within last 90 days)
+> - **OR** have 5000 alpha staked against hotkey
+> 
+> This filter is in place as a barrier for low quality or exploitative miners. Minimum stake indicates investment in the long term success of the subnet.
+> If you connot personally meet the minimum stake threshold reach out to the subnet owner or another significant holder of Bitcast alpha token for sponsorship - acceptance may depend on the quality of your YouTube channel and content.
 
 ---
 

@@ -120,6 +120,7 @@ def get_youtube_metrics(eco_mode, for_daily=False):
 CHANNEL_CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
+    "playbackBasedCpm": ("playbackBasedCpm", "", None, None, None),  # YPP membership check - core requirement
 }
 
 # Additional channel metrics for non-ECO mode
@@ -130,7 +131,6 @@ CHANNEL_ADDITIONAL_METRICS = {
     "subscribersGained": ("subscribersGained", "day", None, None, "day"),
     "subscribersLost": ("subscribersLost", "", None, None, None),
     "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
-    "playbackBasedCpm": ("playbackBasedCpm", "", None, None, None),
     "trafficSourceViews": ("views", "insightTrafficSourceType", None, None, None),
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "countryViews": ("views", "country", None, None, None),

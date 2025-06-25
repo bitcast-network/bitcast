@@ -25,10 +25,10 @@ from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.socials.youtube.main import eval_youtube
 from bitcast.validator.socials.youtube.utils import state
 from bitcast.validator.rewards_scaling import scale_rewards
-from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE
+from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE, YT_MIN_ALPHA_STAKE_THRESHOLD
 from bitcast.protocol import AccessTokenSynapse
 
-def reward(uid, briefs, response) -> dict:
+def reward(uid, briefs, response, metagraph=None) -> dict:
     """
     Returns:
     - dict: The YouTube statistics dictionary for the miner with nested account structure.
@@ -49,6 +49,10 @@ def reward(uid, briefs, response) -> dict:
         "scores": {brief["id"]: 0.0 for brief in briefs},  # Aggregated scores across all accounts
         "uid": uid
     }
+
+    # Add metagraph information during initialization if metagraph is provided
+    if metagraph is not None:
+        add_metagraph_info_to_stats(metagraph, uid, yt_stats)
 
     try:
         # YouTube Scoring - handle multiple tokens
@@ -72,7 +76,12 @@ def reward(uid, briefs, response) -> dict:
                     
                     try:
                         creds = Credentials(token=yt_access_token)
-                        account_stats = eval_youtube(creds, briefs)
+                        # Check if minimum stake threshold is met
+                        min_stake = False
+                        if yt_stats.get("metagraph"):
+                            alpha_stake = yt_stats["metagraph"].get("alpha_stake", 0)
+                            min_stake = float(alpha_stake) > YT_MIN_ALPHA_STAKE_THRESHOLD
+                        account_stats = eval_youtube(creds, briefs, min_stake)
                         
                         # Store the account-specific data in the nested structure
                         yt_stats[account_id] = {
@@ -157,9 +166,7 @@ async def get_rewards(
         miner_response = await query_miner(self, uid)
         
         # Process the response immediately
-        yt_stats = reward(uid, briefs, miner_response)
-
-        add_metagraph_info_to_stats(self.metagraph, uid, yt_stats)
+        yt_stats = reward(uid, briefs, miner_response, self.metagraph)
     
         yt_stats_list.append(yt_stats)
 

@@ -18,13 +18,14 @@ from bitcast.validator.utils.config import (
 from bitcast.validator.utils.blacklist import is_blacklisted
 
 
-def vet_channel(channel_data, channel_analytics):
+def vet_channel(channel_data, channel_analytics, min_stake=False):
     """
     Vet a YouTube channel against all validation criteria.
     
     Args:
         channel_data (dict): Channel metadata including subscriber count and creation date
         channel_analytics (dict): Channel analytics data including retention and minutes watched
+        min_stake (bool): Whether the miner meets the minimum alpha_stake threshold for acceptance filter
         
     Returns:
         tuple: (vet_result: bool, blacklisted: bool)
@@ -40,7 +41,7 @@ def vet_channel(channel_data, channel_analytics):
     channel_age_days = calculate_channel_age(channel_data)
     
     # Check if channel meets the criteria
-    criteria_met = check_channel_criteria(channel_data, channel_analytics, channel_age_days)
+    criteria_met = check_channel_criteria(channel_data, channel_analytics, channel_age_days, min_stake)
     
     if criteria_met:
         bt.logging.info(f"Channel Evaluation Passed")
@@ -69,7 +70,7 @@ def calculate_channel_age(channel_data):
     return (datetime.now() - channel_start_date).days
 
 
-def check_channel_criteria(channel_data, channel_analytics, channel_age_days):
+def check_channel_criteria(channel_data, channel_analytics, channel_age_days, min_stake=False):
     """
     Check if the channel meets all the required criteria.
     
@@ -77,11 +78,32 @@ def check_channel_criteria(channel_data, channel_analytics, channel_age_days):
         channel_data (dict): Channel metadata including subscriber count
         channel_analytics (dict): Channel analytics including retention and minutes watched
         channel_age_days (int): Age of the channel in days
+        min_stake (bool): Whether the miner meets the minimum alpha_stake threshold for acceptance filter
         
     Returns:
         bool: True if all criteria are met, False otherwise
     """
     criteria_met = True
+
+    # Acceptance filter: Check YouTube Partner Program (YPP) membership OR min_stake = True
+    acceptance_filter_passed = False
+    
+    # Check YPP membership via playbackBasedCpm presence (YPP channels have monetization metrics)
+    playback_based_cpm = channel_analytics.get("playbackBasedCpm")
+    if playback_based_cpm is not None and float(playback_based_cpm) > 0:
+        acceptance_filter_passed = True
+    bt.logging.info(f"YPP: {acceptance_filter_passed}")
+    
+    # If YPP check failed, check min_stake as alternative qualification
+    if not acceptance_filter_passed:
+        bt.logging.info(f"Min stake met: {min_stake}")
+        if min_stake:
+            acceptance_filter_passed = True
+
+    # If both YPP and stake checks failed, the channel fails vetting
+    if not acceptance_filter_passed:
+        bt.logging.warning("Channel failed checks")
+        criteria_met = False
 
     if channel_age_days < YT_MIN_CHANNEL_AGE:
         bt.logging.warning(f"Channel age check failed: {channel_data['bitcastChannelId']}. {channel_age_days} < {YT_MIN_CHANNEL_AGE}")
