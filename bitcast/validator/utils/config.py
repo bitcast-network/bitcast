@@ -60,7 +60,7 @@ YT_MIN_CHANNEL_RETENTION = 10
 YT_MIN_VIDEO_RETENTION = 10
 
 # acceptance filter
-YT_MIN_ALPHA_STAKE_THRESHOLD = 5000  # Minimum alpha_stake required if account is not YPP
+YT_MIN_ALPHA_STAKE_THRESHOLD = 0
 
 # transcript api
 TRANSCRIPT_MAX_RETRY = 10

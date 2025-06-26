@@ -88,9 +88,9 @@ def check_channel_criteria(channel_data, channel_analytics, channel_age_days, mi
     # Acceptance filter: Check YouTube Partner Program (YPP) membership OR min_stake = True
     acceptance_filter_passed = False
     
-    # Check YPP membership via playbackBasedCpm presence (YPP channels have monetization metrics)
-    playback_based_cpm = channel_analytics.get("playbackBasedCpm")
-    if playback_based_cpm is not None and float(playback_based_cpm) > 0:
+    # Check YPP membership via cpm presence (YPP channels have monetization metrics)
+    cpm = channel_analytics.get("cpm")
+    if cpm is not None and float(cpm) > 0:
         acceptance_filter_passed = True
     bt.logging.info(f"YPP: {acceptance_filter_passed}")
     

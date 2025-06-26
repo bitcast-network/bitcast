@@ -252,7 +252,7 @@ class MockYouTubeAnalyticsClient:
                     else:
                         # Return overall metrics
                         data = {
-                            "rows": [[50, total_minutes, 2.5]]  # [averageViewPercentage, estimatedMinutesWatched, playbackBasedCpm]
+                            "rows": [[50, total_minutes, 2.5]]  # [averageViewPercentage, estimatedMinutesWatched, cpm]
                         }
                     
                     logger.info(f"📈 Returning video analytics: {data}")
@@ -260,7 +260,7 @@ class MockYouTubeAnalyticsClient:
                 
                 # Static base metrics for channel-level queries
                 data = {
-                    "rows": [[50, 10000, 2.5]]  # [averageViewPercentage, estimatedMinutesWatched, playbackBasedCpm]
+                    "rows": [[50, 10000, 2.5]]  # [averageViewPercentage, estimatedMinutesWatched, cpm]
                 }
                 logger.debug(f"Created MockResponse with data: {data}")
                 return MockResponse(data)
@@ -431,7 +431,7 @@ async def test_get_rewards_single_miner(mock_make_openai_request, mock_get_trans
             "averageViewPercentage": 50,
             "estimatedMinutesWatched": 10000,
             "subCount": "1000",
-            "playbackBasedCpm": 2.5  # Add YPP membership indicator
+            "cpm": 2.5  # Add YPP membership indicator
         }
     
     mock_get_channel_analytics.side_effect = mock_get_channel_analytics_side_effect

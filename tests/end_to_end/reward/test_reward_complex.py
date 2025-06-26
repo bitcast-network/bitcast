@@ -249,7 +249,7 @@ class MockYouTubeAnalyticsClient:
                         ]
                     })
                 else:
-                    # Return analytics in the new core metrics format: [averageViewPercentage, estimatedMinutesWatched, playbackBasedCpm]
+                    # Return analytics in the new core metrics format: [averageViewPercentage, estimatedMinutesWatched, cpm]
                     return MockResponse({"rows": [[YT_MIN_CHANNEL_RETENTION + 5, YT_MIN_MINS_WATCHED + 10, 2.5]]})
         return Reports()
 
@@ -345,7 +345,7 @@ async def test_reward_function(mock_make_openai_request, mock_get_transcript,
     mock_get_channel_analytics.return_value = {
         "averageViewPercentage": 50,
         "estimatedMinutesWatched": 10000,
-        "playbackBasedCpm": 2.5  # Add YPP membership indicator
+        "cpm": 2.5  # Add YPP membership indicator
     }
     
     mock_get_all_uploads.return_value = ["test_video_1", "test_video_2", "test_video_3", "test_video_4"]
