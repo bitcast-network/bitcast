@@ -80,7 +80,7 @@ def reward(uid, briefs, response, metagraph=None) -> dict:
                         min_stake = False
                         if yt_stats.get("metagraph"):
                             alpha_stake = yt_stats["metagraph"].get("alpha_stake", 0)
-                            min_stake = float(alpha_stake) > YT_MIN_ALPHA_STAKE_THRESHOLD
+                            min_stake = float(alpha_stake) >= YT_MIN_ALPHA_STAKE_THRESHOLD
                         account_stats = eval_youtube(creds, briefs, min_stake)
                         
                         # Store the account-specific data in the nested structure
