@@ -24,7 +24,7 @@ from google.oauth2.credentials import Credentials
 from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.socials.youtube.main import eval_youtube
 from bitcast.validator.socials.youtube.utils import state
-from bitcast.validator.rewards_scaling import scale_rewards
+from bitcast.validator.rewards_scaling import scale_rewards, allocate_community_reserve
 from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE, YT_MIN_ALPHA_STAKE_THRESHOLD
 from bitcast.protocol import AccessTokenSynapse
 
@@ -184,6 +184,9 @@ async def get_rewards(
     
     # Add scaled scores to each miner's stats
     add_scaled_scores_to_stats(yt_stats_list, scaled_matrix, briefs)
+    
+    # Allocate community reserve as the final step
+    rewards = allocate_community_reserve(rewards, uids)
 
     return rewards, yt_stats_list
 
