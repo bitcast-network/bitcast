@@ -26,7 +26,7 @@ from bitcast.validator.utils.config import (
 
 import bitcast.validator.clients.OpenaiClient as openai_client_module
 
-def eval_youtube(creds, briefs):
+def eval_youtube(creds, briefs, min_stake=False):
     bt.logging.info(f"Scoring Youtube Content")
     
     # Initialize the result structure and get API clients
@@ -54,7 +54,7 @@ def eval_youtube(creds, briefs):
     result["yt_account"]["analytics"] = channel_analytics
     
     # Vet the channel and store the result
-    channel_vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
+    channel_vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
     result["yt_account"]["blacklisted"] = is_blacklisted
 

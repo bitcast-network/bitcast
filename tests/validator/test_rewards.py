@@ -60,7 +60,7 @@ async def test_get_rewards():
     # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=MOCK_TEST_BRIEFS) as mock_get_briefs, \
          patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response, metagraph=None: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
         result, yt_stats_list = await get_rewards(mock_self, uids)
@@ -148,7 +148,7 @@ async def test_get_rewards_identical_responses():
     # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=MOCK_TEST_BRIEFS) as mock_get_briefs, \
          patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response, metagraph=None: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
         result, yt_stats_list = await get_rewards(mock_self, uids)
@@ -232,7 +232,7 @@ async def test_get_rewards_with_zeros():
     # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=MOCK_TEST_BRIEFS) as mock_get_briefs, \
          patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response, metagraph=None: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
         result, yt_stats_list = await get_rewards(mock_self, uids)
@@ -323,7 +323,7 @@ async def test_get_rewards_all_zeros_in_first_position():
     # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
          patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response, metagraph=None: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
         result, yt_stats_list = await get_rewards(mock_self, uids)
@@ -461,7 +461,7 @@ async def test_get_rewards_with_brief_weights():
     # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
          patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response, metagraph=None: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
         result, yt_stats_list = await get_rewards(mock_self, uids)
@@ -634,8 +634,8 @@ def test_normalise_scores():
     assert np.allclose(final_scores, [1.0, 0.0])
 
 @pytest.mark.asyncio
-async def test_scaled_scores_in_yt_stats():
-    """Test that scaled_scores field is correctly added to yt_stats"""
+async def test_rewards_in_yt_stats():
+    """Test that rewards field is correctly added to yt_stats"""
     
     # Create mock briefs
     mock_briefs = [
@@ -669,36 +669,36 @@ async def test_scaled_scores_in_yt_stats():
     # Patch get_briefs, query_miner, and reward functions
     with patch('bitcast.validator.reward.get_briefs', return_value=mock_briefs) as mock_get_briefs, \
          patch('bitcast.validator.reward.query_miner', side_effect=mock_query_miner) as mock_query_miner_patch, \
-         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response: mock_yt_stats[uid]) as mock_reward:
+         patch('bitcast.validator.reward.reward', side_effect=lambda uid, briefs, response, metagraph=None: mock_yt_stats[uid]) as mock_reward:
         
         # Call get_rewards
         result, yt_stats_list = await get_rewards(mock_self, uids)
         
-        # Verify that yt_stats_list contains scaled_scores for each miner
+        # Verify that yt_stats_list contains rewards for each miner
         assert len(yt_stats_list) == 3
         
         for i, yt_stats in enumerate(yt_stats_list):
-            # Each miner should have a scaled_scores field
-            assert "scaled_scores" in yt_stats, f"UID {uids[i]} missing scaled_scores field"
+            # Each miner should have a rewards field (this is the scaled scores)
+            assert "rewards" in yt_stats, f"UID {uids[i]} missing rewards field"
             
-            # scaled_scores should be a dict with brief IDs as keys
-            scaled_scores = yt_stats["scaled_scores"]
-            assert isinstance(scaled_scores, dict), f"UID {uids[i]} scaled_scores should be a dict"
+            # rewards should be a dict with brief IDs as keys
+            rewards = yt_stats["rewards"]
+            assert isinstance(rewards, dict), f"UID {uids[i]} rewards should be a dict"
             
             # Should have entries for all briefs
-            assert "brief1" in scaled_scores, f"UID {uids[i]} missing brief1 in scaled_scores"
-            assert "brief2" in scaled_scores, f"UID {uids[i]} missing brief2 in scaled_scores"
+            assert "brief1" in rewards, f"UID {uids[i]} missing brief1 in rewards"
+            assert "brief2" in rewards, f"UID {uids[i]} missing brief2 in rewards"
             
             # Values should be floats
-            assert isinstance(scaled_scores["brief1"], float), f"UID {uids[i]} brief1 scaled_score should be float"
-            assert isinstance(scaled_scores["brief2"], float), f"UID {uids[i]} brief2 scaled_score should be float"
+            assert isinstance(rewards["brief1"], float), f"UID {uids[i]} brief1 reward should be float"
+            assert isinstance(rewards["brief2"], float), f"UID {uids[i]} brief2 reward should be float"
             
-            # For UID 0, scaled scores should be higher due to burn mechanism
+            # For UID 0, rewards should be higher due to burn mechanism
             if uids[i] == 0:
-                # UID 0 typically gets the burn amount, so should have positive scaled scores
-                assert scaled_scores["brief1"] >= 0, f"UID {uids[i]} brief1 scaled_score should be non-negative"
-                assert scaled_scores["brief2"] >= 0, f"UID {uids[i]} brief2 scaled_score should be non-negative"
+                # UID 0 typically gets the burn amount, so should have positive rewards
+                assert rewards["brief1"] >= 0, f"UID {uids[i]} brief1 reward should be non-negative"
+                assert rewards["brief2"] >= 0, f"UID {uids[i]} brief2 reward should be non-negative"
             else:
-                # Other UIDs should have non-negative scaled scores
-                assert scaled_scores["brief1"] >= 0, f"UID {uids[i]} brief1 scaled_score should be non-negative"
-                assert scaled_scores["brief2"] >= 0, f"UID {uids[i]} brief2 scaled_score should be non-negative"
+                # Other UIDs should have non-negative rewards
+                assert rewards["brief1"] >= 0, f"UID {uids[i]} brief1 reward should be non-negative"
+                assert rewards["brief2"] >= 0, f"UID {uids[i]} brief2 reward should be non-negative"

@@ -56,7 +56,8 @@ def test_check_channel_criteria():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
+        "cpm": 1.5  # Add this to pass acceptance filter
     }
     channel_age_days = YT_MIN_CHANNEL_AGE + 10
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == True
@@ -118,7 +119,8 @@ def test_vet_channel_not_blacklisted(mock_blacklist):
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
+        "cpm": 1.5  # Add this to pass acceptance filter
     }
     
     # Mock blacklist to be empty
@@ -140,7 +142,8 @@ def test_vet_channel():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
+        "cpm": 1.5  # Add this to pass acceptance filter
     }
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
     assert vet_result == True
@@ -150,6 +153,53 @@ def test_vet_channel():
     channel_data["channel_start"] = (datetime.now() - timedelta(days=YT_MIN_CHANNEL_AGE - 10)).strftime('%Y-%m-%dT%H:%M:%SZ')
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
     assert vet_result == False
+    assert is_blacklisted == False
+
+def test_acceptance_filter():
+    """Test the new acceptance filter for YouTube Partner Program (YPP) membership and min_stake."""
+    # Setup base channel data that meets all other criteria
+    channel_data = {
+        "bitcastChannelId": "test_channel_acceptance",
+        "subCount": str(YT_MIN_SUBS + 1000),
+        "channel_start": (datetime.now() - timedelta(days=YT_MIN_CHANNEL_AGE + 10)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    }
+    channel_analytics = {
+        "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
+        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+    }
+    
+    # Test case 1: Channel passes with YPP membership (cpm > 0)
+    channel_analytics["cpm"] = 1.5
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
+    assert vet_result == True
+    assert is_blacklisted == False
+    
+    # Test case 2: Channel fails when not YPP member (cpm = 0) and min_stake = False
+    channel_analytics["cpm"] = 0
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=False)
+    assert vet_result == False
+    assert is_blacklisted == False
+    
+    # Test case 3: Channel fails when not YPP member (no cpm field) and min_stake = False
+    del channel_analytics["cpm"]
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=False)
+    assert vet_result == False
+    assert is_blacklisted == False
+    
+    # Test case 4: Channel passes with min_stake = True when not YPP member (high stake bypass)
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=True)
+    assert vet_result == True
+    assert is_blacklisted == False
+    
+    # Test case 5: Channel fails with min_stake = False when not YPP member
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=False)
+    assert vet_result == False
+    assert is_blacklisted == False
+    
+    # Test case 6: Channel passes with YPP membership even with min_stake = False
+    channel_analytics["cpm"] = 2.0
+    vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=False)
+    assert vet_result == True
     assert is_blacklisted == False
 
 # ============================================================================

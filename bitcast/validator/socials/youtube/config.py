@@ -85,7 +85,7 @@ ADDITIONAL_DAILY_METRICS = {
     "videosAddedToPlaylists": ("videosAddedToPlaylists", "day", None, None, "day"),
     "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
     "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
-    "playbackBasedCpm": ("playbackBasedCpm", "day", None, None, "day"),
+    "cpm": ("cpm", "day", None, None, "day"),
 }
 
 def get_youtube_metrics(eco_mode, for_daily=False):
@@ -120,6 +120,7 @@ def get_youtube_metrics(eco_mode, for_daily=False):
 CHANNEL_CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
+    "cpm": ("cpm", "", None, None, None),
 }
 
 # Additional channel metrics for non-ECO mode
@@ -129,8 +130,8 @@ CHANNEL_ADDITIONAL_METRICS = {
     "shares": ("shares", "", None, None, None),
     "subscribersGained": ("subscribersGained", "day", None, None, "day"),
     "subscribersLost": ("subscribersLost", "", None, None, None),
+    "monetizedPlaybacks": ("monetizedPlaybacks", "", None, None, None),
     "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
-    "playbackBasedCpm": ("playbackBasedCpm", "", None, None, None),
     "trafficSourceViews": ("views", "insightTrafficSourceType", None, None, None),
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "countryViews": ("views", "country", None, None, None),
@@ -138,7 +139,7 @@ CHANNEL_ADDITIONAL_METRICS = {
 }
 
 # Revenue metrics that commonly fail for accounts without monetization
-REVENUE_METRICS = {"estimatedAdRevenue", "playbackBasedCpm", "estimatedRedPartnerRevenue"}
+REVENUE_METRICS = {"estimatedAdRevenue", "cpm", "estimatedRedPartnerRevenue", "monetizedPlaybacks"}
 
 def get_channel_metrics(eco_mode=False):
     """
