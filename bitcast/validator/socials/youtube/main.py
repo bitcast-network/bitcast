@@ -1,11 +1,12 @@
-import asyncio
 import bittensor as bt
 from datetime import datetime, timedelta
-from googleapiclient.discovery import build
 import time
 
-from bitcast.validator.socials.youtube import youtube_utils
-from bitcast.validator.socials.youtube.youtube_evaluation import (
+from bitcast.validator.socials.youtube.utils import state
+from bitcast.validator.socials.youtube.api.video import get_all_uploads
+from bitcast.validator.socials.youtube.api import initialize_youtube_clients, get_channel_data, get_channel_analytics
+from bitcast.validator.socials.youtube.utils import channel_briefs_filter, _format_error
+from bitcast.validator.socials.youtube.evaluation import (
     vet_channel,
     vet_videos,
     calculate_video_score
@@ -19,21 +20,19 @@ from bitcast.validator.utils.config import (
     YT_ROLLING_WINDOW,
     DISCRETE_MODE,
     YT_LOOKBACK,
-    ECO_MODE
-)
-from bitcast.validator.utils.config import (
+    ECO_MODE,
     RAPID_API_KEY
 )
 
 import bitcast.validator.clients.OpenaiClient as openai_client_module
 
-def eval_youtube(creds, briefs):
+def eval_youtube(creds, briefs, min_stake=False):
     bt.logging.info(f"Scoring Youtube Content")
     
     # Initialize the result structure and get API clients
     result, youtube_data_client, youtube_analytics_client = initialize_youtube_evaluation(creds, briefs)
     # Reset API call counters for this token evaluation
-    youtube_utils.reset_api_call_counts()
+    state.reset_api_call_counts()
     openai_client_module.reset_openai_request_count()
     start = time.perf_counter()
     
@@ -43,8 +42,8 @@ def eval_youtube(creds, briefs):
         # Attach API call counts on early exit
         elapsed = time.perf_counter() - start
         result["performance_stats"] = {
-            "data_api_calls": youtube_utils.data_api_call_count,
-            "analytics_api_calls": youtube_utils.analytics_api_call_count,
+            "data_api_calls": state.data_api_call_count,
+            "analytics_api_calls": state.analytics_api_call_count,
             "openai_requests": openai_client_module.openai_request_count,
             "evaluation_time": elapsed
         }
@@ -55,7 +54,7 @@ def eval_youtube(creds, briefs):
     result["yt_account"]["analytics"] = channel_analytics
     
     # Vet the channel and store the result
-    channel_vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
+    channel_vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
     result["yt_account"]["blacklisted"] = is_blacklisted
 
@@ -64,8 +63,8 @@ def eval_youtube(creds, briefs):
         # Attach API call counts on early exit
         elapsed = time.perf_counter() - start
         result["performance_stats"] = {
-            "data_api_calls": youtube_utils.data_api_call_count,
-            "analytics_api_calls": youtube_utils.analytics_api_call_count,
+            "data_api_calls": state.data_api_call_count,
+            "analytics_api_calls": state.analytics_api_call_count,
             "openai_requests": openai_client_module.openai_request_count,
             "evaluation_time_s": elapsed
         }
@@ -78,8 +77,8 @@ def eval_youtube(creds, briefs):
     # Attach performance stats to result after full evaluation
     elapsed = time.perf_counter() - start
     result["performance_stats"] = {
-        "data_api_calls": youtube_utils.data_api_call_count,
-        "analytics_api_calls": youtube_utils.analytics_api_call_count,
+        "data_api_calls": state.data_api_call_count,
+        "analytics_api_calls": state.analytics_api_call_count,
         "openai_requests": openai_client_module.openai_request_count,
         "evaluation_time_s": elapsed
     }
@@ -102,33 +101,28 @@ def initialize_youtube_evaluation(creds, briefs):
         "scores": scores
     }
     
-    try:
-        youtube_data_client = build("youtube", "v3", credentials=creds)
-        youtube_analytics_client = build("youtubeAnalytics", "v2", credentials=creds)
-        return result, youtube_data_client, youtube_analytics_client
-    except Exception as e:
-        bt.logging.warning(f"An error occurred while initializing YouTube clients: {e}")
-        return result, None, None
+    youtube_data_client, youtube_analytics_client = initialize_youtube_clients(creds)
+    return result, youtube_data_client, youtube_analytics_client
 
 def get_channel_information(youtube_data_client, youtube_analytics_client):
     """Retrieve channel data and analytics."""
     try:
-        channel_data = youtube_utils.get_channel_data(youtube_data_client, DISCRETE_MODE)
+        channel_data = get_channel_data(youtube_data_client, DISCRETE_MODE)
         
         # Calculate date range for the last YT_LOOKBACK days
         end_date = datetime.now().strftime('%Y-%m-%d')
         start_date = (datetime.now() - timedelta(days=YT_LOOKBACK)).strftime('%Y-%m-%d')
         
-        channel_analytics = youtube_utils.get_channel_analytics(youtube_analytics_client, start_date=start_date, end_date=end_date)
+        channel_analytics = get_channel_analytics(youtube_analytics_client, start_date=start_date, end_date=end_date)
         return channel_data, channel_analytics
     except Exception as e:
-        bt.logging.warning(f"An error occurred while retrieving YouTube data: {youtube_utils._format_error(e)}")
+        bt.logging.warning(f"An error occurred while retrieving YouTube data: {_format_error(e)}")
         return None, None
 
 def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
     """Process videos, calculate scores, and update the result structure."""
     try:
-        video_ids = youtube_utils.get_all_uploads(youtube_data_client, YT_LOOKBACK)
+        video_ids = get_all_uploads(youtube_data_client, YT_LOOKBACK)
         
         # Vet videos and store the results
         video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
@@ -154,7 +148,7 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
             result["scores"] = {brief["id"]: 0 for brief in briefs}
             
     except Exception as e:
-        bt.logging.error(f"Error during video evaluation: {youtube_utils._format_error(e)}")
+        bt.logging.error(f"Error during video evaluation: {_format_error(e)}")
     
     return result
 
@@ -217,73 +211,4 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         if match:
             brief_id = briefs[i]["id"]
             result["scores"][brief_id] += video_score
-            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}")
-
-def check_subscriber_range(sub_count, subs_range):
-    """
-    Check if a subscriber count falls within a given range.
-    Handles null values in the range:
-    - If both values are null, returns True (no filtering)
-    - If first value is null, checks if count is less than or equal to max
-    - If second value is null, checks if count is greater than or equal to min
-    - If neither is null, checks if count is within range (inclusive)
-    
-    Args:
-        sub_count (int): Channel's subscriber count
-        subs_range (list): List of [min_subs, max_subs] where either can be null
-        
-    Returns:
-        bool: True if subscriber count is within range, False otherwise
-    """
-    min_subs, max_subs = subs_range
-    
-    # If both values are null, no filtering
-    if min_subs is None and max_subs is None:
-        return True
-        
-    # If first value is null, check if count is less than or equal to max
-    if min_subs is None:
-        return sub_count <= max_subs
-        
-    # If second value is null, check if count is greater than or equal to min
-    if max_subs is None:
-        return sub_count >= min_subs
-        
-    # If neither is null, check if count is within range (inclusive)
-    return min_subs <= sub_count <= max_subs
-
-def channel_briefs_filter(briefs, channel_analytics):
-    """
-    Filter briefs based on the channel's subscriber count.
-    Only returns briefs where the channel's subscriber count falls within the brief's subs_range (inclusive).
-    
-    Args:
-        briefs (List[dict]): List of briefs to filter
-        channel_analytics (dict): Channel analytics data containing subscriber count
-        
-    Returns:
-        List[dict]: Filtered list of briefs
-    """
-    if not briefs:
-        return []
-        
-    # Get channel's subscriber count
-    sub_count = int(channel_analytics.get("subCount", 0))
-    
-    # Filter briefs based on subscriber count range
-    filtered_briefs = []
-    for brief in briefs:
-        # If brief doesn't have a subs_range, include it
-        if "subs_range" not in brief:
-            filtered_briefs.append(brief)
-            continue
-            
-        # Check if channel's subscriber count falls within the range
-        if check_subscriber_range(sub_count, brief["subs_range"]):
-            filtered_briefs.append(brief)
-        else:
-            min_subs, max_subs = brief["subs_range"]
-            range_str = f"[{min_subs or 'null'}, {max_subs or 'null'}]"
-            bt.logging.info(f"Channel subscriber count {sub_count} outside brief {brief['id']} range {range_str}")
-            
-    return filtered_briefs
+            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}") 
