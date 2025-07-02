@@ -122,6 +122,7 @@ CHANNEL_CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
     "cpm": ("cpm", "", None, None, None),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Additional channel metrics for non-ECO mode
