@@ -35,6 +35,7 @@ CORE_METRICS = {
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
     "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Additional metrics for full analytics (when not in ECO_MODE)
