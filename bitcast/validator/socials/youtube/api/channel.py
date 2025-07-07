@@ -205,6 +205,7 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None):
     daily_metrics = [metric for _, (metric, dims, _, _, _) in metrics_config.items() if dims == "day"]
     
     # Try all core metrics first, fallback to non-revenue if needed
+    ypp = True  # Assume YPP membership initially
     try:
         resp = youtube_analytics_client.reports().query(
             ids="channel==MINE", startDate=start_date, endDate=end,
@@ -214,6 +215,7 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None):
     except Exception as e:
         bt.logging.warning(f"Revenue metrics failed, retrying without them: {_format_error(e)}")
         state.analytics_api_call_count += 1
+        ypp = False  # Revenue metrics failed, indicating no YPP membership
         
         # Filter out revenue metrics and retry
         revenue_metric_names = {metric for key, (metric, _, _, _, _) in metrics_config.items() if key in REVENUE_METRICS}
@@ -232,6 +234,9 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None):
     
     if not info:
         raise Exception("No channel analytics data found.")
+
+    # Add YPP membership status to the analytics data
+    info["ypp"] = ypp
 
     # Handle daily metrics separately if they exist
     if daily_metrics:
