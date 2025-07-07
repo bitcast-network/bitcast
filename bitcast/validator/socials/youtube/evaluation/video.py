@@ -21,7 +21,7 @@ from bitcast.validator.utils.config import (
     DISCRETE_MODE,
     RAPID_API_KEY
 )
-from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics
+from bitcast.validator.socials.youtube.config import get_youtube_metrics, get_advanced_metrics, REVENUE_METRICS
 
 
 def get_video_analytics_batch(youtube_analytics_client, video_ids):
@@ -42,8 +42,34 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids):
     
     for video_id in video_ids:
         try:
-            # Get all analytics in a single call
+            # Try all metrics first, fallback to non-revenue if needed (same pattern as channel analytics)
             video_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
+            
+            # Check if any core metrics returned None, which indicates revenue metrics caused API failure
+            core_metrics_failed = any(
+                video_analytics.get(key) is None 
+                for key in ["averageViewPercentage", "estimatedMinutesWatched"] 
+                if key in all_metric_dims
+            )
+            
+            if core_metrics_failed:
+                bt.logging.warning(f"Retrying without revenue metrics")
+                
+                # Filter out revenue metrics and retry
+                revenue_metric_names = {metric for key, (metric, _, _, _, _) in all_metric_dims.items() if key in REVENUE_METRICS}
+                non_revenue_metric_dims = {
+                    key: metric_config for key, metric_config in all_metric_dims.items() 
+                    if metric_config[0] not in revenue_metric_names
+                }
+                
+                # Retry without revenue metrics
+                video_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=non_revenue_metric_dims)
+                
+                # Add missing revenue metrics with default values
+                for key in REVENUE_METRICS:
+                    if key in all_metric_dims:
+                        video_analytics[key] = 0
+            
             video_analytics_dict[video_id] = video_analytics
         except Exception as e:
             bt.logging.error(f"Error getting analytics for video {video_id}: {_format_error(e)}")
@@ -324,7 +350,12 @@ def check_video_retention(video_data, video_analytics, decision_details):
     Returns:
         bool: True if retention is sufficient, False otherwise
     """
-    averageViewPercentage = float(video_analytics.get("averageViewPercentage", -1))
+    retention_value = video_analytics.get("averageViewPercentage", -1)
+    # Handle case where revenue metrics in CORE_METRICS cause API to return None for other metrics
+    if retention_value is None:
+        retention_value = -1
+    
+    averageViewPercentage = float(retention_value)
     if averageViewPercentage < YT_MIN_VIDEO_RETENTION:
         bt.logging.info(f"Avg retention check failed for video: {video_data['bitcastVideoId']}. {averageViewPercentage} <= {YT_MIN_VIDEO_RETENTION}%.")
         decision_details["averageViewPercentageCheck"] = False
