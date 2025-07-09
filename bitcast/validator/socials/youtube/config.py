@@ -88,6 +88,7 @@ ADDITIONAL_DAILY_METRICS = {
     "engagedViews": ("engagedViews", "day", None, None, "day"),
     "videosAddedToPlaylists": ("videosAddedToPlaylists", "day", None, None, "day"),
     "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
+    "monetizedPlaybacks": ("monetizedPlaybacks", "day", None, None, "day"),
 }
 
 def get_youtube_metrics(eco_mode, for_daily=False):
