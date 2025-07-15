@@ -24,7 +24,6 @@ bitcast/validator/socials/youtube/
 │   └── scoring.py              # Video scoring algorithms
 └── utils/                       # Utility functions
     ├── state.py                # Global state management
-    ├── filters.py              # Brief filtering utilities
     └── helpers.py              # General helper functions
 ```
 
@@ -52,7 +51,6 @@ Primary entry point with `eval_youtube(creds, briefs)` function. Orchestrates th
 
 ### `utils/` Layer
 - **`state.py`**: API call counters, `scored_video_ids` tracking
-- **`filters.py`**: `channel_briefs_filter()` - Brief filtering by channel metrics
 - **`helpers.py`**: `_format_error()` - Error formatting utilities
 
 ## Usage Examples
@@ -144,5 +142,4 @@ Key configuration variables from `bitcast.validator.utils.config`:
 
 ### Utilities
 - `initialize_youtube_clients(creds) -> tuple` - Create authenticated clients
-- `channel_briefs_filter(briefs, channel_analytics) -> list` - Filter applicable briefs
 - `get_video_transcript(video_id) -> str` - Retrieve video transcripts 

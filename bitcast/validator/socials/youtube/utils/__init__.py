@@ -17,10 +17,7 @@ from .state import (
     reset_api_call_counts
 )
 
-from .filters import (
-    check_subscriber_range,
-    channel_briefs_filter
-)
+
 
 from .helpers import (
     _format_error
@@ -35,10 +32,6 @@ __all__ = [
     'is_video_already_scored',
     'mark_video_as_scored',
     'reset_api_call_counts',
-    
-    # Filters
-    'check_subscriber_range',
-    'channel_briefs_filter',
     
     # Helpers
     '_format_error'

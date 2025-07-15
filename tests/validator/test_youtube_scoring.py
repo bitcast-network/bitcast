@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from bitcast.validator.socials.youtube.main import update_video_score, check_video_brief_matches
-from bitcast.validator.socials.youtube.utils import channel_briefs_filter, check_subscriber_range
+
 
 def test_update_video_score():
     # Setup
@@ -91,133 +91,9 @@ def test_check_video_brief_matches():
     assert matches_any_brief == True
     assert matching_brief_ids == ["brief1", "brief2", "brief3"]
 
-def test_check_subscriber_range():
-    """Test subscriber range checking with null values."""
-    # Test case 1: Both values null (no filtering)
-    assert check_subscriber_range(100, [None, None]) == True
-    assert check_subscriber_range(1000, [None, None]) == True
-    assert check_subscriber_range(10000, [None, None]) == True
 
-    # Test case 2: First value null (up to max)
-    assert check_subscriber_range(100, [None, 1000]) == True
-    assert check_subscriber_range(1000, [None, 1000]) == True
-    assert check_subscriber_range(1001, [None, 1000]) == False
 
-    # Test case 3: Second value null (over min)
-    assert check_subscriber_range(100, [1000, None]) == False
-    assert check_subscriber_range(1000, [1000, None]) == True
-    assert check_subscriber_range(1001, [1000, None]) == True
 
-    # Test case 4: Both values set (inclusive range)
-    assert check_subscriber_range(100, [100, 1000]) == True
-    assert check_subscriber_range(1000, [100, 1000]) == True
-    assert check_subscriber_range(99, [100, 1000]) == False
-    assert check_subscriber_range(1001, [100, 1000]) == False
-
-def test_channel_briefs_filter():
-    """Test filtering briefs based on channel subscriber count."""
-    # Test case 1: Channel subscriber count within range
-    briefs = [
-        {
-            "id": "brief1",
-            "subs_range": [100, 1000],
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        },
-        {
-            "id": "brief2",
-            "subs_range": [1000, 10000],
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        }
-    ]
-    channel_analytics = {"subCount": "500"}
-    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
-    assert len(filtered_briefs) == 1
-    assert filtered_briefs[0]["id"] == "brief1"
-
-    # Test case 2: Channel subscriber count outside all ranges
-    channel_analytics = {"subCount": "50"}
-    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
-    assert len(filtered_briefs) == 0
-
-    # Test case 3: Brief without subs_range should be included
-    briefs = [
-        {
-            "id": "brief1",
-            "subs_range": [100, 1000],
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        },
-        {
-            "id": "brief2",
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        }
-    ]
-    channel_analytics = {"subCount": "50"}
-    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
-    assert len(filtered_briefs) == 1
-    assert filtered_briefs[0]["id"] == "brief2"
-
-    # Test case 4: Empty briefs list
-    filtered_briefs = channel_briefs_filter([], channel_analytics)
-    assert len(filtered_briefs) == 0
-
-    # Test case 5: Channel analytics missing subCount
-    briefs = [
-        {
-            "id": "brief1",
-            "subs_range": [100, 1000],
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        }
-    ]
-    channel_analytics = {}
-    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
-    assert len(filtered_briefs) == 0
-
-    # Test case 6: Both range values null (no filtering)
-    briefs = [
-        {
-            "id": "brief1",
-            "subs_range": [None, None],
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        }
-    ]
-    channel_analytics = {"subCount": "50"}
-    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
-    assert len(filtered_briefs) == 1
-    assert filtered_briefs[0]["id"] == "brief1"
-
-    # Test case 7: First value null (up to max)
-    briefs = [
-        {
-            "id": "brief1",
-            "subs_range": [None, 1000],
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        }
-    ]
-    channel_analytics = {"subCount": "500"}
-    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
-    assert len(filtered_briefs) == 1
-    assert filtered_briefs[0]["id"] == "brief1"
-
-    # Test case 8: Second value null (over min)
-    briefs = [
-        {
-            "id": "brief1",
-            "subs_range": [1000, None],
-            "start_date": "2023-01-01",
-            "end_date": "2023-12-31"
-        }
-    ]
-    channel_analytics = {"subCount": "1500"}
-    filtered_briefs = channel_briefs_filter(briefs, channel_analytics)
-    assert len(filtered_briefs) == 1
-    assert filtered_briefs[0]["id"] == "brief1"
 
 def test_process_videos_empty_briefs():
     """Test process_videos function with empty briefs list."""

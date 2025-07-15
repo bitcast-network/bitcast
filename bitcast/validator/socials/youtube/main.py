@@ -5,7 +5,7 @@ import time
 from bitcast.validator.socials.youtube.utils import state
 from bitcast.validator.socials.youtube.api.video import get_all_uploads
 from bitcast.validator.socials.youtube.api import initialize_youtube_clients, get_channel_data, get_channel_analytics
-from bitcast.validator.socials.youtube.utils import channel_briefs_filter, _format_error
+from bitcast.validator.socials.youtube.utils import _format_error
 from bitcast.validator.socials.youtube.evaluation import (
     vet_channel,
     vet_videos,
@@ -70,8 +70,6 @@ def eval_youtube(creds, briefs, min_stake=False):
         }
         return result
 
-    briefs = channel_briefs_filter(briefs, channel_analytics)
-    
     # Process videos and update the result
     result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
     # Attach performance stats to result after full evaluation
