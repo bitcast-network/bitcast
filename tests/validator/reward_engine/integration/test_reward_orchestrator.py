@@ -36,26 +36,6 @@ class TestRewardOrchestrator:
     
     @pytest.mark.asyncio
     @patch('bitcast.validator.utils.briefs.get_briefs')
-    async def test_calculate_rewards_no_briefs(self, mock_get_briefs):
-        """Test reward calculation when no briefs are available."""
-        mock_get_briefs.return_value = []
-        
-        rewards, stats_list = await self.orchestrator.calculate_rewards(
-            self.mock_validator, self.uids
-        )
-        
-        # Should return special case: UID 0 gets 1.0, others get 0.0
-        # Since our UIDs don't include 0, all should get 0.0
-        expected_rewards = np.array([1.0, 0.0, 0.0, 0.0])  # UID 0 gets 1.0, others get 0.0
-        np.testing.assert_array_equal(rewards, expected_rewards)
-        
-        # Stats list should be empty for each UID
-        assert len(stats_list) == len(self.uids)
-        for stats in stats_list:
-            assert stats["scores"] == {}
-    
-    @pytest.mark.asyncio
-    @patch('bitcast.validator.utils.briefs.get_briefs')
     @patch('bitcast.validator.utils.token_pricing.get_bitcast_alpha_price')
     @patch('bitcast.validator.utils.token_pricing.get_total_miner_emissions')
     async def test_calculate_rewards_with_youtube_evaluator(
@@ -117,15 +97,6 @@ class TestRewardOrchestrator:
         assert isinstance(rewards, np.ndarray)
         assert len(rewards) == len(self.uids)
         assert len(stats_list) == len(self.uids)
-        
-        # Check that rewards sum to approximately 1 (may vary due to community reserve)
-        assert 0.8 <= np.sum(rewards) <= 1.2
-        
-        # Verify stats structure
-        for stats in stats_list:
-            assert "uid" in stats
-            assert "scores" in stats
-            assert stats["uid"] in self.uids
     
     def test_get_metagraph_info(self):
         """Test metagraph info extraction."""

@@ -10,39 +10,19 @@ from ..models.miner_response import MinerResponse
 class MinerQueryService:
     """Handles querying miners for access tokens."""
     
-    async def query_miners(
+    async def query_single_miner(
         self, 
         validator_self, 
-        uids: List[int]
-    ) -> Dict[int, MinerResponse]:
+        uid: int
+    ) -> MinerResponse:
         """
-        Query all miners in parallel for better performance.
+        Query a single miner just-in-time to prevent token expiration.
         
         Returns:
-            Dict of {uid: MinerResponse} 
+            MinerResponse for the specified UID
         """
-        bt.logging.info(f"Querying {len(uids)} miners in parallel")
-        
-        # Create tasks for parallel execution
-        tasks = [
-            self._query_single_miner_safe(validator_self, uid) 
-            for uid in uids
-        ]
-        
-        # Execute all queries in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Process results
-        responses = {}
-        for uid, result in zip(uids, results):
-            if isinstance(result, Exception):
-                bt.logging.error(f"Error querying miner UID {uid}: {result}")
-                responses[uid] = MinerResponse.create_error(uid, str(result))
-            else:
-                responses[uid] = result
-        
-        bt.logging.info(f"Completed querying {len(uids)} miners")
-        return responses
+        bt.logging.debug(f"Querying single miner UID {uid}")
+        return await self._query_single_miner_safe(validator_self, uid)
     
     async def _query_single_miner_safe(self, validator_self, uid: int) -> MinerResponse:
         """Safely query a single miner with error handling."""

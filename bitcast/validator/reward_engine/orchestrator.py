@@ -11,7 +11,7 @@ from .services.platform_registry import PlatformRegistry
 from .services.score_aggregation_service import ScoreAggregationService
 from .services.emission_calculation_service import EmissionCalculationService
 from .services.reward_distribution_service import RewardDistributionService
-from .models.evaluation_result import EvaluationResultCollection
+from .models.evaluation_result import EvaluationResultCollection, EvaluationResult
 from .models.miner_response import MinerResponse
 
 
@@ -49,26 +49,29 @@ class RewardOrchestrator:
             if not briefs:
                 return self._no_briefs_fallback(uids)
             
-            bt.logging.info(f"Processing {len(briefs)} briefs for {len(uids)} miners")
+            bt.logging.info(f"Processing {len(briefs)} briefs for {len(uids)} miners sequentially")
             
-            # 2. Query all miners for access tokens
-            miner_responses = await self.miner_query.query_miners(validator_self, uids)
+            # 2. Process miners sequentially to prevent token expiration
+            evaluation_results = EvaluationResultCollection()
             
-            # 3. Evaluate content using platform evaluators
-            evaluation_results = await self._evaluate_miner_content(
-                miner_responses, briefs, validator_self.metagraph
-            )
+            for uid in uids:
+                # Query this miner just-in-time
+                miner_response = await self.miner_query.query_single_miner(validator_self, uid)
+                
+                # Evaluate immediately while token is fresh
+                result = await self._evaluate_single_miner(miner_response, briefs, validator_self.metagraph)
+                evaluation_results.add_result(uid, result)
             
-            # 4. Aggregate scores across platforms
+            # 3. Aggregate scores across platforms
             score_matrix = self.score_aggregator.aggregate_scores(evaluation_results, briefs)
             
-            # 5. Reset state for next evaluation cycle
+            # 4. Reset state for next evaluation cycle
             state.reset_scored_videos()
             
-            # 6. Calculate emission targets
+            # 5. Calculate emission targets
             emission_targets = self.emission_calculator.calculate_targets(score_matrix, briefs)
             
-            # 7. Distribute final rewards
+            # 6. Distribute final rewards
             rewards, stats_list = self.reward_distributor.calculate_distribution(
                 emission_targets, evaluation_results, briefs, uids
             )
@@ -77,47 +80,55 @@ class RewardOrchestrator:
             return rewards, stats_list
             
         except Exception as e:
-            bt.logging.error(f"Reward calculation failed: {e}")
+            bt.logging.error(f"Sequential reward calculation failed: {e}")
             return self._error_fallback(uids)
     
-    async def _evaluate_miner_content(
+    async def _evaluate_single_miner(
         self, 
-        miner_responses: Dict[int, MinerResponse], 
+        miner_response: MinerResponse, 
         briefs: List[dict],
         metagraph
-    ) -> EvaluationResultCollection:
-        """Evaluate all miner content using appropriate platform evaluators."""
-        results = EvaluationResultCollection()
+    ) -> EvaluationResult:
+        """Evaluate a single miner's response immediately after querying."""
+        uid = miner_response.uid
         
-        for uid, response in miner_responses.items():
-            try:
-                # Special handling for burn UID
-                if uid == 0:
-                    bt.logging.debug(f"Burn UID {uid}: setting scores to 0")
-                    results.add_empty_result(uid, "Burn UID")
-                    continue
+        try:
+            # Special handling for burn UID
+            if uid == 0:
+                bt.logging.debug(f"Burn UID {uid}: setting scores to 0")
+                return EvaluationResult(
+                    uid=uid,
+                    platform="burn",
+                    aggregated_scores={brief["id"]: 0.0 for brief in briefs}
+                )
+            
+            # Find platform evaluator for this response
+            evaluator = self.platforms.get_evaluator_for_response(miner_response)
+            
+            if evaluator:
+                bt.logging.debug(f"Using {evaluator.platform_name()} for UID {uid}")
                 
-                # Find platform evaluator for this response
-                evaluator = self.platforms.get_evaluator_for_response(response)
+                # Extract metagraph info and evaluate
+                metagraph_info = self._extract_metagraph_info(metagraph, uid)
+                result = await evaluator.evaluate_accounts(miner_response, briefs, metagraph_info)
                 
-                if evaluator:
-                    bt.logging.debug(f"Using {evaluator.platform_name()} for UID {uid}")
-                    
-                    # Extract metagraph info and evaluate
-                    metagraph_info = self._extract_metagraph_info(metagraph, uid)
-                    result = await evaluator.evaluate_accounts(response, briefs, metagraph_info)
-                    
-                    results.add_result(uid, result)
-                    bt.logging.debug(f"Evaluated UID {uid}: {len(result.account_results)} accounts")
-                else:
-                    bt.logging.warning(f"No evaluator found for UID {uid}")
-                    results.add_empty_result(uid, "No suitable evaluator")
-                    
-            except Exception as e:
-                bt.logging.error(f"Failed to evaluate UID {uid}: {e}")
-                results.add_empty_result(uid, f"Evaluation error: {e}")
-        
-        return results
+                bt.logging.debug(f"Evaluated UID {uid}: {len(result.account_results)} accounts")
+                return result
+            else:
+                bt.logging.warning(f"No evaluator found for UID {uid}")
+                return EvaluationResult(
+                    uid=uid,
+                    platform="unknown",
+                    aggregated_scores={brief["id"]: 0.0 for brief in briefs}
+                )
+                
+        except Exception as e:
+            bt.logging.error(f"Failed to evaluate UID {uid}: {e}")
+            return EvaluationResult(
+                uid=uid,
+                platform="error",
+                aggregated_scores={brief["id"]: 0.0 for brief in briefs}
+            )
     
     def _extract_metagraph_info(self, metagraph, uid: int) -> Dict[str, Any]:
         """Extract relevant metagraph information for a UID."""
