@@ -248,17 +248,18 @@ def test_check_video_publish_date():
     assert check_video_publish_date(video_data, briefs, decision_details) == True
     assert decision_details["publishDateCheck"] == True
 
-    # Test case 6: Invalid date format (should fail)
+    # Test case 6: Invalid date format (should raise RuntimeError)
     video_data["publishedAt"] = "invalid-date"
     decision_details = {"contentAgainstBriefCheck": []}
-    assert check_video_publish_date(video_data, briefs, decision_details) == False
-    assert decision_details["publishDateCheck"] == False
+    import pytest
+    with pytest.raises(RuntimeError, match="Processing operation 'video publish date validation' failed"):
+        check_video_publish_date(video_data, briefs, decision_details)
 
-    # Test case 7: Missing publishedAt field (should fail)
+    # Test case 7: Missing publishedAt field (should raise RuntimeError)
     video_data = {}
     decision_details = {"contentAgainstBriefCheck": []}
-    assert check_video_publish_date(video_data, briefs, decision_details) == False
-    assert decision_details["publishDateCheck"] == False
+    with pytest.raises(RuntimeError, match="Processing operation 'video publish date validation' failed"):
+        check_video_publish_date(video_data, briefs, decision_details)
 
     # Test case 8: Empty briefs list (should pass - no briefs means no date restrictions)
     video_data = {"publishedAt": "2023-01-15T00:00:00Z"}
@@ -266,12 +267,12 @@ def test_check_video_publish_date():
     assert check_video_publish_date(video_data, [], decision_details) == True
     assert decision_details["publishDateCheck"] == True
 
-    # Test case 9: Malformed brief date (should fail)
+    # Test case 9: Malformed brief date (should raise RuntimeError)
     malformed_briefs = [{"id": "brief1", "start_date": "invalid-date"}]
     video_data = {"publishedAt": "2023-01-15T00:00:00Z"}
     decision_details = {"contentAgainstBriefCheck": []}
-    assert check_video_publish_date(video_data, malformed_briefs, decision_details) == False
-    assert decision_details["publishDateCheck"] == False
+    with pytest.raises(RuntimeError, match="Processing operation 'video publish date validation' failed"):
+        check_video_publish_date(video_data, malformed_briefs, decision_details)
 
 def test_check_video_retention():
     """Test video retention validation with different scenarios."""

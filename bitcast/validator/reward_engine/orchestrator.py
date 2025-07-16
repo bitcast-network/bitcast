@@ -40,7 +40,12 @@ class RewardOrchestrator:
         """Main entry point for reward calculation workflow."""
         try:
             # 1. Get content briefs
-            briefs = get_briefs()
+            try:
+                briefs = get_briefs()
+            except ConnectionError as e:
+                bt.logging.error(f"Failed to fetch content briefs: {e}")
+                return self._no_briefs_fallback(uids)
+                
             if not briefs:
                 return self._no_briefs_fallback(uids)
             

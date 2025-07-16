@@ -68,9 +68,9 @@ def test_get_briefs_active(monkeypatch):
 
 def test_get_briefs_error(monkeypatch):
     """
-    Test that get_briefs returns cached data when available, or empty list when no cache exists.
+    Test that get_briefs returns cached data when available, or raises ConnectionError when no cache exists.
     """
-    # First test: No cache available
+    # First test: No cache available - should raise ConnectionError
     cache = BriefsCache.get_cache()
     cache.delete("briefs_True")  # Ensure no cache exists
     
@@ -78,8 +78,11 @@ def test_get_briefs_error(monkeypatch):
         raise requests.exceptions.RequestException("API error")
     
     monkeypatch.setattr(requests, "get", mock_get)
-    briefs = get_briefs(all=True)
-    assert briefs == []  # Should return empty list when no cache exists
+    
+    # Should raise ConnectionError when no cache exists
+    import pytest
+    with pytest.raises(ConnectionError, match="Content briefs fetch failed"):
+        get_briefs(all=True)
     
     # Second test: Cache available
     cache_data = [{"id": "cached_brief", "start_date": "2020-01-01", "end_date": "2020-01-02"}]
@@ -209,7 +212,7 @@ def test_get_briefs_caching_fallback(monkeypatch):
 
 def test_get_briefs_no_cache_fallback(monkeypatch):
     """
-    Test that get_briefs returns empty list when API fails and no cache exists.
+    Test that get_briefs raises ConnectionError when API fails and no cache exists.
     """
     # Ensure cache is empty
     cache = BriefsCache.get_cache()
@@ -221,6 +224,7 @@ def test_get_briefs_no_cache_fallback(monkeypatch):
     
     monkeypatch.setattr(requests, "get", mock_get)
     
-    # Call should return empty list
-    briefs = get_briefs(all=True)
-    assert briefs == []
+    # Call should raise ConnectionError
+    import pytest
+    with pytest.raises(ConnectionError, match="Content briefs fetch failed"):
+        get_briefs(all=True)

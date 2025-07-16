@@ -6,6 +6,7 @@ import os
 from threading import Lock
 import atexit
 from bitcast.validator.utils.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY, CACHE_DIRS
+from bitcast.validator.utils.error_handling import log_and_raise_api_error
 
 class BriefsCache:
     _instance = None
@@ -97,11 +98,15 @@ def get_briefs(all: bool = False):
         return filtered_briefs
 
     except requests.exceptions.RequestException as e:
-        bt.logging.error(f"Error fetching briefs: {e}")
         # Try to return cached data if available
         cached_briefs = cache.get(cache_key)
         if cached_briefs is not None:
             bt.logging.warning("Using cached briefs due to API error")
             return cached_briefs
-        bt.logging.error("No cached briefs available")
-        return []
+        
+        # No cached data available - this is a real error
+        log_and_raise_api_error(
+            error=e,
+            endpoint=BITCAST_BRIEFS_ENDPOINT,
+            context="Content briefs fetch"
+        )

@@ -23,6 +23,7 @@ from bitcast.validator.utils.config import (
     RAPID_API_KEY
 )
 from bitcast.validator.platforms.youtube.config import get_youtube_metrics, get_advanced_metrics, REVENUE_METRICS
+from bitcast.validator.utils.error_handling import log_and_raise_api_error, log_and_raise_processing_error
 
 
 def get_video_analytics_batch(youtube_analytics_client, video_ids):
@@ -73,8 +74,13 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids):
             
             video_analytics_dict[video_id] = video_analytics
         except Exception as e:
-            bt.logging.error(f"Error getting analytics for video {video_id}: {_format_error(e)}")
-            video_analytics_dict[video_id] = {}
+            # Don't log actual YouTube video ID for privacy
+            log_and_raise_api_error(
+                error=e,
+                endpoint="youtube.analytics.reports.query",
+                params={"batch_size": len(video_ids)},
+                context="YouTube analytics batch fetch"
+            )
     
     return video_analytics_dict
 
@@ -105,8 +111,13 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
     bt.logging.info(f"Video data batch fetch took {time.time() - start_time:.2f} seconds")
 
     start_time = time.time()
-    video_analytics_dict = get_video_analytics_batch(youtube_analytics_client, video_ids)
-    bt.logging.info(f"Video analytics batch fetch took {time.time() - start_time:.2f} seconds")
+    try:
+        video_analytics_dict = get_video_analytics_batch(youtube_analytics_client, video_ids)
+        bt.logging.info(f"Video analytics batch fetch took {time.time() - start_time:.2f} seconds")
+    except ConnectionError as e:
+        bt.logging.error(f"Failed to fetch video analytics batch: {e}")
+        # Return results with all videos marked as failed
+        return {video_id: [False] * len(briefs) for video_id in video_ids}, video_data_dict, {}, {}
 
     for video_id in video_ids:
         try:
@@ -212,9 +223,15 @@ def vet_video(video_id, briefs, video_data, video_analytics):
             return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
     # Check if video was published after brief start date
-    if not check_video_publish_date(video_data, briefs, decision_details):
-        if handle_check_failure():
-            return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
+    try:
+        if not check_video_publish_date(video_data, briefs, decision_details):
+            if handle_check_failure():
+                return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
+    except RuntimeError as e:
+        bt.logging.error(f"System error during publish date check: {e}")
+        decision_details["video_vet_result"] = False
+        decision_details["publishDateCheck"] = False
+        return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": []}
     
     # Check video retention
     if not check_video_retention(video_data, video_analytics, decision_details):
@@ -231,12 +248,19 @@ def vet_video(video_id, briefs, video_data, video_analytics):
     brief_reasonings = []
     if all_checks_passed:
         # Get transcript only when needed
-        transcript = get_video_transcript(video_id, video_data)
-        if transcript is None:
+        try:
+            transcript = get_video_transcript(video_id, video_data)
+        except ConnectionError as e:
+            bt.logging.error(f"Failed to get video transcript: {e}")
             decision_details["video_vet_result"] = False
             decision_details["promptInjectionCheck"] = False
             decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
             brief_reasonings = ["Failed to get video transcript"] * len(briefs)
+            transcript = None
+        
+        if transcript is None:
+            # Already handled above in exception case
+            pass
         else:
             # Check for prompt injection
             if not check_prompt_injection(video_id, video_data, transcript, decision_details):
@@ -245,7 +269,14 @@ def vet_video(video_id, briefs, video_data, video_analytics):
                 brief_reasonings = ["Video failed prompt injection check"] * len(briefs)
             else:
                 # Evaluate content against briefs only if prompt injection check passed
-                met_brief_ids, brief_reasonings = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+                try:
+                    met_brief_ids, brief_reasonings = evaluate_content_against_briefs(briefs, video_data, transcript, decision_details)
+                except RuntimeError as e:
+                    bt.logging.error(f"System error during brief evaluation: {e}")
+                    decision_details["video_vet_result"] = False
+                    decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
+                    brief_reasonings = ["Brief evaluation system error"] * len(briefs)
+                    met_brief_ids = []
     else:
         # If any check failed, set all briefs to false and prompt injection to false
         decision_details["promptInjectionCheck"] = False
@@ -335,9 +366,11 @@ def check_video_publish_date(video_data, briefs, decision_details):
         decision_details["publishDateCheck"] = True
         return True
     except Exception as e:
-        bt.logging.error(f"Error checking video publish date: {e}")
-        decision_details["publishDateCheck"] = False
-        return False
+        log_and_raise_processing_error(
+            error=e,
+            operation="video publish date validation",
+            context={"video_id": video_data.get("bitcastVideoId")}
+        )
 
 
 def check_video_retention(video_data, video_analytics, decision_details):
@@ -404,12 +437,20 @@ def get_video_transcript(video_id, video_data):
         try:
             transcript = fetch_video_transcript_api(video_id, RAPID_API_KEY)
         except Exception as e:
-            bt.logging.warning(f"Error retrieving transcript for video: {video_data['bitcastVideoId']} - {_format_error(e)}")
-            transcript = None
+            log_and_raise_api_error(
+                error=e,
+                endpoint="rapid-api.transcript",
+                params={"bitcast_video_id": video_data.get("bitcastVideoId", "unknown")},
+                context="Video transcript fetch"
+            )
 
     if transcript is None:
-        bt.logging.warning(f"Transcript retrieval failed for video: {video_data['bitcastVideoId']}")
-        return None
+        log_and_raise_api_error(
+            error=RuntimeError("Transcript API returned None"),
+            endpoint="rapid-api.transcript",
+            params={"bitcast_video_id": video_data.get("bitcastVideoId", "unknown")},
+            context="Video transcript fetch"
+        )
         
     return str(transcript)
 
@@ -485,9 +526,14 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                     met_brief_ids.append(brief["id"])
                 # Note: Individual brief completion logs will appear from OpenaiClient
             except Exception as e:
-                bt.logging.error(f"Error evaluating brief {brief['id']} for video: {video_data['bitcastVideoId']}: {_format_error(e)}")
-                brief_results[brief_index] = False
-                brief_reasonings[brief_index] = f"Error during evaluation: {str(e)}"
+                log_and_raise_processing_error(
+                    error=e,
+                    operation="brief evaluation",
+                    context={
+                        "brief_id": brief["id"],
+                        "video_id": video_data.get("bitcastVideoId")
+                    }
+                )
     
     # Update decision_details with results in correct order
     decision_details["contentAgainstBriefCheck"].extend(brief_results)

@@ -5,6 +5,7 @@ import os
 from threading import Lock
 import atexit
 from bitcast.validator.utils.config import BITCAST_BLACKLIST_ENDPOINT, BITCAST_BLACKLIST_SOURCES_ENDPOINT, CACHE_DIRS, BLACKLIST_CACHE_EXPIRY
+from bitcast.validator.utils.error_handling import log_and_raise_api_error
 from typing import Dict, List, TypedDict
 
 class BlacklistSources(TypedDict):
@@ -86,14 +87,18 @@ def get_blacklist() -> list[str]:
         return blacklist_items
 
     except requests.exceptions.RequestException as e:
-        bt.logging.error(f"Error fetching blacklist: {e}")
         # Try to return cached data if available (even if expired)
         cached_blacklist = cache.get(cache_key)
         if cached_blacklist is not None:
             bt.logging.warning("Using cached blacklist due to API error")
             return cached_blacklist
-        bt.logging.error("No cached blacklist available")
-        return []
+        
+        # No cached data available - this is a real error
+        log_and_raise_api_error(
+            error=e,
+            endpoint=BITCAST_BLACKLIST_ENDPOINT,
+            context="Blacklist fetch"
+        )
 
 def is_blacklisted(id: str) -> bool:
     """
