@@ -22,8 +22,8 @@ def test_update_video_score():
             "details": {"bitcastVideoId": video_id_1}, 
             "analytics": {}  # Analytics not used in scoring anymore
         }
-        mock_calculate.return_value = {"score": 2.50, "daily_analytics": {}}
-        update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result)
+        mock_calculate.return_value = {"score": 2.50, "daily_analytics": {}, "scoring_method": "ypp"}
+        update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True, cached_ratio=None)
         assert result["scores"]["test_brief"] == 2.50, "First score should be 2.50"
         
         # Test case 2: Second video with revenue score 1.75 (daily average over 1 day = 1.75)
@@ -33,8 +33,8 @@ def test_update_video_score():
             "details": {"bitcastVideoId": video_id_2}, 
             "analytics": {}
         }
-        mock_calculate.return_value = {"score": 1.75, "daily_analytics": {}}
-        update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result)
+        mock_calculate.return_value = {"score": 1.75, "daily_analytics": {}, "scoring_method": "ypp"}
+        update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True, cached_ratio=None)
         assert result["scores"]["test_brief"] == 4.25, "Score should be 4.25 (2.50 + 1.75)"
         
         # Test case 3: Third video with revenue score 0 (no revenue generated)
@@ -44,8 +44,8 @@ def test_update_video_score():
             "details": {"bitcastVideoId": video_id_3}, 
             "analytics": {}
         }
-        mock_calculate.return_value = {"score": 0, "daily_analytics": {}}
-        update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result)
+        mock_calculate.return_value = {"score": 0, "daily_analytics": {}, "scoring_method": "ypp"}
+        update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True, cached_ratio=None)
         assert result["scores"]["test_brief"] == 4.25, "Score should remain 4.25 (2.50 + 1.75 + 0)"
         
         # Test case 4: Fourth video with revenue score 0.80 (daily average over 1 day = 0.80)
@@ -55,8 +55,8 @@ def test_update_video_score():
             "details": {"bitcastVideoId": video_id_4}, 
             "analytics": {}
         }
-        mock_calculate.return_value = {"score": 0.80, "daily_analytics": {}}
-        update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result)
+        mock_calculate.return_value = {"score": 0.80, "daily_analytics": {}, "scoring_method": "ypp"}
+        update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True, cached_ratio=None)
         assert result["scores"]["test_brief"] == 5.05, "Score should be 5.05 (2.50 + 1.75 + 0 + 0.80)"
 
 

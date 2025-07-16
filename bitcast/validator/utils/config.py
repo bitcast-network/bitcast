@@ -13,7 +13,8 @@ CACHE_DIRS = {
     "openai": os.path.join(CACHE_ROOT, "openai"),
     "briefs": os.path.join(CACHE_ROOT, "briefs"),
     "blacklist": os.path.join(CACHE_ROOT, "blacklist"),
-    "youtube_search": os.path.join(CACHE_ROOT, "youtube_search")
+    "youtube_search": os.path.join(CACHE_ROOT, "youtube_search"),
+    "views_revenue_ratio": os.path.join(CACHE_ROOT, "views_revenue_ratio")
 }
 
 # Cache expiry times (in seconds)

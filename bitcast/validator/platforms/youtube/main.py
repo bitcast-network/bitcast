@@ -11,6 +11,7 @@ from bitcast.validator.platforms.youtube.evaluation import (
     vet_videos,
     calculate_video_score
 )
+from bitcast.validator.platforms.youtube.evaluation.dual_scoring import get_cached_ratio
 from bitcast.validator.utils.config import (
     YT_MIN_SUBS, 
     YT_MIN_CHANNEL_AGE, 
@@ -120,6 +121,14 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
 def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
     """Process videos, calculate scores, and update the result structure."""
     try:
+        # Get YPP status from channel analytics
+        is_ypp_account = result["yt_account"]["analytics"].get("ypp", False)
+        
+        # Get cached ratio for Non-YPP accounts
+        cached_ratio = get_cached_ratio()
+        
+        bt.logging.info(f"Account YPP status: {is_ypp_account}, Cached ratio available: {cached_ratio is not None}")
+        
         video_ids = get_all_uploads(youtube_data_client, YT_LOOKBACK)
         
         # Vet videos and store the results
@@ -138,7 +147,9 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
                     video_decision_details, 
                     briefs, 
                     youtube_analytics_client, 
-                    result
+                    result,
+                    is_ypp_account,
+                    cached_ratio
                 )
         
         # If channel vetting failed, set all scores to 0 but keep the video data
@@ -151,7 +162,8 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
     return result
 
 def process_single_video(video_id, video_data_dict, video_analytics_dict, video_matches, 
-                         video_decision_details, briefs, youtube_analytics_client, result):
+                         video_decision_details, briefs, youtube_analytics_client, result,
+                         is_ypp_account, cached_ratio):
     """Process a single video and update the result structure."""
     video_data = video_data_dict[video_id]
     video_analytics = video_analytics_dict[video_id]
@@ -175,7 +187,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     
     # Calculate and store the score if the video passes vetting and matches a brief
     if video_vet_result and matches_any_brief:
-        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result)
+        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, cached_ratio)
     else:
         result["videos"][video_id]["score"] = 0
 
@@ -191,17 +203,23 @@ def check_video_brief_matches(video_id, video_matches, briefs):
     
     return matches_any_brief, matching_brief_ids
 
-def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result):
-    """Calculate and update the score for a video that matches a brief."""
+def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, cached_ratio):
+    """Calculate and update the score for a video that matches a brief using dual scoring mechanism."""
     video_publish_date = result["videos"][video_id]["details"].get("publishedAt")
     existing_analytics = result["videos"][video_id]["analytics"]
     
-    video_score_result = calculate_video_score(video_id, youtube_analytics_client, video_publish_date, existing_analytics)
+    video_score_result = calculate_video_score(
+        video_id, youtube_analytics_client, video_publish_date, existing_analytics,
+        is_ypp_account=is_ypp_account, cached_ratio=cached_ratio
+    )
     video_score = video_score_result["score"]
-    bt.logging.info(f"Raw video_score from calculate_video_score: {video_score}")
+    scoring_method = video_score_result["scoring_method"]
+    
+    bt.logging.info(f"Raw video_score from calculate_video_score: {video_score} (method: {scoring_method})")
     
     result["videos"][video_id]["score"] = video_score
     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
+    result["videos"][video_id]["scoring_method"] = scoring_method
     
     # Update the score for the matching brief
     for i, match in enumerate(video_matches.get(video_id, [])):

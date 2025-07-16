@@ -6,6 +6,7 @@ This module contains functions for calculating video scores based on analytics d
 
 import bittensor as bt
 from datetime import datetime, timedelta
+from typing import Optional
 
 from bitcast.validator.platforms.youtube.api.video import get_video_analytics
 from bitcast.validator.utils.config import (
@@ -14,20 +15,25 @@ from bitcast.validator.utils.config import (
     ECO_MODE
 )
 from bitcast.validator.platforms.youtube.config import get_youtube_metrics
+from .dual_scoring import calculate_dual_score
 
 
-def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, existing_analytics):
+def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, 
+                         existing_analytics, is_ypp_account: bool = True, 
+                         cached_ratio: Optional[float] = None):
     """
-    Calculate the score for a video based on analytics data.
+    Calculate the score for a video using appropriate strategy based on YPP status.
     
     Args:
         video_id (str): Video ID to calculate score for
         youtube_analytics_client: YouTube Analytics API client
         video_publish_date (str): Video publish date in ISO format
         existing_analytics (dict): Existing analytics data
+        is_ypp_account (bool): Whether this is a YPP account
+        cached_ratio (Optional[float]): Global cached views-to-revenue ratio for Non-YPP accounts
         
     Returns:
-        dict: Dictionary containing score and daily_analytics
+        dict: Dictionary containing score, daily_analytics, and scoring_method
     """
     # Use video publish date as query start date if provided, otherwise use default
     try:
@@ -53,17 +59,5 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     
     daily_analytics = sorted(analytics_result.get("day_metrics", {}).values(), key=lambda x: x.get("day", ""))
     
-    # Calculate total revenue over the scoring time frame
-    total_revenue = sum(
-        item.get('estimatedRedPartnerRevenue', 0) 
-        for item in daily_analytics 
-        if start_date <= item.get('day', '') <= end_date
-    )
-    
-    # Calculate daily average revenue by dividing by YT_ROLLING_WINDOW regardless of actual days present
-    score = total_revenue / YT_ROLLING_WINDOW
-
-    return {
-        "score": score,
-        "daily_analytics": daily_analytics
-    } 
+    # Calculate score using dual scoring logic
+    return calculate_dual_score(daily_analytics, start_date, end_date, is_ypp_account, cached_ratio) 

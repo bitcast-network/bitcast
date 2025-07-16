@@ -33,6 +33,14 @@ from .scoring import (
     calculate_video_score
 )
 
+# Dual scoring utilities
+from .dual_scoring import (
+    calculate_dual_score,
+    calculate_global_ratio,
+    update_cached_ratio,
+    get_cached_ratio
+)
+
 __all__ = [
     # Channel evaluation
     'vet_channel',
@@ -55,4 +63,10 @@ __all__ = [
     
     # Scoring
     'calculate_video_score',
+    
+    # Dual scoring utilities
+    'calculate_dual_score',
+    'calculate_global_ratio',
+    'update_cached_ratio',
+    'get_cached_ratio',
 ] 

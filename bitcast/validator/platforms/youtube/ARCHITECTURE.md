@@ -146,4 +146,31 @@ Key configuration variables from `bitcast.validator.utils.config`:
 
 ### Utilities
 - `initialize_youtube_clients(creds) -> tuple` - Create authenticated clients
-- `get_video_transcript(video_id) -> str` - Retrieve video transcripts 
+- `get_video_transcript(video_id) -> str` - Retrieve video transcripts
+
+## Dual Scoring System
+
+### Overview
+Implements separate scoring for YouTube Partner Program (YPP) and Non-YPP accounts:
+- **YPP Accounts**: Revenue-based scoring (existing algorithm)
+- **Non-YPP Accounts**: Predicted revenue using cached views-to-revenue ratios
+
+### Key Components
+- **Dual Scoring Functions**: `dual_scoring.py` with simple functions for YPP/Non-YPP scoring and ratio management
+- **Ratio Cache**: `ratio_cache.py` for persistent ratio storage
+
+### Scoring Logic
+- **YPP**: `score = total_revenue / YT_ROLLING_WINDOW` (unchanged)
+- **Non-YPP**: `score = (total_views × cached_ratio) / YT_ROLLING_WINDOW`
+- **Fallback**: Non-YPP accounts score 0 if no cached ratio available (first cycle only)
+
+### YPP Detection & Ratio Management
+- **Detection**: Automatic during `get_channel_analytics()` - revenue metrics success/failure determines YPP status
+- **Ratio Calculation**: `global_ratio = total_revenue_all_ypp_videos / total_views_all_ypp_videos`
+- **Caching**: Updated every 4-hour cycle via `orchestrator.py`, simple overwrite (no expiry)
+- **Storage**: Uses existing cache infrastructure (`CACHE_DIRS["views_revenue_ratio"]`)
+
+### Integration
+- **Main Flow**: YPP status extracted from channel analytics, passed to `calculate_video_score()`
+- **Orchestrator**: Calls `_update_global_ratio()` after score aggregation to cache new ratio
+- **Enhanced Function**: `calculate_video_score()` now accepts `is_ypp_account` and `cached_ratio` parameters 
