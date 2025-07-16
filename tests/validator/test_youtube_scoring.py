@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from bitcast.validator.socials.youtube.main import update_video_score, check_video_brief_matches
+from bitcast.validator.platforms.youtube.main import update_video_score, check_video_brief_matches
 
 def test_update_video_score():
     # Setup
@@ -12,8 +12,8 @@ def test_update_video_score():
     video_matches = {}
     
     # Mock YT_ROLLING_WINDOW to 1 for easier test calculations (so no division)
-    with patch('bitcast.validator.socials.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 1), \
-         patch('bitcast.validator.socials.youtube.main.calculate_video_score') as mock_calculate:
+    with patch('bitcast.validator.platforms.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 1), \
+         patch('bitcast.validator.platforms.youtube.main.calculate_video_score') as mock_calculate:
         
         # Test case 1: First video with revenue score 2.50 (daily average over 1 day = 2.50)
         video_id_1 = "test_video_id_1"
@@ -111,8 +111,8 @@ def test_process_videos_empty_briefs():
     }
     
     # Mock the necessary functions
-    with patch('bitcast.validator.socials.youtube.main.get_all_uploads') as mock_get_uploads, \
-         patch('bitcast.validator.socials.youtube.main.vet_videos') as mock_vet_videos:
+    with patch('bitcast.validator.platforms.youtube.main.get_all_uploads') as mock_get_uploads, \
+         patch('bitcast.validator.platforms.youtube.main.vet_videos') as mock_vet_videos:
         
         # Setup mock return values
         mock_get_uploads.return_value = ["video1", "video2"]
@@ -124,7 +124,7 @@ def test_process_videos_empty_briefs():
         )
         
         # Call the function
-        from bitcast.validator.socials.youtube.main import process_videos
+        from bitcast.validator.platforms.youtube.main import process_videos
         result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
         
         # Verify the results
@@ -144,7 +144,7 @@ def test_process_videos_empty_briefs():
 
 def test_calculate_video_score_revenue_based():
     """Test the revenue-based scoring calculation logic with daily average."""
-    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+    from bitcast.validator.platforms.youtube.evaluation.scoring import calculate_video_score
     from datetime import datetime
 
     # Mock dependencies
@@ -153,8 +153,8 @@ def test_calculate_video_score_revenue_based():
     existing_analytics = {}  # Not used anymore
 
     # Mock YT_ROLLING_WINDOW to 7 for realistic testing
-    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
-         patch('bitcast.validator.socials.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
+    with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.platforms.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
         
         # Test case: Revenue across multiple days, total = 5.05, average = 5.05/7 ≈ 0.721
         mock_analytics.return_value = {
@@ -175,7 +175,7 @@ def test_calculate_video_score_revenue_based():
         }
         
         # Mock datetime.now() to return a fixed date
-        with patch('bitcast.validator.socials.youtube.evaluation.scoring.datetime') as mock_datetime:
+        with patch('bitcast.validator.platforms.youtube.evaluation.scoring.datetime') as mock_datetime:
             # Set up the datetime mock to return a real datetime object for now()
             mock_datetime.now.return_value = datetime(2023, 1, 12)
             mock_datetime.strptime = datetime.strptime
@@ -200,15 +200,15 @@ def test_calculate_video_score_revenue_based():
 
 def test_calculate_video_score_no_revenue():
     """Test scoring when there's no revenue data."""
-    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+    from bitcast.validator.platforms.youtube.evaluation.scoring import calculate_video_score
     from datetime import datetime
 
     youtube_analytics_client = MagicMock()
     video_publish_date = "2023-01-01T00:00:00Z"
     existing_analytics = {}
 
-    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
-         patch('bitcast.validator.socials.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
+    with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.platforms.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
         
         mock_analytics.return_value = {
             "day_metrics": {
@@ -219,7 +219,7 @@ def test_calculate_video_score_no_revenue():
             }
         }
         
-        with patch('bitcast.validator.socials.youtube.evaluation.scoring.datetime') as mock_datetime:
+        with patch('bitcast.validator.platforms.youtube.evaluation.scoring.datetime') as mock_datetime:
             mock_datetime.now.return_value = datetime(2023, 1, 10)
             mock_datetime.strptime = datetime.strptime
             import datetime as dt
@@ -234,21 +234,21 @@ def test_calculate_video_score_no_revenue():
 
 def test_calculate_video_score_empty_analytics():
     """Test scoring when analytics data is empty."""
-    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+    from bitcast.validator.platforms.youtube.evaluation.scoring import calculate_video_score
     from datetime import datetime
 
     youtube_analytics_client = MagicMock()
     video_publish_date = "2023-01-01T00:00:00Z"
     existing_analytics = {}
 
-    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
-         patch('bitcast.validator.socials.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
+    with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.platforms.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
         
         mock_analytics.return_value = {
             "day_metrics": {}  # Empty analytics
         }
         
-        with patch('bitcast.validator.socials.youtube.evaluation.scoring.datetime') as mock_datetime:
+        with patch('bitcast.validator.platforms.youtube.evaluation.scoring.datetime') as mock_datetime:
             mock_datetime.now.return_value = datetime(2023, 1, 10)
             mock_datetime.strptime = datetime.strptime
             import datetime as dt
@@ -263,15 +263,15 @@ def test_calculate_video_score_empty_analytics():
 
 def test_calculate_video_score_partial_window_data():
     """Test that scoring divides by YT_ROLLING_WINDOW even with partial data."""
-    from bitcast.validator.socials.youtube.evaluation.scoring import calculate_video_score
+    from bitcast.validator.platforms.youtube.evaluation.scoring import calculate_video_score
     from datetime import datetime
 
     youtube_analytics_client = MagicMock()
     video_publish_date = "2023-01-01T00:00:00Z"
     existing_analytics = {}
 
-    with patch('bitcast.validator.socials.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
-         patch('bitcast.validator.socials.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
+    with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_video_analytics') as mock_analytics, \
+         patch('bitcast.validator.platforms.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
         
         # Only 2 days of data in a 7-day window
         mock_analytics.return_value = {
@@ -288,7 +288,7 @@ def test_calculate_video_score_partial_window_data():
             }
         }
         
-        with patch('bitcast.validator.socials.youtube.evaluation.scoring.datetime') as mock_datetime:
+        with patch('bitcast.validator.platforms.youtube.evaluation.scoring.datetime') as mock_datetime:
             mock_datetime.now.return_value = datetime(2023, 1, 10)
             mock_datetime.strptime = datetime.strptime
             import datetime as dt

@@ -6,8 +6,8 @@ import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
-from bitcast.validator.socials.youtube.youtube_evaluation import vet_video
-from bitcast.validator.socials.youtube import youtube_utils
+from bitcast.validator.platforms.youtube.youtube_evaluation import vet_video
+from bitcast.validator.platforms.youtube import youtube_utils
 from bitcast.validator.utils.config import RAPID_API_KEY
 import asyncio
 

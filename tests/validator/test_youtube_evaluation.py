@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 import bittensor as bt
-from bitcast.validator.socials.youtube.evaluation import (
+from bitcast.validator.platforms.youtube.evaluation import (
     vet_channel,
     calculate_channel_age,
     check_channel_criteria,
@@ -299,14 +299,14 @@ def test_check_video_retention():
     assert decision_details["averageViewPercentageCheck"] == False
 
 @pytest.mark.asyncio
-@patch('bitcast.validator.socials.youtube.api.clients.build')
-@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_data_batch')
-@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_analytics')
-@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript')
-@patch('bitcast.validator.socials.youtube.evaluation.video.state.is_video_already_scored')
-@patch('bitcast.validator.socials.youtube.evaluation.video.state.mark_video_as_scored')
-@patch('bitcast.validator.socials.youtube.evaluation.video.check_for_prompt_injection')
-@patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_brief')
+@patch('bitcast.validator.platforms.youtube.api.clients.build')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_data_batch')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_analytics')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.state.is_video_already_scored')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.state.mark_video_as_scored')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.evaluate_content_against_brief')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
 async def test_process_video_vetting(mock_evaluate_content, mock_check_injection, mock_mark_video_as_scored, 
                         mock_is_video_already_scored, mock_get_transcript,
