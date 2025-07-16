@@ -31,11 +31,6 @@ Example usage:
 # Core metrics for general analytics
 CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
-    "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
-    "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
-    "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
-    "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
-    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Additional metrics for full analytics (when not in ECO_MODE)
@@ -45,6 +40,8 @@ ADDITIONAL_METRICS = {
     "likes": ("likes", "", None, None, None),
     "dislikes": ("dislikes", "", None, None, None),
     "shares": ("shares", "", None, None, None),
+    "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
+    "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "averageViewDuration": ("averageViewDuration", "", None, None, None),
     "countryMinutes": ("estimatedMinutesWatched", "country", None, None, "-estimatedMinutesWatched"),
     "ageGroupViewerPercentage": ("viewerPercentage", "ageGroup,gender", None, None, None),
@@ -53,6 +50,10 @@ ADDITIONAL_METRICS = {
     "relativeRetentionPerformance": ("relativeRetentionPerformance", "elapsedVideoTimeRatio", None, None, None),
     "creatorContentTypeMinutes": ("estimatedMinutesWatched", "creatorContentType", None, None, None),
     "subscribedStatusMinutes": ("averageViewPercentage", "subscribedStatus", None, None, None),
+    "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
+    "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
+    "monetizedPlaybacks": ("monetizedPlaybacks", "", None, None, None),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Slow API calls that we only use in non eco mode on videos of interest
@@ -64,10 +65,7 @@ ADVANCED_METRICS = {
 
 # Core daily metrics - all metrics with day dimension
 CORE_DAILY_METRICS = {
-    "estimatedMinutesWatched": ("estimatedMinutesWatched", "day", None, None, "day"),
-    "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType,day", None, None, "day"),
-    "cpm": ("cpm", "day", None, None, "day"),
-    "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
 }
 
 # Additional daily metrics for ECO_MODE
@@ -87,8 +85,10 @@ ADDITIONAL_DAILY_METRICS = {
     "youtubeProductMinutes": ("estimatedMinutesWatched", "youtubeProduct,day", None, None, "day"),
     "engagedViews": ("engagedViews", "day", None, None, "day"),
     "videosAddedToPlaylists": ("videosAddedToPlaylists", "day", None, None, "day"),
-    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
-    "monetizedPlaybacks": ("monetizedPlaybacks", "day", None, None, "day"),
+    "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
+    "cpm": ("cpm", "day", None, None, "day"),
+    "estimatedMinutesWatched": ("estimatedMinutesWatched", "day", None, None, "day"),
+    "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType,day", None, None, "day"),
 }
 
 def get_youtube_metrics(eco_mode, for_daily=False):
@@ -123,8 +123,6 @@ def get_youtube_metrics(eco_mode, for_daily=False):
 CHANNEL_CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
-    "cpm": ("cpm", "", None, None, None),
-    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Additional channel metrics for non-ECO mode
@@ -140,6 +138,8 @@ CHANNEL_ADDITIONAL_METRICS = {
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "countryViews": ("views", "country", None, None, None),
     "countryMinutes": ("estimatedMinutesWatched", "country", None, None, None),
+    "cpm": ("cpm", "", None, None, None),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Revenue metrics that commonly fail for accounts without monetization

@@ -45,7 +45,7 @@ def eval_youtube(creds, briefs, min_stake=False):
             "data_api_calls": state.data_api_call_count,
             "analytics_api_calls": state.analytics_api_call_count,
             "openai_requests": openai_client_module.openai_request_count,
-            "evaluation_time": elapsed
+            "evaluation_time_s": elapsed
         }
         return result
     
@@ -201,7 +201,6 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
     bt.logging.info(f"Raw video_score from calculate_video_score: {video_score}")
     
     result["videos"][video_id]["score"] = video_score
-    result["videos"][video_id]["analytics"]["scorableHistoryMins"] = video_score_result["scorableHistoryMins"]
     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
     
     # Update the score for the matching brief

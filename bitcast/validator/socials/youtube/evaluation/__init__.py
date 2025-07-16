@@ -30,9 +30,7 @@ from .video import (
 
 # Scoring functions
 from .scoring import (
-    calculate_video_score,
-    calculate_blacklisted_ext_url_proportion,
-    get_scorable_minutes
+    calculate_video_score
 )
 
 __all__ = [
@@ -57,6 +55,4 @@ __all__ = [
     
     # Scoring
     'calculate_video_score',
-    'calculate_blacklisted_ext_url_proportion',
-    'get_scorable_minutes'
 ] 

@@ -88,6 +88,9 @@ Key configuration variables from `bitcast.validator.utils.config`:
 
 - `YT_MIN_SUBS`, `YT_MIN_CHANNEL_AGE`, `YT_MIN_CHANNEL_RETENTION` - Channel criteria
 - `YT_MIN_VIDEO_RETENTION`, `YT_REWARD_DELAY`, `YT_ROLLING_WINDOW` - Video criteria  
+- `YT_SCALING_FACTOR_DEDICATED`, `YT_SCALING_FACTOR_PRE_ROLL` - Scaling factors for different brief types
+- `YT_SMOOTHING_FACTOR` - Score smoothing factor for reward calculations
+- `YT_MIN_EMISSIONS` - Minimum emissions threshold for reward scaling
 - `ECO_MODE` - Performance optimizations and early exits
 - `YT_LOOKBACK` - Days to look back for videos
 - `RAPID_API_KEY` - API key for transcript services

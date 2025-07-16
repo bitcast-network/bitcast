@@ -24,8 +24,9 @@ from google.oauth2.credentials import Credentials
 from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.socials.youtube.main import eval_youtube
 from bitcast.validator.socials.youtube.utils import state
-from bitcast.validator.rewards_scaling import scale_rewards, allocate_community_reserve
-from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE, YT_MIN_ALPHA_STAKE_THRESHOLD
+from bitcast.validator.rewards_scaling import allocate_community_reserve
+from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE, YT_MIN_ALPHA_STAKE_THRESHOLD, YT_SCALING_FACTOR_DEDICATED, YT_SCALING_FACTOR_PRE_ROLL, YT_SMOOTHING_FACTOR, YT_MIN_EMISSIONS
+from bitcast.validator.utils.token_pricing import get_bitcast_alpha_price, get_total_miner_emissions
 from bitcast.protocol import AccessTokenSynapse
 
 def reward(uid, briefs, response, metagraph=None) -> dict:
@@ -180,45 +181,148 @@ async def get_rewards(
     scores_matrix = np.array(scores_matrix)
     
     state.reset_scored_videos()
-    rewards, scaled_matrix = normalise_scores(scores_matrix, yt_stats_list, briefs)
+
+    # Convert raw scores to emission targets (USD)
+    emission_targets = calculate_emission_targets(scores_matrix, briefs)
     
-    # Add scaled scores to each miner's stats
-    add_scaled_scores_to_stats(yt_stats_list, scaled_matrix, briefs)
+    add_matrix_to_stats(yt_stats_list, emission_targets, briefs, "emission_targets")
+
+    # Convert USD emission targets to raw weights based on current token pricing
+    raw_weights_matrix = calculate_raw_weights(emission_targets)
+    
+    add_matrix_to_stats(yt_stats_list, raw_weights_matrix, briefs, "raw_weights")
+
+    # Normalize raw weights into final reward distribution
+    rewards, rewards_matrix = normalise_scores(raw_weights_matrix, briefs, uids)
+    
+    add_matrix_to_stats(yt_stats_list, rewards_matrix, briefs, "rewards")
     
     # Allocate community reserve as the final step
     rewards = allocate_community_reserve(rewards, uids)
 
     return rewards, yt_stats_list
 
-def normalise_scores(scores_matrix, yt_stats_list, briefs):
+def calculate_emission_targets(scores_matrix, briefs):
     """
-    Normalizes the scores matrix in three steps:
-    1. Normalize each brief's scores across all miners so each column sums to 1.
-    2. Normalize each miner's scores by the weighted number of briefs. Matrix should now sum to 1.
-    3. Scale rewards to determine burn portions.
-    4. Sum each miner's normalized and scaled scores to produce a final reward per miner.
+    Transform raw scores into USD daily emission targets through scaling, smoothing, and readjustment.
+    This is the USD amount we will aim to reward the miners today.
+        
+    Returns:
+        numpy array: emission target matrix (miners x briefs)
+    """
+    
+    if isinstance(scores_matrix, list):
+        scores_matrix = np.array(scores_matrix, dtype=np.float64)
+    if scores_matrix.size == 0:
+        return np.array([])
+    
+    emission_targets = scores_matrix.copy()
+    
+    # Process each brief (column) to calculate emission targets
+    for brief_idx, brief in enumerate(briefs):
+        if brief_idx >= emission_targets.shape[1]:
+            continue
+            
+        # Apply format-specific scaling factor for emission targeting
+        brief_format = brief.get("format", "dedicated")
+        scaling_factor = (YT_SCALING_FACTOR_DEDICATED if brief_format == "dedicated" 
+                         else YT_SCALING_FACTOR_PRE_ROLL if brief_format == "pre-roll"
+                         else YT_SCALING_FACTOR_DEDICATED)
+        
+        if brief_format not in ["dedicated", "pre-roll"]:
+            bt.logging.warning(f"Unknown brief format '{brief_format}', defaulting to dedicated")
+        
+        # Scale scores for emission distribution
+        emission_targets[:, brief_idx] *= scaling_factor
+        
+        # Store scaled scores for readjustment (after scaling but before smoothing)
+        scaled_scores = emission_targets[:, brief_idx].copy()
+        
+        # Apply smoothing
+        pre_smooth_scores = np.maximum(emission_targets[:, brief_idx], 0)
+        smoothed_scores = np.power(pre_smooth_scores, YT_SMOOTHING_FACTOR)
+        
+        # Readjust to maintain scaled proportions (use scaled averages)
+        # Use non-negative scaled scores for readjustment to avoid negative emissions
+        avg_scaled = np.mean(np.maximum(scaled_scores, 0))
+        avg_smoothed = np.mean(smoothed_scores)
+        
+        if avg_smoothed != 0:
+            emission_targets[:, brief_idx] = smoothed_scores * (avg_scaled / avg_smoothed)
+        else:
+            emission_targets[:, brief_idx] = smoothed_scores
+    
+    return emission_targets
+
+def calculate_raw_weights(emission_targets_matrix):
+    """
+    Convert USD emission targets to raw weights based on token pricing.
+    Formula: target_usd / alpha_price / total_daily_alpha = raw_weight
     
     Returns:
-        tuple: (final_rewards, scaled_matrix_before_summing)
+        numpy array: raw weight matrix (miners x briefs) representing proportion of daily alpha emissions
     """
-    res = normalize_across_miners(scores_matrix)
-    res = normalize_across_briefs(res, briefs)
-    scaled_matrix = scale_rewards(res, yt_stats_list, briefs)  # Apply scaling after normalization but before summing
-    final_rewards = sum_scores(scaled_matrix)
+    if isinstance(emission_targets_matrix, list):
+        emission_targets_matrix = np.array(emission_targets_matrix, dtype=np.float64)
+    if emission_targets_matrix.size == 0:
+        return np.array([])
     
-    return final_rewards, scaled_matrix
+    try:
+        alpha_price_usd = get_bitcast_alpha_price()
+        total_daily_alpha = get_total_miner_emissions()
+        
+        bt.logging.info(f"Alpha price: ${alpha_price_usd}, Daily emissions: {total_daily_alpha}")
+        
+        # Convert USD targets directly to raw weights
+        raw_weights = emission_targets_matrix / alpha_price_usd / total_daily_alpha
+        
+        bt.logging.info(f"Max raw weight: {np.max(raw_weights):.6f}")
+        return raw_weights
+        
+    except Exception as e:
+        bt.logging.error(f"Error converting to raw weights: {e}")
+        return np.zeros_like(emission_targets_matrix)
 
-def normalize_across_miners(scores_matrix):
+def normalise_scores(scores_matrix, briefs, uids):
     """
-    For each brief (column), normalize scores so the sum across all miners is 1.
+    Normalizes the scores matrix in two steps:
+    1. Clip each brief's scores: scale down if sum > 1, scale up if sum < YT_MIN_EMISSIONS.
+    2. Normalize each miner's scores by the weighted number of briefs. Matrix should now sum to 1.
+    3. Sum each miner's normalized scores to produce a final reward per miner.
+    
+    Returns:
+        tuple: (final_rewards, normalized_matrix_before_summing)
+    """
+    res = clip_scores(scores_matrix)
+    rewards_matrix = normalize_across_briefs(res, briefs)
+    rewards_list = sum_scores(rewards_matrix, uids)
+    
+    return rewards_list, rewards_matrix
+
+def clip_scores(scores_matrix):
+    """
+    For each brief (column), clip scores based on their sum:
+    - If sum > 1: scale down proportionally to equal 1
+    - If sum < YT_MIN_EMISSIONS: scale up to YT_MIN_EMISSIONS
+    - If sum = 0: leave unchanged
     """
     if isinstance(scores_matrix, list):
         scores_matrix = np.array(scores_matrix, dtype=np.float64)
     if scores_matrix.size == 0:
         return np.array([])
-    col_sums = scores_matrix.sum(axis=0, keepdims=True)
-    col_sums[col_sums == 0] = 1  # Avoid division by zero
-    return scores_matrix / col_sums
+    
+    # Ensure we're working with float64 to avoid casting errors
+    result = scores_matrix.astype(np.float64)
+    for col_idx in range(result.shape[1]):
+        col_sum = result[:, col_idx].sum()
+        if col_sum == 0:
+            continue
+        elif col_sum > 1:
+            result[:, col_idx] /= col_sum
+        elif col_sum < YT_MIN_EMISSIONS:
+            result[:, col_idx] *= (YT_MIN_EMISSIONS / col_sum)
+    
+    return result
 
 def normalize_across_briefs(normalized_scores_matrix, briefs):
     """
@@ -243,15 +347,34 @@ def normalize_across_briefs(normalized_scores_matrix, briefs):
     # Apply weights to columns (briefs) instead of rows (miners)
     return normalized_scores_matrix * (brief_weights / total_weight)[np.newaxis, :]
 
-def sum_scores(scores_matrix):
+def sum_scores(scores_matrix, uids):
     """
     For each miner (row), sum all normalized scores to get a single reward value.
+    Ensures the total scores sum to 1 by setting UID 0 to 1 - sum(other_scores).
     """
     if isinstance(scores_matrix, list):
         scores_matrix = np.array(scores_matrix, dtype=np.float64)
     if scores_matrix.size == 0:
         return np.array([])
-    return scores_matrix.sum(axis=1)
+    
+    # Sum each miner's scores across briefs
+    rewards = scores_matrix.sum(axis=1)
+    
+    # Find the index of UID 0
+    uid_0_index = None
+    for i, uid in enumerate(uids):
+        if uid == 0:
+            uid_0_index = i
+            break
+    
+    # If UID 0 exists, set its reward to ensure total sums to 1
+    if uid_0_index is not None:
+        # Calculate sum of all other rewards
+        other_rewards_sum = sum(rewards[i] for i in range(len(rewards)) if i != uid_0_index)
+        # Set UID 0's reward to make total sum to 1
+        rewards[uid_0_index] = 1.0 - other_rewards_sum
+    
+    return rewards
 
 def add_metagraph_info_to_stats(metagraph, uid: int, yt_stats: dict) -> None:
     """
@@ -280,20 +403,20 @@ def add_metagraph_info_to_stats(metagraph, uid: int, yt_stats: dict) -> None:
     except Exception as e:
         bt.logging.error(f"Error getting metagraph info for UID {uid}: {e}")
 
-def add_scaled_scores_to_stats(yt_stats_list, scaled_matrix, briefs):
+def add_matrix_to_stats(yt_stats_list, matrix, briefs, name):
     """
-    Add scaled scores per brief to each miner's stats.
+    Add normalized scores per brief to each miner's stats.
     
     Args:
         yt_stats_list: List of miner statistics dictionaries
-        scaled_matrix: Matrix from scale_rewards (miners x briefs)
+        normalized_matrix: Normalized matrix (miners x briefs)
         briefs: List of brief dictionaries with IDs
     """
     for i, yt_stats in enumerate(yt_stats_list):
-        if i < len(scaled_matrix):  # Ensure we don't go out of bounds
-            scaled_scores_for_miner = scaled_matrix[i]
-            yt_stats["rewards"] = {
-                brief["id"]: float(scaled_scores_for_miner[j]) 
+        if i < len(matrix):  # Ensure we don't go out of bounds
+            normalized_scores_for_miner = matrix[i]
+            yt_stats[name] = {
+                brief["id"]: float(normalized_scores_for_miner[j]) 
                 for j, brief in enumerate(briefs) 
-                if j < len(scaled_scores_for_miner)
+                if j < len(normalized_scores_for_miner)
             }
