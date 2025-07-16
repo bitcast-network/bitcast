@@ -12,4 +12,4 @@ wandb/
 *.egg-info/
 build/
 .cursor/
-dev_planning/
+.dev_planning/
