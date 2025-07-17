@@ -19,6 +19,7 @@ from bitcast.validator.utils.config import (
     YT_MIN_VIDEO_RETENTION, 
     YT_REWARD_DELAY, 
     YT_ROLLING_WINDOW,
+    YT_MAX_VIDEOS_PER_DEDICATED_BRIEF,
     DISCRETE_MODE,
     YT_LOOKBACK,
     ECO_MODE,
@@ -118,6 +119,78 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
         bt.logging.warning(f"An error occurred while retrieving YouTube data: {_format_error(e)}")
         return None, None
 
+def apply_video_limits(briefs, result):
+    """
+    Apply video scoring limits for dedicated briefs.
+    
+    For each dedicated brief, limits the number of videos that can receive scores per account.
+    Only the top N scoring videos keep their scores, the rest are set to 0.
+    
+    Args:
+        briefs (list): List of brief dictionaries
+        result (dict): Video evaluation result structure
+    """
+    for brief in briefs:
+        brief_id = brief["id"]
+        brief_format = brief.get("format", "dedicated")
+        
+        # Only apply limits to dedicated briefs
+        if brief_format != "dedicated":
+            continue
+            
+        # Find all videos that scored > 0 for this brief
+        scored_videos = []
+        for video_id, video_data in result["videos"].items():
+            if video_data.get("matching_brief_ids") and brief_id in video_data["matching_brief_ids"]:
+                video_score = video_data.get("score", 0)
+                if video_score > 0:
+                    scored_videos.append({
+                        "video_id": video_id,
+                        "score": video_score,
+                        "bitcast_video_id": video_data["details"].get("bitcastVideoId", video_id)
+                    })
+        
+        # Check if we need to apply limits
+        if len(scored_videos) <= YT_MAX_VIDEOS_PER_DEDICATED_BRIEF:
+            continue
+            
+        # Sort videos by score (descending) - ties handled by natural list order (doesn't matter which)
+        scored_videos.sort(key=lambda x: x["score"], reverse=True)
+        
+        # Keep top N videos, zero out the rest
+        videos_to_limit = scored_videos[YT_MAX_VIDEOS_PER_DEDICATED_BRIEF:]
+        original_total_score = result["scores"][brief_id]
+        score_reduction = 0
+        
+        for video_info in videos_to_limit:
+            video_id = video_info["video_id"]
+            original_score = video_info["score"]
+            
+            # Set video score to 0
+            result["videos"][video_id]["score"] = 0
+            
+            # Add metadata to track this was limited
+            if "score_limited" not in result["videos"][video_id]:
+                result["videos"][video_id]["score_limited"] = {}
+            result["videos"][video_id]["score_limited"][brief_id] = {
+                "original_score": original_score,
+                "reason": "exceeded_dedicated_brief_limit"
+            }
+            
+            score_reduction += original_score
+        
+        # Update the total score for this brief
+        result["scores"][brief_id] = original_total_score - score_reduction
+        
+        # Log the limiting action
+        limited_video_ids = [v["bitcast_video_id"] for v in videos_to_limit]
+        bt.logging.info(
+            f"Applied video limit for dedicated brief '{brief_id}': "
+            f"kept top {YT_MAX_VIDEOS_PER_DEDICATED_BRIEF} of {len(scored_videos)} videos, "
+            f"limited {len(videos_to_limit)} videos: {limited_video_ids}, "
+            f"score reduced by {score_reduction:.4f}"
+        )
+
 def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
     """Process videos, calculate scores, and update the result structure."""
     try:
@@ -155,6 +228,9 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
                     cached_ratio,
                     channel_analytics
                 )
+        
+        # Apply video scoring limits for dedicated briefs
+        apply_video_limits(briefs, result)
         
         # If channel vetting failed, set all scores to 0 but keep the video data
         if not result["yt_account"]["channel_vet_result"]:
