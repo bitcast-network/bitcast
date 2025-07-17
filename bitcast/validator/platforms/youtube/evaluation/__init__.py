@@ -41,6 +41,13 @@ from .dual_scoring import (
     get_cached_ratio
 )
 
+# Score capping
+from .score_cap import (
+    get_cap_period_dates,
+    pad_missing_days_with_zeros,
+    calculate_median_from_analytics
+)
+
 __all__ = [
     # Channel evaluation
     'vet_channel',
@@ -69,4 +76,9 @@ __all__ = [
     'calculate_global_ratio',
     'update_cached_ratio',
     'get_cached_ratio',
+    
+    # Score capping
+    'get_cap_period_dates',
+    'pad_missing_days_with_zeros',
+    'calculate_median_from_analytics',
 ] 

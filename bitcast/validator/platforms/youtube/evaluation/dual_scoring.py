@@ -11,8 +11,25 @@ from bitcast.validator.utils.config import YT_ROLLING_WINDOW
 from bitcast.validator.platforms.youtube.cache.ratio_cache import ViewsToRevenueRatioCache
 
 
+def _apply_median_cap(total_value: float, median_cap: Optional[float], metric_name: str) -> tuple[float, bool, float]:
+    """Apply median cap and return (capped_value, applied_cap, original_value)."""
+    original_value = total_value
+    applied_cap = False
+    
+    if median_cap is not None:
+        cap_limit = median_cap * YT_ROLLING_WINDOW
+        if total_value > cap_limit:
+            total_value = cap_limit
+            applied_cap = True
+            bt.logging.info(f"Applied {metric_name} cap: original={original_value:.0f}, capped={total_value:.0f}, median_cap={median_cap:.0f}")
+    
+    return total_value, applied_cap, original_value
+
+
 def calculate_dual_score(daily_analytics: List[Dict[str, Any]], start_date: str, end_date: str, 
-                        is_ypp_account: bool, cached_ratio: Optional[float] = None) -> Dict[str, Any]:
+                        is_ypp_account: bool, cached_ratio: Optional[float] = None,
+                        median_revenue_cap: Optional[float] = None,
+                        median_views_cap: Optional[float] = None) -> Dict[str, Any]:
     """
     Calculate video score using either YPP (revenue) or Non-YPP (predicted) scoring.
     
@@ -22,41 +39,77 @@ def calculate_dual_score(daily_analytics: List[Dict[str, Any]], start_date: str,
         end_date: End date for scoring window
         is_ypp_account: Whether this is a YPP account
         cached_ratio: Global cached views-to-revenue ratio for Non-YPP accounts
+        median_revenue_cap: Optional median daily revenue cap (YPP only)
+        median_views_cap: Optional median daily views cap (Non-YPP only)
         
     Returns:
-        Dict with score, daily_analytics, and scoring_method
+        Dict with score, daily_analytics, scoring_method, and cap debugging info
     """
     if is_ypp_account:
-        # YPP: Use actual revenue data
+        # YPP: Use actual revenue data with optional median capping
         total_revenue = sum(
             item.get('estimatedRedPartnerRevenue', 0) 
             for item in daily_analytics 
             if start_date <= item.get('day', '') <= end_date
         )
+        
+        # Apply median revenue cap if provided (anti-exploitation measure)
+        total_revenue, applied_cap, original_revenue = _apply_median_cap(total_revenue, median_revenue_cap, "revenue")
+        
         score = total_revenue / YT_ROLLING_WINDOW
         scoring_method = "ypp"
         
+        return {
+            "score": score,
+            "daily_analytics": daily_analytics,
+            "scoring_method": scoring_method,
+            "applied_cap": applied_cap,
+            "original_revenue": original_revenue,
+            "capped_revenue": total_revenue,
+            "median_revenue_cap": median_revenue_cap
+        }
+        
     else:
-        # Non-YPP: Use predicted revenue or fallback to 0
+        # Non-YPP: Use predicted revenue with optional views capping or fallback to 0
         if cached_ratio is not None:
             total_views = sum(
                 item.get('views', 0) 
                 for item in daily_analytics 
                 if start_date <= item.get('day', '') <= end_date
             )
+            
+            # Apply median views cap if provided (anti-exploitation measure)
+            total_views, applied_cap, original_views = _apply_median_cap(total_views, median_views_cap, "views")
+            
             predicted_revenue = total_views * cached_ratio
             score = predicted_revenue / YT_ROLLING_WINDOW
             scoring_method = "non_ypp_predicted"
+            
+            return {
+                "score": score,
+                "daily_analytics": daily_analytics,
+                "scoring_method": scoring_method,
+                "applied_cap": applied_cap,
+                "original_views": original_views,
+                "capped_views": total_views,
+                "median_views_cap": median_views_cap,
+                "predicted_revenue": predicted_revenue
+            }
         else:
             # First cycle fallback
             score = 0.0
             scoring_method = "non_ypp_fallback"
-    
-    return {
-        "score": score,
-        "daily_analytics": daily_analytics,
-        "scoring_method": scoring_method
-    }
+            
+            return {
+                "score": score,
+                "daily_analytics": daily_analytics,
+                "scoring_method": scoring_method,
+                "applied_cap": False,
+                "original_views": None,
+                "capped_views": None,
+                "median_views_cap": None,
+                "predicted_revenue": None
+            }
 
 
 def calculate_global_ratio(evaluation_results) -> Optional[float]:

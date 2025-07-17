@@ -130,9 +130,11 @@ def get_youtube_metrics(eco_mode, for_daily=False, is_ypp_account=True):
 
 # Channel metrics for channel-level analytics
 CHANNEL_CORE_METRICS = {
+    "cpm": ("cpm", "", None, None, None),
+    "views": ("views", "day", None, None, "day"),
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
-    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
 }
 
 # Additional channel metrics for non-ECO mode
@@ -148,7 +150,6 @@ CHANNEL_ADDITIONAL_METRICS = {
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "countryViews": ("views", "country", None, None, None),
     "countryMinutes": ("estimatedMinutesWatched", "country", None, None, None),
-    "cpm": ("cpm", "", None, None, None),
 }
 
 # Revenue metrics that commonly fail for accounts without monetization

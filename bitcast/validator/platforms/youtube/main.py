@@ -136,6 +136,9 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
             video_ids, briefs, youtube_data_client, youtube_analytics_client
         )
         
+        # Get channel analytics for median cap calculation
+        channel_analytics = result["yt_account"]["analytics"]
+        
         # Process each video and update the result
         for video_id in video_ids:
             if video_id in video_data_dict and video_id in video_analytics_dict:
@@ -149,7 +152,8 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
                     youtube_analytics_client, 
                     result,
                     is_ypp_account,
-                    cached_ratio
+                    cached_ratio,
+                    channel_analytics
                 )
         
         # If channel vetting failed, set all scores to 0 but keep the video data
@@ -163,7 +167,7 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
 
 def process_single_video(video_id, video_data_dict, video_analytics_dict, video_matches, 
                          video_decision_details, briefs, youtube_analytics_client, result,
-                         is_ypp_account, cached_ratio):
+                         is_ypp_account, cached_ratio, channel_analytics=None):
     """Process a single video and update the result structure."""
     video_data = video_data_dict[video_id]
     video_analytics = video_analytics_dict[video_id]
@@ -187,7 +191,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     
     # Calculate and store the score if the video passes vetting and matches a brief
     if video_vet_result and matches_any_brief:
-        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, cached_ratio)
+        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, cached_ratio, channel_analytics)
     else:
         result["videos"][video_id]["score"] = 0
 
@@ -203,23 +207,44 @@ def check_video_brief_matches(video_id, video_matches, briefs):
     
     return matches_any_brief, matching_brief_ids
 
-def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, cached_ratio):
+def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, cached_ratio, channel_analytics=None):
     """Calculate and update the score for a video that matches a brief using dual scoring mechanism."""
     video_publish_date = result["videos"][video_id]["details"].get("publishedAt")
     existing_analytics = result["videos"][video_id]["analytics"]
     
     video_score_result = calculate_video_score(
         video_id, youtube_analytics_client, video_publish_date, existing_analytics,
-        is_ypp_account=is_ypp_account, cached_ratio=cached_ratio
+        is_ypp_account=is_ypp_account, cached_ratio=cached_ratio, channel_analytics=channel_analytics
     )
     video_score = video_score_result["score"]
     scoring_method = video_score_result["scoring_method"]
     
-    bt.logging.info(f"Raw video_score from calculate_video_score: {video_score} (method: {scoring_method})")
+    # Log scoring information including cap details
+    cap_info = ""
+    if video_score_result.get("applied_cap", False):
+        if scoring_method == "ypp":
+            cap_info = f" [REVENUE CAP: {video_score_result.get('original_revenue', 0):.4f} -> {video_score_result.get('capped_revenue', 0):.4f}]"
+        elif scoring_method == "non_ypp_predicted":
+            cap_info = f" [VIEWS CAP: {video_score_result.get('original_views', 0):.0f} -> {video_score_result.get('capped_views', 0):.0f}]"
+    
+    bt.logging.info(f"Raw video_score from calculate_video_score: {video_score} (method: {scoring_method}){cap_info}")
     
     result["videos"][video_id]["score"] = video_score
     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
     result["videos"][video_id]["scoring_method"] = scoring_method
+    
+    # Store cap debugging information
+    if "applied_cap" in video_score_result:
+        cap_info_dict = {"applied_cap": video_score_result["applied_cap"]}
+        
+        # Add debugging fields based on account type  
+        ypp_fields = ["original_revenue", "capped_revenue", "median_revenue_cap"]
+        non_ypp_fields = ["original_views", "capped_views", "median_views_cap", "predicted_revenue"]
+        
+        fields = ypp_fields if scoring_method == "ypp" else non_ypp_fields
+        cap_info_dict.update({field: video_score_result.get(field) for field in fields})
+        
+        result["videos"][video_id]["cap_info"] = cap_info_dict
     
     # Update the score for the matching brief
     for i, match in enumerate(video_matches.get(video_id, [])):

@@ -16,11 +16,13 @@ from bitcast.validator.utils.config import (
 )
 from bitcast.validator.platforms.youtube.config import get_youtube_metrics
 from .dual_scoring import calculate_dual_score
+from .score_cap import calculate_median_from_analytics
 
 
 def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, 
                          existing_analytics, is_ypp_account: bool = True, 
-                         cached_ratio: Optional[float] = None):
+                         cached_ratio: Optional[float] = None,
+                         channel_analytics: Optional[dict] = None):
     """
     Calculate the score for a video using appropriate strategy based on YPP status.
     
@@ -31,9 +33,10 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
         existing_analytics (dict): Existing analytics data
         is_ypp_account (bool): Whether this is a YPP account
         cached_ratio (Optional[float]): Global cached views-to-revenue ratio for Non-YPP accounts
+        channel_analytics (Optional[dict]): Channel analytics for median cap calculation
         
     Returns:
-        dict: Dictionary containing score, daily_analytics, and scoring_method
+        dict: Dictionary containing score, daily_analytics, scoring_method, and cap info
     """
     # Use video publish date as query start date if provided, otherwise use default
     try:
@@ -59,5 +62,22 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     
     daily_analytics = sorted(analytics_result.get("day_metrics", {}).values(), key=lambda x: x.get("day", ""))
     
-    # Calculate score using dual scoring logic
-    return calculate_dual_score(daily_analytics, start_date, end_date, is_ypp_account, cached_ratio) 
+    # Calculate median caps
+    median_revenue_cap = None
+    median_views_cap = None
+    
+    if channel_analytics is not None:
+        metric_key = 'estimatedRedPartnerRevenue' if is_ypp_account else 'views'
+        try:
+            median_cap = calculate_median_from_analytics(channel_analytics, metric_key)
+            if is_ypp_account:
+                median_revenue_cap = median_cap
+                bt.logging.debug(f"Calculated median revenue cap: {median_cap:.4f} for video {video_id}")
+            else:
+                median_views_cap = median_cap
+                bt.logging.debug(f"Calculated median views cap: {median_cap:.0f} for video {video_id}")
+        except Exception as e:
+            bt.logging.warning(f"Failed to calculate median cap for video {video_id}: {e}")
+    
+    # Calculate score using dual scoring logic with optional median capping
+    return calculate_dual_score(daily_analytics, start_date, end_date, is_ypp_account, cached_ratio, median_revenue_cap, median_views_cap) 

@@ -22,7 +22,9 @@ bitcast/validator/platforms/youtube/
 ├── evaluation/                  # Business logic layer
 │   ├── channel.py              # Channel vetting logic
 │   ├── video.py                # Video vetting and content evaluation
-│   └── scoring.py              # Video scoring algorithms
+│   ├── scoring.py              # Video scoring orchestration
+│   ├── dual_scoring.py         # YPP/Non-YPP scoring with anti-exploitation caps
+│   └── score_cap.py            # T-60 to T-30 median calculations
 └── utils/                       # Utility functions
     ├── state.py                # Global state management
     └── helpers.py              # General helper functions
@@ -32,7 +34,8 @@ bitcast/validator/platforms/youtube/
 
 1. **Channel Evaluation**: Fetch channel data → vet against criteria → filter applicable briefs
 2. **Video Processing**: Get uploads → batch retrieve data → vet content → match briefs → calculate scores
-3. **Result Compilation**: Aggregate scores and performance metrics
+3. **Anti-Exploitation Protection**: Apply median-based caps using T-60 to T-30 day channel analytics
+4. **Result Compilation**: Aggregate scores and performance metrics
 
 ## Key Modules
 
@@ -48,7 +51,9 @@ Primary entry point with `eval_youtube(creds, briefs)` function. Orchestrates th
 ### `evaluation/` Layer
 - **`channel.py`**: `vet_channel()` - Channel qualification against criteria
 - **`video.py`**: `vet_videos()`, `vet_video()` - Video content evaluation and brief matching
-- **`scoring.py`**: `calculate_video_score()` - Score calculation algorithms
+- **`scoring.py`**: `calculate_video_score()` - Score calculation orchestration
+- **`dual_scoring.py`**: `calculate_dual_score()` - YPP/Non-YPP scoring with median caps
+- **`score_cap.py`**: `calculate_median_from_analytics()` - Anti-exploitation median calculations
 
 ### `utils/` Layer
 - **`state.py`**: API call counters, `scored_video_ids` tracking
@@ -83,6 +88,26 @@ video_matches, video_data_dict, analytics_dict, details = vet_videos(
 )
 ```
 
+### Anti-Exploitation Score Capping
+```python
+from bitcast.validator.platforms.youtube.evaluation import calculate_median_from_analytics, calculate_dual_score
+
+# Calculate median cap from channel analytics
+median_revenue_cap = calculate_median_from_analytics(channel_analytics, 'estimatedRedPartnerRevenue')
+median_views_cap = calculate_median_from_analytics(channel_analytics, 'views')
+
+# Apply caps during scoring
+score_result = calculate_dual_score(
+    daily_analytics, start_date, end_date, 
+    is_ypp_account=True, cached_ratio=None, 
+    median_revenue_cap=median_revenue_cap
+)
+
+# Check if cap was applied
+if score_result["applied_cap"]:
+    print(f"Revenue capped: {score_result['original_revenue']} → {score_result['capped_revenue']}")
+```
+
 ## Configuration
 
 Key configuration variables from `bitcast.validator.utils.config`:
@@ -94,7 +119,37 @@ Key configuration variables from `bitcast.validator.utils.config`:
 - `YT_MIN_EMISSIONS` - Minimum emissions threshold for reward scaling
 - `ECO_MODE` - Performance optimizations and early exits
 - `YT_LOOKBACK` - Days to look back for videos
+- `YT_SCORE_CAP_START_DAYS`, `YT_SCORE_CAP_END_DAYS` - Anti-exploitation score cap period (T-60 to T-30)
 - `RAPID_API_KEY` - API key for transcript services
+
+## Anti-Exploitation Scoring
+
+The system implements median-based scoring caps to prevent fake engagement exploitation using T-60 to T-30 day lookback periods.
+
+### Dual Scoring Architecture
+
+```
+Channel Analytics (T-60 to T-30) → Median Calculation → Scoring Caps → Final Score
+                                         ↓
+Account Type Detection → YPP (Revenue) vs Non-YPP (Views) → Apply Appropriate Cap
+```
+
+### YPP Account Scoring
+- **Data Source**: `estimatedRedPartnerRevenue` from existing channel analytics
+- **Cap Logic**: `min(video_total_revenue, median_daily_revenue × YT_ROLLING_WINDOW)`
+- **Result**: Video daily average limited to historical channel median
+
+### Non-YPP Account Scoring  
+- **Data Source**: `views` from existing channel analytics
+- **Cap Logic**: `min(video_total_views, median_daily_views × YT_ROLLING_WINDOW)`
+- **Conversion**: Capped views converted to predicted revenue using cached ratio
+- **Result**: Predicted revenue based on capped view counts
+
+### Implementation Details
+- **No Additional API Calls**: Uses existing `get_channel_analytics()` data
+- **Graceful Degradation**: Falls back to uncapped scoring if median calculation fails
+- **Comprehensive Logging**: Tracks cap applications for monitoring and debugging
+- **Performance Optimized**: Minimal computational overhead (<10% impact)
 
 ## Result Structure
 
@@ -113,6 +168,17 @@ Key configuration variables from `bitcast.validator.utils.config`:
             "matches_brief": bool,  # Brief matching status
             "matching_brief_ids": [...], # List of matching brief IDs
             "score": float,         # Video score
+            "scoring_method": str,  # "ypp", "non_ypp_predicted", or "non_ypp_fallback"
+            "cap_info": {           # Anti-exploitation cap debugging (if applied)
+                "applied_cap": bool,
+                "original_revenue": float,  # YPP accounts
+                "capped_revenue": float,    # YPP accounts
+                "median_revenue_cap": float, # YPP accounts
+                "original_views": int,      # Non-YPP accounts
+                "capped_views": int,        # Non-YPP accounts
+                "median_views_cap": float,  # Non-YPP accounts
+                "predicted_revenue": float  # Non-YPP accounts
+            },
             "url": str             # YouTube URL
         }
     },
