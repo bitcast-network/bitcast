@@ -31,6 +31,8 @@ Example usage:
 # Core metrics for general analytics
 CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
+    "views": ("views", "", None, None, None),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Additional metrics for full analytics (when not in ECO_MODE)
@@ -53,7 +55,6 @@ ADDITIONAL_METRICS = {
     "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
     "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
     "monetizedPlaybacks": ("monetizedPlaybacks", "", None, None, None),
-    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Slow API calls that we only use in non eco mode on videos of interest
@@ -66,6 +67,7 @@ ADVANCED_METRICS = {
 # Core daily metrics - all metrics with day dimension
 CORE_DAILY_METRICS = {
     "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
+    "views": ("views", "day", None, None, "day"),
 }
 
 # Additional daily metrics for ECO_MODE
@@ -91,19 +93,20 @@ ADDITIONAL_DAILY_METRICS = {
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType,day", None, None, "day"),
 }
 
-def get_youtube_metrics(eco_mode, for_daily=False):
+def get_youtube_metrics(eco_mode, for_daily=False, is_ypp_account=True):
     """
     Get the appropriate YouTube metrics configuration based on context.
     
     Args:
         for_daily: Whether to get daily metrics (True) or general metrics (False)
         eco_mode: Whether to use ECO_MODE metrics (reduced set)
+        is_ypp_account: Whether this is a YPP account (affects revenue metrics)
         
     Returns:
         Dictionary of metric configurations in format: {key: (metric, dimensions, filter, maxResults, sort)}
         
     Example:
-        metrics = get_youtube_metrics(eco_mode=False, for_daily=True)
+        metrics = get_youtube_metrics(eco_mode=False, for_daily=True, is_ypp_account=False)
         analytics = get_video_analytics(
             client, video_id,
             metric_dims=metrics,
@@ -111,18 +114,25 @@ def get_youtube_metrics(eco_mode, for_daily=False):
         )
     """
     if for_daily and eco_mode:
-        return CORE_DAILY_METRICS
+        metrics = CORE_DAILY_METRICS.copy()
     elif for_daily and not eco_mode:
-        return {**CORE_DAILY_METRICS, **ADDITIONAL_DAILY_METRICS}
+        metrics = {**CORE_DAILY_METRICS, **ADDITIONAL_DAILY_METRICS}
     elif not for_daily and eco_mode:
-        return {**CORE_METRICS}
+        metrics = CORE_METRICS.copy()
     else:
-        return {**CORE_METRICS, **ADDITIONAL_METRICS}
+        metrics = {**CORE_METRICS, **ADDITIONAL_METRICS}
+    
+    # Remove revenue metrics for Non-YPP accounts
+    if not is_ypp_account:
+        metrics = {k: v for k, v in metrics.items() if k not in REVENUE_METRICS}
+    
+    return metrics
 
 # Channel metrics for channel-level analytics
 CHANNEL_CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
+    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Additional channel metrics for non-ECO mode
@@ -139,7 +149,6 @@ CHANNEL_ADDITIONAL_METRICS = {
     "countryViews": ("views", "country", None, None, None),
     "countryMinutes": ("estimatedMinutesWatched", "country", None, None, None),
     "cpm": ("cpm", "", None, None, None),
-    "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Revenue metrics that commonly fail for accounts without monetization

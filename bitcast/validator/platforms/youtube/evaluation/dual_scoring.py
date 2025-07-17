@@ -77,30 +77,26 @@ def calculate_global_ratio(evaluation_results) -> Optional[float]:
             continue
             
         for account_id, account_result in result.account_results.items():
-            # Check if this is a YPP account
-            channel_analytics = account_result.platform_data.get("yt_account", {}).get("analytics", {})
-            if not channel_analytics.get("ypp", False):
+            # Check if this is a YPP account - FIXED: YPP is directly in platform_data.analytics
+            analytics = account_result.platform_data.get("analytics", {})
+            is_ypp = analytics.get("ypp", False)
+            
+            if not is_ypp:
                 continue
                 
             # Extract views and revenue from YPP videos
             for video_id, video_data in account_result.videos.items():
                 if "daily_analytics" in video_data and video_data.get("score", 0) > 0:
-                    daily_analytics = video_data["daily_analytics"]
+                    # FIXED: Use video-level analytics instead of daily_analytics
+                    video_analytics = video_data.get("analytics", {})
                     
-                    video_views = sum(
-                        day.get("views", 0) for day in daily_analytics
-                        if isinstance(day, dict) and day.get("views") is not None
-                    )
-                    
-                    video_revenue = sum(
-                        day.get("estimatedRedPartnerRevenue", 0) for day in daily_analytics
-                        if isinstance(day, dict) and day.get("estimatedRedPartnerRevenue") is not None
-                    )
+                    video_views = video_analytics.get("views", 0)
+                    video_revenue = video_analytics.get("estimatedRedPartnerRevenue", 0)
                     
                     if video_views > 0 and video_revenue >= 0:
                         total_views += video_views
                         total_revenue += video_revenue
-    
+
     if total_views == 0:
         bt.logging.warning("No valid YPP videos with views and revenue data found")
         return None

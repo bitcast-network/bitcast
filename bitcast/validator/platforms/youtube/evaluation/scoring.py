@@ -47,8 +47,8 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     end_date = (datetime.now() - timedelta(days=YT_REWARD_DELAY)).strftime('%Y-%m-%d')
     today = datetime.now().strftime('%Y-%m-%d')
 
-    # Get daily metrics from config
-    metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=True)    
+    # Get daily metrics from config, excluding revenue metrics for Non-YPP accounts
+    metric_dims = get_youtube_metrics(eco_mode=ECO_MODE, for_daily=True, is_ypp_account=is_ypp_account)    
     analytics_result = get_video_analytics(
         youtube_analytics_client, 
         video_id, 

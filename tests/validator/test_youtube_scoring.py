@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, Mock
 from bitcast.validator.platforms.youtube.main import update_video_score, check_video_brief_matches
 
 def test_update_video_score():
@@ -302,3 +302,108 @@ def test_calculate_video_score_partial_window_data():
             # Both 2023-01-01 and 2023-01-02 fall in window: (3.50 + 3.50) / 7 = 1.0
             assert result["score"] == 1.0
             assert len(result["daily_analytics"]) == 2 
+
+
+def test_calculate_video_score_non_ypp_with_cached_ratio():
+    """Test Non-YPP scoring works with cached ratio and non-revenue metrics."""
+    from bitcast.validator.platforms.youtube.evaluation.scoring import calculate_video_score
+    from datetime import datetime, timedelta
+    
+    mock_analytics_client = Mock()
+    
+    # Test data
+    video_id = "test_video_123"
+    video_publish_date = "2024-01-01T00:00:00Z"
+    existing_analytics = {}
+    cached_ratio = 0.001  # $0.001 per view
+    
+    # Calculate realistic dates that would be within the scoring window
+    # The scoring function calculates: 
+    # start_date = (now - YT_REWARD_DELAY - YT_ROLLING_WINDOW + 1)
+    # end_date = (now - YT_REWARD_DELAY)
+    # With YT_REWARD_DELAY=3 and YT_ROLLING_WINDOW=7, this is roughly 9 days ago to 3 days ago
+    now = datetime.now()
+    test_start = (now - timedelta(days=9)).strftime('%Y-%m-%d')
+    test_middle = (now - timedelta(days=6)).strftime('%Y-%m-%d') 
+    test_end = (now - timedelta(days=3)).strftime('%Y-%m-%d')
+    
+    # Mock get_video_analytics to return views data (no revenue metrics for Non-YPP)
+    with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_video_analytics') as mock_get_analytics:
+        mock_get_analytics.return_value = {
+            "day_metrics": {
+                test_start: {"day": test_start, "views": 5000},
+                test_middle: {"day": test_middle, "views": 3000},
+                test_end: {"day": test_end, "views": 2000}
+            }
+        }
+        
+        # Mock get_youtube_metrics to verify it's called with is_ypp_account=False
+        with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_youtube_metrics') as mock_get_metrics:
+            mock_get_metrics.return_value = {"views": ("views", "day", None, None, "day")}
+            
+            # Mock YT_ROLLING_WINDOW to 7 for predictable testing
+            with patch('bitcast.validator.platforms.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 7):
+                result = calculate_video_score(
+                    video_id=video_id,
+                    youtube_analytics_client=mock_analytics_client,
+                    video_publish_date=video_publish_date,
+                    existing_analytics=existing_analytics,
+                    is_ypp_account=False,  # Non-YPP account
+                    cached_ratio=cached_ratio
+                )
+    
+    # Verify get_youtube_metrics was called with is_ypp_account=False
+    mock_get_metrics.assert_called_once_with(eco_mode=True, for_daily=True, is_ypp_account=False)
+    
+    # Verify the result uses predicted scoring
+    assert result["scoring_method"] == "non_ypp_predicted"
+    
+    # Expected calculation: 10,000 total views * 0.001 ratio = $10 predicted revenue
+    # Score = predicted_revenue / YT_ROLLING_WINDOW (7 days) = 10 / 7 ≈ 1.429
+    expected_score = (10000 * cached_ratio) / 7  # Total views: 5000+3000+2000=10000
+    assert abs(result["score"] - expected_score) < 0.001
+    
+    # Should have daily analytics with views data
+    assert len(result["daily_analytics"]) == 3
+
+
+def test_calculate_video_score_non_ypp_no_cached_ratio():
+    """Test Non-YPP scoring falls back to standard dual scoring when no cached ratio available."""
+    from bitcast.validator.platforms.youtube.evaluation.scoring import calculate_video_score
+    
+    mock_analytics_client = Mock()
+    
+    video_id = "test_video_123"
+    video_publish_date = "2024-01-01T00:00:00Z"
+    existing_analytics = {}
+    cached_ratio = None  # No cached ratio
+    
+    # Mock get_video_analytics to return views data
+    with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_video_analytics') as mock_get_analytics:
+        mock_get_analytics.return_value = {
+            "day_metrics": {
+                "2024-01-01": {"day": "2024-01-01", "views": 1000}
+            }
+        }
+        
+        with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_youtube_metrics') as mock_get_metrics:
+            mock_get_metrics.return_value = {"views": ("views", "day", None, None, "day")}
+            
+            with patch('bitcast.validator.platforms.youtube.evaluation.scoring.calculate_dual_score') as mock_dual_score:
+                mock_dual_score.return_value = {
+                    "score": 0.0,
+                    "daily_analytics": [],
+                    "scoring_method": "non_ypp_fallback"
+                }
+                
+                result = calculate_video_score(
+                    video_id=video_id,
+                    youtube_analytics_client=mock_analytics_client,
+                    video_publish_date=video_publish_date,
+                    existing_analytics=existing_analytics,
+                    is_ypp_account=False,
+                    cached_ratio=cached_ratio  # None
+                )
+    
+    # Should use standard dual scoring path
+    assert result["scoring_method"] == "non_ypp_fallback" 
