@@ -319,7 +319,8 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
         "id": "brief1", 
         "title": "Test Brief 1",
         "brief": "Test Brief Description",  # Added missing brief field
-        "start_date": "2023-01-01"
+        "start_date": "2023-01-01",
+        "unique_identifier": "TESTCODE123"
     }]
     youtube_data_client = MagicMock()
     youtube_analytics_client = MagicMock()
@@ -330,7 +331,7 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
     video_data = {
         "bitcastVideoId": video_id,
         "title": "Test Video",
-        "description": "Test Description",
+        "description": "Test Description with TESTCODE123 for pre-screening",
         "publishedAt": "2023-01-15T00:00:00Z",
         "duration": "PT10M",
         "caption": False,
@@ -376,4 +377,5 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
     assert video_decision_details[video_id]["publishDateCheck"] == True
     assert video_decision_details[video_id]["averageViewPercentageCheck"] == True
     assert video_decision_details[video_id]["manualCaptionsCheck"] == True
-    assert video_decision_details[video_id]["promptInjectionCheck"] == True 
+    assert video_decision_details[video_id]["promptInjectionCheck"] == True
+    assert video_decision_details[video_id]["preScreeningCheck"] == [True] 

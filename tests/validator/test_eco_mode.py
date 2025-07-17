@@ -212,8 +212,8 @@ def test_eco_mode_early_return_at_each_stage():
 def test_eco_mode_disabled_full_pipeline():
     """Test the full validation pipeline executes with ECO_MODE disabled."""
     video_id = "test_video_1"
-    briefs = [{"id": "brief1"}]
-    video_data = {"bitcastVideoId": video_id}
+    briefs = [{"id": "brief1", "unique_identifier": "TEST123"}]
+    video_data = {"bitcastVideoId": video_id, "description": "Video contains TEST123 identifier"}
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
     # Set up all checks to pass
@@ -254,8 +254,8 @@ def test_eco_mode_disabled_full_pipeline():
 def test_early_return_flag():
     """Test that the early_return flag is properly set when checks fail."""
     video_id = "test_video_1"
-    briefs = [{"id": "brief1"}]
-    video_data = {"bitcastVideoId": video_id}
+    briefs = [{"id": "brief1", "unique_identifier": "TEST123"}]
+    video_data = {"bitcastVideoId": video_id, "description": "Video contains TEST123 identifier"}
     video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
     
     # Set up a spy on check_prompt_injection to verify early_return value
