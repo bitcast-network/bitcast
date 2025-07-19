@@ -69,13 +69,13 @@ def test_check_video_brief_matches():
         {"id": "brief3"}
     ]
     
-    # Test case 1: Video matches multiple briefs
+    # Test case 1: Video matches multiple briefs - only first matching brief is returned as list
     video_matches = {
-        video_id: [True, True, False]  # Matches brief1 and brief2
+        video_id: [True, True, False]  # Matches brief1 and brief2, but only brief1 returned
     }
     matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
     assert matches_any_brief == True
-    assert matching_brief_ids == ["brief1", "brief2"]
+    assert matching_brief_ids == ['brief1', 'brief2']
     
     # Test case 2: Video matches no briefs
     video_matches = {
@@ -83,15 +83,15 @@ def test_check_video_brief_matches():
     }
     matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
     assert matches_any_brief == False
-    assert matching_brief_ids == []
+    assert matching_brief_ids == []  # Empty list
     
-    # Test case 3: Video matches all briefs
+    # Test case 3: Video matches all briefs - only first matching brief is returned as list
     video_matches = {
         video_id: [True, True, True]
     }
     matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
     assert matches_any_brief == True
-    assert matching_brief_ids == ["brief1", "brief2", "brief3"]
+    assert matching_brief_ids == ['brief1', 'brief2', 'brief3']
 
 
 def test_process_videos_empty_briefs():
@@ -407,3 +407,76 @@ def test_calculate_video_score_non_ypp_no_cached_ratio():
     
     # Should use standard dual scoring path
     assert result["scoring_method"] == "non_ypp_fallback" 
+
+
+def test_select_highest_priority_brief():
+    """Test the select_highest_priority_brief function with weight-based selection."""
+    from bitcast.validator.platforms.youtube.evaluation.video import select_highest_priority_brief
+    
+    # Test case 1: Select highest weight brief
+    briefs = [
+        {"id": "brief1", "weight": 5},
+        {"id": "brief2", "weight": 10},  # Should be selected
+        {"id": "brief3", "weight": 3}
+    ]
+    brief_results = [True, True, True]  # All match
+    
+    selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
+    assert selected_index == 1
+    assert selected_brief["id"] == "brief2"
+    assert selected_brief["weight"] == 10
+    
+    # Test case 2: Handle missing weight field (defaults to 0)
+    briefs = [
+        {"id": "brief1", "weight": 5},
+        {"id": "brief2"},  # No weight field - defaults to 0
+        {"id": "brief3", "weight": 8}  # Should be selected
+    ]
+    brief_results = [True, True, True]
+    
+    selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
+    assert selected_index == 2
+    assert selected_brief["id"] == "brief3"
+    assert selected_brief["weight"] == 8
+    
+    # Test case 3: Tie-breaking (same weight, first one wins)
+    briefs = [
+        {"id": "brief1", "weight": 5},
+        {"id": "brief2", "weight": 5},  # Same weight, but brief1 should win (earlier index)
+        {"id": "brief3", "weight": 3}
+    ]
+    brief_results = [True, True, True]
+    
+    selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
+    assert selected_index == 0  # First one with highest weight
+    assert selected_brief["id"] == "brief1"
+    
+    # Test case 4: Only some briefs match
+    briefs = [
+        {"id": "brief1", "weight": 10},  # Matches but not selected
+        {"id": "brief2", "weight": 15},  # Doesn't match
+        {"id": "brief3", "weight": 8}   # Should be selected (highest among matching)
+    ]
+    brief_results = [True, False, True]  # Only brief1 and brief3 match
+    
+    selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
+    assert selected_index == 0  # brief1 wins among matching briefs
+    assert selected_brief["id"] == "brief1"
+    assert selected_brief["weight"] == 10
+    
+    # Test case 5: No briefs match
+    briefs = [
+        {"id": "brief1", "weight": 5},
+        {"id": "brief2", "weight": 10},
+        {"id": "brief3", "weight": 3}
+    ]
+    brief_results = [False, False, False]  # None match
+    
+    selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
+    assert selected_index is None
+    assert selected_brief is None
+    
+    # Test case 6: Empty lists
+    selected_index, selected_brief = select_highest_priority_brief([], [])
+    assert selected_index is None
+    assert selected_brief is None 

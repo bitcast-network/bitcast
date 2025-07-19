@@ -272,7 +272,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         result["videos"][video_id]["score"] = 0
 
 def check_video_brief_matches(video_id, video_matches, briefs):
-    """Check if a video matches any briefs and return all matching brief IDs."""
+    """Check if a video matches any briefs and return the matching brief IDs as a list (max length 1)."""
     matches_any_brief = False
     matching_brief_ids = []
     

@@ -609,6 +609,38 @@ def map_brief_results_to_original_order(eligible_brief_reasonings, eligible_brie
     return brief_reasonings, content_against_brief_results
 
 
+def select_highest_priority_brief(matching_briefs, brief_results):
+    """
+    Select the highest priority brief from matching briefs using weight field.
+    
+    Args:
+        matching_briefs (list): List of brief dictionaries that matched
+        brief_results (list): List of boolean results for each matching brief
+        
+    Returns:
+        tuple: (selected_brief_index, selected_brief) or (None, None) if no matches
+    """
+    if not any(brief_results):
+        return None, None
+    
+    # Create list of (index, brief, result) for matching briefs only
+    matching_entries = [
+        (i, brief, result) 
+        for i, (brief, result) in enumerate(zip(matching_briefs, brief_results)) 
+        if result
+    ]
+    
+    if not matching_entries:
+        return None, None
+    
+    # Sort by weight (descending), then by index for tie-breaking
+    matching_entries.sort(key=lambda x: (x[1].get("weight", 0), -x[0]), reverse=True)
+    
+    # Return the highest priority match
+    selected_index, selected_brief, _ = matching_entries[0]
+    return selected_index, selected_brief
+
+
 def evaluate_content_against_briefs(briefs, video_data, transcript, decision_details):
     """
     Evaluate the video content against each brief concurrently.
@@ -667,8 +699,29 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                     }
                 )
     
-    # Update decision_details with results in correct order
-    decision_details["contentAgainstBriefCheck"].extend(brief_results)
+    # Apply single brief matching limitation using weight-based priority
+    selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
+    
+    # Reset all results and only set the selected brief to True
+    final_brief_results = [False] * len(briefs)
+    final_met_brief_ids = []
+    
+    if selected_index is not None and selected_brief is not None:
+        final_brief_results[selected_index] = True
+        final_met_brief_ids.append(selected_brief["id"])
+        
+        # Log the selection with weight information
+        total_matches = sum(brief_results)
+        selected_weight = selected_brief.get("weight", 0)
+        bt.logging.info(
+            f"Selected brief '{selected_brief['id']}' (weight: {selected_weight}) "
+            f"from {total_matches} matching briefs for video: {video_data.get('bitcastVideoId')}"
+        )
+    else:
+        bt.logging.info(f"No briefs matched for video: {video_data.get('bitcastVideoId')}")
+    
+    # Update decision_details with final results
+    decision_details["contentAgainstBriefCheck"].extend(final_brief_results)
     reasonings = brief_reasonings
             
-    return met_brief_ids, reasonings 
+    return final_met_brief_ids, reasonings 
