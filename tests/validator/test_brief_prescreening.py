@@ -7,7 +7,8 @@ from unittest.mock import patch, MagicMock
 from bitcast.validator.platforms.youtube.evaluation.video import (
     check_brief_unique_identifier,
     vet_video,
-    initialize_decision_details
+    initialize_decision_details,
+    prescreen_briefs_for_video
 )
 from bitcast.validator.utils.config import YT_MIN_VIDEO_RETENTION
 
@@ -164,7 +165,7 @@ class TestBriefPreScreening:
     @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
     @patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
     def test_vet_video_brief_validation_error(self, mock_check_injection, mock_get_transcript):
-        """Test that brief validation errors are handled correctly."""
+        """Test that brief validation errors are handled correctly - only the invalid brief fails."""
         # Setup mock data
         video_id = "test_video"
         briefs = [
@@ -191,13 +192,89 @@ class TestBriefPreScreening:
         # Call vet_video
         result = vet_video(video_id, briefs, video_data, video_analytics)
 
-        # Verify error handling
+        # Verify that the video evaluation doesn't fail entirely due to brief validation error
         decision_details = result["decision_details"]
-        assert decision_details["video_vet_result"] is False
-        assert decision_details["preScreeningCheck"] == [False]
-        assert decision_details["contentAgainstBriefCheck"] == [False]
+        assert decision_details["video_vet_result"] is True  # Video evaluation should still succeed
+        assert decision_details["preScreeningCheck"] == [False]  # Brief fails pre-screening
+        assert decision_details["contentAgainstBriefCheck"] == [False]  # Brief fails content check
         
-        # Verify error reasoning
+        # Verify error reasoning - should contain the default message since we just log validation errors
         brief_reasonings = result["brief_reasonings"]
         assert len(brief_reasonings) == 1
-        assert "missing required unique_identifier field" in brief_reasonings[0] 
+        assert brief_reasonings[0] == "Video description does not contain required unique identifier"
+
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.evaluate_content_against_brief')
+    def test_vet_video_mixed_valid_invalid_briefs(self, mock_evaluate_content, mock_check_injection, mock_get_transcript):
+        """Test that evaluation continues for valid briefs even when some briefs have validation errors."""
+        # Setup mock data
+        video_id = "test_video"
+        briefs = [
+            {"id": "brief1", "unique_identifier": "VALID123", "start_date": "2023-01-01"},  # Valid brief
+            {"id": "brief2", "start_date": "2023-01-01"},  # Missing unique_identifier field
+            {"id": "brief3", "unique_identifier": "NOMATCH456", "start_date": "2023-01-01"}  # Valid but no match
+        ]
+        video_data = {
+            "bitcastVideoId": video_id,
+            "title": "Test Video",
+            "description": "This video contains VALID123 for testing",
+            "publishedAt": "2023-01-15T00:00:00Z",
+            "duration": "PT10M",
+            "caption": False,
+            "privacyStatus": "public"
+        }
+        video_analytics = {
+            "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
+            "estimatedMinutesWatched": 1000
+        }
+
+        # Mock dependencies
+        mock_get_transcript.return_value = "Test transcript content"
+        mock_check_injection.return_value = False  # No prompt injection
+        mock_evaluate_content.return_value = (True, "Content meets brief")
+
+        # Call vet_video
+        result = vet_video(video_id, briefs, video_data, video_analytics)
+
+        # Verify that the video evaluation succeeds and processes valid briefs
+        decision_details = result["decision_details"]
+        assert decision_details["video_vet_result"] is True
+        assert decision_details["preScreeningCheck"] == [True, False, False]  # Only first brief passes
+        assert decision_details["contentAgainstBriefCheck"] == [True, False, False]  # Only first brief evaluated
+        
+        # Verify only the valid brief was evaluated by LLM
+        assert mock_evaluate_content.call_count == 1
+        
+        # Verify reasoning for each brief
+        brief_reasonings = result["brief_reasonings"]
+        assert len(brief_reasonings) == 3
+        assert brief_reasonings[0] == "Content meets brief"  # Valid brief that passed
+        assert brief_reasonings[1] == "Video description does not contain required unique identifier"  # Default message
+        assert brief_reasonings[2] == "Video description does not contain required unique identifier"  # No match
+        
+        # Verify met_brief_ids contains only the valid brief
+        assert result["met_brief_ids"] == ["brief1"]
+
+    def test_prescreen_briefs_for_video_with_validation_errors(self):
+        """Test that prescreen_briefs_for_video handles validation errors gracefully."""
+        briefs = [
+            {"id": "brief1", "unique_identifier": "VALID123"},  # Valid brief
+            {"id": "brief2"},  # Missing unique_identifier field
+            {"id": "brief3", "unique_identifier": ""},  # Empty unique_identifier field
+            {"id": "brief4", "unique_identifier": "NOMATCH456"}  # Valid but no match
+        ]
+        video_description = "This video contains VALID123 for testing"
+        
+        # Call prescreen_briefs_for_video
+        eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(briefs, video_description)
+        
+        # Verify only the first brief passed pre-screening
+        assert len(eligible_briefs) == 1
+        assert eligible_briefs[0]["id"] == "brief1"
+        
+        # Verify prescreening results for all briefs
+        assert prescreening_results == [True, False, False, False]
+        
+        # Verify filtered brief IDs (validation errors and non-matches are both filtered)
+        assert set(filtered_brief_ids) == {"brief2", "brief3", "brief4"} 

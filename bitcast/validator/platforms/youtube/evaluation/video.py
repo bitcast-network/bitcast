@@ -269,17 +269,8 @@ def vet_video(video_id, briefs, video_data, video_analytics):
                 brief_reasonings = ["Video failed prompt injection check"] * len(briefs)
             else:
                 # Pre-screen briefs based on unique_identifier before expensive LLM evaluation
-                try:
-                    eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(briefs, video_data.get("description", ""))
-                    decision_details["preScreeningCheck"] = prescreening_results
-                    
-                except ValueError as e:
-                    bt.logging.error(f"Brief validation error: {e}")
-                    decision_details["video_vet_result"] = False
-                    decision_details["preScreeningCheck"] = [False] * len(briefs)
-                    decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
-                    brief_reasonings = [str(e)] * len(briefs)
-                    return {"met_brief_ids": [], "decision_details": decision_details, "brief_reasonings": brief_reasonings}
+                eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(briefs, video_data.get("description", ""))
+                decision_details["preScreeningCheck"] = prescreening_results
                 
                 # Only evaluate eligible briefs against content if any passed pre-screening
                 if eligible_briefs:
@@ -290,7 +281,9 @@ def vet_video(video_id, briefs, video_data, video_analytics):
                         eligible_brief_results = temp_decision_details["contentAgainstBriefCheck"]
                         
                         # Map results back to original brief order
-                        brief_reasonings, content_against_brief_results = map_brief_results_to_original_order(eligible_brief_reasonings, eligible_brief_results, prescreening_results)
+                        brief_reasonings, content_against_brief_results = map_brief_results_to_original_order(
+                            eligible_brief_reasonings, eligible_brief_results, prescreening_results
+                        )
                         
                         decision_details["contentAgainstBriefCheck"] = content_against_brief_results
                                 
@@ -301,10 +294,12 @@ def vet_video(video_id, briefs, video_data, video_analytics):
                         brief_reasonings = ["Brief evaluation system error"] * len(briefs)
                         met_brief_ids = []
                 else:
-                    # No briefs passed pre-screening, skip LLM evaluation entirely
-                    bt.logging.info(f"No briefs passed pre-screening for video {video_data['bitcastVideoId']}, skipping LLM evaluation")
+                    # No briefs passed pre-screening, create appropriate reasonings
+                    brief_reasonings = [
+                        "Video description does not contain required unique identifier"
+                        for brief in briefs
+                    ]
                     decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
-                    brief_reasonings = ["Video description does not contain required unique identifier"] * len(briefs)
                     met_brief_ids = []
     else:
         # If any check failed, set all briefs to false and prompt injection to false
@@ -546,26 +541,33 @@ def prescreen_briefs_for_video(briefs, video_description):
             - eligible_briefs: List of briefs that passed pre-screening
             - prescreening_results: List of bool results for each original brief
             - filtered_brief_ids: List of brief IDs that were filtered out
-            
-    Raises:
-        ValueError: If any brief has invalid unique_identifier field
     """
     eligible_briefs = []
     prescreening_results = []
     filtered_brief_ids = []
     
     for brief in briefs:
-        passed_prescreening = check_brief_unique_identifier(brief, video_description)
-        
-        if not passed_prescreening:
-            bt.logging.info(f"Meets brief '{brief['id']}': False ❌ (pre-screen)")
-        
-        if passed_prescreening:
-            eligible_briefs.append(brief)
-            prescreening_results.append(True)
-        else:
+        try:
+            passed_prescreening = check_brief_unique_identifier(brief, video_description)
+            
+            if not passed_prescreening:
+                bt.logging.info(f"Meets brief '{brief['id']}': False ❌ (pre-screen)")
+            
+            if passed_prescreening:
+                eligible_briefs.append(brief)
+                prescreening_results.append(True)
+            else:
+                prescreening_results.append(False)
+                filtered_brief_ids.append(brief.get("id", "unknown"))
+                
+        except ValueError as e:
+            # Log the validation error for this specific brief but continue with others
+            brief_id = brief.get("id", "unknown")
+            bt.logging.error(f"Brief validation error: {e}")
+            
+            # Mark this brief as failed in prescreening
             prescreening_results.append(False)
-            filtered_brief_ids.append(brief.get("id", "unknown"))
+            filtered_brief_ids.append(brief_id)
     
     return eligible_briefs, prescreening_results, filtered_brief_ids
 
@@ -586,7 +588,7 @@ def map_brief_results_to_original_order(eligible_brief_reasonings, eligible_brie
     content_against_brief_results = []
     eligible_idx = 0
     
-    for passed_prescreening in prescreening_results:
+    for i, passed_prescreening in enumerate(prescreening_results):
         if passed_prescreening:
             # Handle cases where eligible results may be shorter than expected (e.g., in tests)
             if eligible_idx < len(eligible_brief_reasonings):
@@ -602,6 +604,7 @@ def map_brief_results_to_original_order(eligible_brief_reasonings, eligible_brie
                 
             eligible_idx += 1
         else:
+            # Use default message - validation errors will be applied later
             brief_reasonings.append("Video description does not contain required unique identifier")
             content_against_brief_results.append(False)
     
