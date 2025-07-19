@@ -53,6 +53,7 @@ class EmissionCalculationService(EmissionCalculator):
                 },
                 scaling_factors={
                     "scaling_factor": self._get_scaling_factor(brief),
+                    "boost_factor": brief.get("Boost", 1.0),
                     "smoothing_factor": YT_SMOOTHING_FACTOR
                 }
             )
@@ -83,6 +84,12 @@ class EmissionCalculationService(EmissionCalculator):
             # Apply scaling factor in-place
             scaling_factor = self._get_scaling_factor(brief)
             emission_targets[:, brief_idx] *= scaling_factor
+            
+            # Apply boost multiplier (before smoothing and clipping)
+            boost_factor = brief.get("Boost", 1.0)
+            if boost_factor != 1.0:
+                bt.logging.info(f"Applying boost {boost_factor}x to brief {brief.get('id', 'unknown')}")
+            emission_targets[:, brief_idx] *= boost_factor
             
             # Store scaled scores before smoothing (for readjustment)
             scaled_scores = emission_targets[:, brief_idx].copy()
