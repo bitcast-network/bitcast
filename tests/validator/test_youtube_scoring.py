@@ -307,6 +307,7 @@ def test_calculate_video_score_partial_window_data():
 def test_calculate_video_score_non_ypp_with_cached_ratio():
     """Test Non-YPP scoring works with cached ratio and non-revenue metrics."""
     from bitcast.validator.platforms.youtube.evaluation.scoring import calculate_video_score
+    from bitcast.validator.utils.config import ECO_MODE
     from datetime import datetime, timedelta
     
     mock_analytics_client = Mock()
@@ -353,7 +354,7 @@ def test_calculate_video_score_non_ypp_with_cached_ratio():
                 )
     
     # Verify get_youtube_metrics was called with is_ypp_account=False
-    mock_get_metrics.assert_called_once_with(eco_mode=True, for_daily=True, is_ypp_account=False)
+    mock_get_metrics.assert_called_once_with(eco_mode=ECO_MODE, for_daily=True, is_ypp_account=False)
     
     # Verify the result uses predicted scoring
     assert result["scoring_method"] == "non_ypp_predicted"

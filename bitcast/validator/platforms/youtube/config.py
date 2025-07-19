@@ -37,31 +37,25 @@ CORE_METRICS = {
 
 # Additional metrics for full analytics (when not in ECO_MODE)
 ADDITIONAL_METRICS = {
-    "views": ("views", "", None, None, None),
-    "comments": ("comments", "", None, None, None),
-    "likes": ("likes", "", None, None, None),
-    "dislikes": ("dislikes", "", None, None, None),
-    "shares": ("shares", "", None, None, None),
     "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "averageViewDuration": ("averageViewDuration", "", None, None, None),
     "countryMinutes": ("estimatedMinutesWatched", "country", None, None, "-estimatedMinutesWatched"),
-    "ageGroupViewerPercentage": ("viewerPercentage", "ageGroup,gender", None, None, None),
     "elapsedVideoTimeRatioAudienceWatchRatio": ("audienceWatchRatio", "elapsedVideoTimeRatio", None, None, None),
-    "sharingServiceShares": ("shares", "sharingService", None, None, "-shares"),
-    "relativeRetentionPerformance": ("relativeRetentionPerformance", "elapsedVideoTimeRatio", None, None, None),
+    #"sharingServiceShares": ("shares", "sharingService", None, None, "-shares"),
+    #"relativeRetentionPerformance": ("relativeRetentionPerformance", "elapsedVideoTimeRatio", None, None, None),
     "creatorContentTypeMinutes": ("estimatedMinutesWatched", "creatorContentType", None, None, None),
     "subscribedStatusMinutes": ("averageViewPercentage", "subscribedStatus", None, None, None),
-    "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
     "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
     "monetizedPlaybacks": ("monetizedPlaybacks", "", None, None, None),
 }
 
 # Slow API calls that we only use in non eco mode on videos of interest
 ADVANCED_METRICS = {
-    "insightTrafficSourceDetail_YT_SEARCH": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_SEARCH", 10, "-estimatedMinutesWatched"),
-    "insightTrafficSourceDetail_RELATED_VIDEO": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==RELATED_VIDEO", 10, "-estimatedMinutesWatched"),
-    "insightTrafficSourceDetail_YT_CHANNEL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_CHANNEL", 10, "-estimatedMinutesWatched"),
+    "insightTrafficSourceDetail_EXT_URL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==EXT_URL", 10, "-estimatedMinutesWatched"),
+    #"insightTrafficSourceDetail_YT_SEARCH": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_SEARCH", 10, "-estimatedMinutesWatched"),
+    #"insightTrafficSourceDetail_RELATED_VIDEO": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==RELATED_VIDEO", 10, "-estimatedMinutesWatched"),
+    #"insightTrafficSourceDetail_YT_CHANNEL": ("estimatedMinutesWatched", "insightTrafficSourceDetail", "insightTrafficSourceType==YT_CHANNEL", 10, "-estimatedMinutesWatched"),
 }
 
 # Core daily metrics - all metrics with day dimension
@@ -72,20 +66,16 @@ CORE_DAILY_METRICS = {
 
 # Additional daily metrics for ECO_MODE
 ADDITIONAL_DAILY_METRICS = {
-    "views": ("views", "day", None, None, "day"),
-    "comments": ("comments", "day", None, None, "day"),
-    "likes": ("likes", "day", None, None, "day"),
-    "shares": ("shares", "day", None, None, "day"),
-    "averageViewDuration": ("averageViewDuration", "day", None, None, "day"),
-    "AverageViewPercentage": ("averageViewPercentage", "day", None, None, "day"),
+    # "comments": ("comments", "day", None, None, "day"),
+    # "likes": ("likes", "day", None, None, "day"),
+    # "shares": ("shares", "day", None, None, "day"),
+    # "averageViewDuration": ("averageViewDuration", "day", None, None, "day"),
+    # "AverageViewPercentage": ("averageViewPercentage", "day", None, None, "day"),
     "deviceTypeMinutes": ("estimatedMinutesWatched", "deviceType,day", None, None, "day"),
     "operatingSystemMinutes": ("estimatedMinutesWatched", "operatingSystem,day", None, None, "day"),
-    "creatorContentTypeMinutes": ("estimatedMinutesWatched", "creatorContentType,day", None, None, "day"),
-    "playbackLocationMinutes": ("estimatedMinutesWatched", "insightPlaybackLocationType,day", None, None, "day"),
+    #"playbackLocationMinutes": ("estimatedMinutesWatched", "insightPlaybackLocationType,day", None, None, "day"),
     "avgViewPercentageByTrafficSource": ("averageViewPercentage", "insightTrafficSourceType,day", None, None, "day"),
-    "liveOrOnDemandMinutes": ("estimatedMinutesWatched", "liveOrOnDemand,day", None, None, "day"),
-    "youtubeProductMinutes": ("estimatedMinutesWatched", "youtubeProduct,day", None, None, "day"),
-    "engagedViews": ("engagedViews", "day", None, None, "day"),
+    #"engagedViews": ("engagedViews", "day", None, None, "day"),
     "videosAddedToPlaylists": ("videosAddedToPlaylists", "day", None, None, "day"),
     "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
     "cpm": ("cpm", "day", None, None, "day"),
