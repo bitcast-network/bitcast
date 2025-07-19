@@ -611,7 +611,7 @@ def map_brief_results_to_original_order(eligible_brief_reasonings, eligible_brie
 
 def select_highest_priority_brief(matching_briefs, brief_results):
     """
-    Select the highest priority brief from matching briefs using weight field.
+    Select the highest priority brief from matching briefs using weight * boost calculation.
     
     Args:
         matching_briefs (list): List of brief dictionaries that matched
@@ -633,8 +633,8 @@ def select_highest_priority_brief(matching_briefs, brief_results):
     if not matching_entries:
         return None, None
     
-    # Sort by weight (descending), then by index for tie-breaking
-    matching_entries.sort(key=lambda x: (x[1].get("weight", 0), -x[0]), reverse=True)
+    # Sort by weight * boost (descending), then by index for tie-breaking
+    matching_entries.sort(key=lambda x: (x[1].get("weight", 0) * x[1].get("Boost", 1.0), -x[0]), reverse=True)
     
     # Return the highest priority match
     selected_index, selected_brief, _ = matching_entries[0]
@@ -710,11 +710,13 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
         final_brief_results[selected_index] = True
         final_met_brief_ids.append(selected_brief["id"])
         
-        # Log the selection with weight information
+        # Log the selection with weight and boost information
         total_matches = sum(brief_results)
         selected_weight = selected_brief.get("weight", 0)
+        selected_boost = selected_brief.get("Boost", 1.0)
+        priority_value = selected_weight * selected_boost
         bt.logging.info(
-            f"Selected brief '{selected_brief['id']}' (weight: {selected_weight}) "
+            f"Selected brief '{selected_brief['id']}' (weight: {selected_weight}, boost: {selected_boost}, priority: {priority_value}) "
             f"from {total_matches} matching briefs for video: {video_data.get('bitcastVideoId')}"
         )
     else:
