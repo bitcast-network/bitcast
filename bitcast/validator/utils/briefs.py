@@ -81,9 +81,11 @@ def get_briefs(all: bool = False):
                 try:
                     start_date = datetime.strptime(brief["start_date"], "%Y-%m-%d").date()
                     end_date = datetime.strptime(brief["end_date"], "%Y-%m-%d").date()
+                    # Apply delay to both start and end dates
+                    start_date_with_delay = start_date - timedelta(days=YT_REWARD_DELAY)
                     end_date_with_delay = end_date + timedelta(days=YT_REWARD_DELAY)
                     
-                    if start_date <= current_date <= end_date_with_delay:
+                    if start_date_with_delay <= current_date <= end_date_with_delay:
                         filtered_briefs.append(brief)
                 except Exception as e:
                     bt.logging.error(f"Error parsing dates for brief {brief.get('id', 'unknown')}: {e}")
