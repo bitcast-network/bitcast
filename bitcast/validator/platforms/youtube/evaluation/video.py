@@ -557,9 +557,8 @@ def prescreen_briefs_for_video(briefs, video_description):
     for brief in briefs:
         passed_prescreening = check_brief_unique_identifier(brief, video_description)
         
-        # Log each brief result individually (matching LLM logging style)
-        emoji = "✅" if passed_prescreening else "❌"
-        bt.logging.info(f"Meets brief '{brief['id']}': {passed_prescreening} {emoji} (pre-screen)")
+        if not passed_prescreening:
+            bt.logging.info(f"Meets brief '{brief['id']}': False ❌ (pre-screen)")
         
         if passed_prescreening:
             eligible_briefs.append(brief)
