@@ -1,32 +1,29 @@
-import bittensor as bt
 from datetime import datetime, timedelta
 import time
 
-from bitcast.validator.platforms.youtube.utils import state
-from bitcast.validator.platforms.youtube.api.video import get_all_uploads
-from bitcast.validator.platforms.youtube.api import initialize_youtube_clients, get_channel_data, get_channel_analytics
-from bitcast.validator.platforms.youtube.utils import _format_error
-from bitcast.validator.platforms.youtube.evaluation import (
-    vet_channel,
-    vet_videos,
-    calculate_video_score
-)
-from bitcast.validator.platforms.youtube.evaluation.dual_scoring import get_cached_ratio
-from bitcast.validator.utils.config import (
-    YT_MIN_SUBS, 
-    YT_MIN_CHANNEL_AGE, 
-    YT_MIN_CHANNEL_RETENTION, 
-    YT_MIN_VIDEO_RETENTION, 
-    YT_REWARD_DELAY, 
-    YT_ROLLING_WINDOW,
-    YT_MAX_VIDEOS_PER_DEDICATED_BRIEF,
-    DISCRETE_MODE,
-    YT_LOOKBACK,
-    ECO_MODE,
-    RAPID_API_KEY
-)
+import bittensor as bt
 
 import bitcast.validator.clients.OpenaiClient as openai_client_module
+from bitcast.validator.platforms.youtube.api import (
+    get_channel_analytics,
+    get_channel_data,
+    initialize_youtube_clients,
+)
+from bitcast.validator.platforms.youtube.api.video import get_all_uploads
+from bitcast.validator.platforms.youtube.evaluation import (
+    calculate_video_score,
+    vet_channel,
+    vet_videos,
+)
+from bitcast.validator.platforms.youtube.evaluation.dual_scoring import get_cached_ratio
+from bitcast.validator.platforms.youtube.utils import _format_error, state
+from bitcast.validator.utils.config import (
+    DISCRETE_MODE,
+    ECO_MODE,
+    YT_LOOKBACK,
+    YT_MAX_VIDEOS_PER_DEDICATED_BRIEF,
+)
+
 
 def eval_youtube(creds, briefs, min_stake=False):
     bt.logging.info(f"Scoring Youtube Content")
@@ -116,6 +113,7 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
         channel_analytics = get_channel_analytics(youtube_analytics_client, start_date=start_date, end_date=end_date)
         return channel_data, channel_analytics
     except Exception as e:
+        # Log warning but don't raise - this function is designed to return None on failure
         bt.logging.warning(f"An error occurred while retrieving YouTube data: {_format_error(e)}")
         return None, None
 

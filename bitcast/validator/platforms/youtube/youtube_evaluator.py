@@ -1,14 +1,24 @@
 """YouTube-specific platform evaluator - wraps existing YouTube logic."""
 
-from typing import List, Dict, Any
-from google.oauth2.credentials import Credentials
-import bittensor as bt
+from typing import Any, Dict, List
 
-from bitcast.validator.reward_engine.interfaces.platform_evaluator import PlatformEvaluator
-from bitcast.validator.reward_engine.models.evaluation_result import EvaluationResult, AccountResult
+import bittensor as bt
+from google.oauth2.credentials import Credentials
+
+from bitcast.validator.reward_engine.interfaces.platform_evaluator import (
+    PlatformEvaluator,
+)
+from bitcast.validator.reward_engine.models.evaluation_result import (
+    AccountResult,
+    EvaluationResult,
+)
 from bitcast.validator.reward_engine.models.miner_response import MinerResponse
+from bitcast.validator.utils.config import (
+    MAX_ACCOUNTS_PER_SYNAPSE,
+    YT_MIN_ALPHA_STAKE_THRESHOLD,
+)
+
 from .main import eval_youtube  # Existing function
-from bitcast.validator.utils.config import MAX_ACCOUNTS_PER_SYNAPSE, YT_MIN_ALPHA_STAKE_THRESHOLD
 
 
 class YouTubeEvaluator(PlatformEvaluator):

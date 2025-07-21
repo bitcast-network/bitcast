@@ -1,12 +1,17 @@
-import bittensor as bt
+from datetime import datetime
 import hashlib
-from datetime import datetime, timedelta
+
+import bittensor as bt
 from tenacity import retry, stop_after_attempt, wait_fixed
 
+from bitcast.validator.platforms.youtube.config import (
+    get_channel_metrics,
+    REVENUE_METRICS,
+)
+
 # Import global state and helper functions from utils modules  
-from bitcast.validator.platforms.youtube.utils import state, _format_error
+from bitcast.validator.platforms.youtube.utils import _format_error, state
 from bitcast.validator.utils.config import ECO_MODE
-from bitcast.validator.platforms.youtube.config import get_channel_metrics, REVENUE_METRICS
 
 # Retry configuration for YouTube API calls
 YT_API_RETRY_CONFIG = {

@@ -4,17 +4,15 @@ Scoring logic for YouTube video evaluation.
 This module contains functions for calculating video scores based on analytics data.
 """
 
-import bittensor as bt
 from datetime import datetime, timedelta
 from typing import Optional
 
+import bittensor as bt
+
 from bitcast.validator.platforms.youtube.api.video import get_video_analytics
-from bitcast.validator.utils.config import (
-    YT_REWARD_DELAY,
-    YT_ROLLING_WINDOW,
-    ECO_MODE
-)
 from bitcast.validator.platforms.youtube.config import get_youtube_metrics
+from bitcast.validator.utils.config import ECO_MODE, YT_REWARD_DELAY, YT_ROLLING_WINDOW
+
 from .dual_scoring import calculate_dual_score
 from .score_cap import calculate_median_from_analytics
 

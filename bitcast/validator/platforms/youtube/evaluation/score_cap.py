@@ -5,12 +5,16 @@ This module provides functions for calculating median values from account-level
 daily analytics data to implement scoring caps based on T-60 to T-30 day periods.
 """
 
-import bittensor as bt
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Tuple
 import statistics
+from typing import Any, Dict, Tuple
 
-from bitcast.validator.utils.config import YT_SCORE_CAP_START_DAYS, YT_SCORE_CAP_END_DAYS
+import bittensor as bt
+
+from bitcast.validator.utils.config import (
+    YT_SCORE_CAP_END_DAYS,
+    YT_SCORE_CAP_START_DAYS,
+)
 
 
 def get_cap_period_dates() -> Tuple[str, str]:

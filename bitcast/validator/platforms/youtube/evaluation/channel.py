@@ -5,17 +5,19 @@ This module contains functions for vetting YouTube channels against criteria
 such as subscriber count, channel age, retention rates, and blacklist status.
 """
 
+from datetime import datetime
+
 import bittensor as bt
-from datetime import datetime, timedelta
+
+from bitcast.validator.utils.blacklist import is_blacklisted
 from bitcast.validator.utils.config import (
-    YT_MIN_SUBS,
+    YT_LOOKBACK,
     YT_MAX_SUBS,
     YT_MIN_CHANNEL_AGE,
     YT_MIN_CHANNEL_RETENTION,
     YT_MIN_MINS_WATCHED,
-    YT_LOOKBACK
+    YT_MIN_SUBS,
 )
-from bitcast.validator.utils.blacklist import is_blacklisted
 
 
 def vet_channel(channel_data, channel_analytics, min_stake=False):

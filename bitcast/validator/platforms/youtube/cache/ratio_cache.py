@@ -6,10 +6,13 @@ for Non-YPP account scoring. The ratio is calculated from YPP accounts
 and cached for use in predicting revenue for Non-YPP accounts.
 """
 
-import bittensor as bt
 from typing import Optional
-from .base import BaseCache
+
+import bittensor as bt
+
 from bitcast.validator.utils.config import CACHE_DIRS
+
+from .base import BaseCache
 
 
 class ViewsToRevenueRatioCache(BaseCache):

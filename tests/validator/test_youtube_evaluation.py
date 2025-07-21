@@ -306,10 +306,11 @@ def test_check_video_retention():
 @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
 @patch('bitcast.validator.platforms.youtube.evaluation.video.state.is_video_already_scored')
 @patch('bitcast.validator.platforms.youtube.evaluation.video.state.mark_video_as_scored')
-@patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
-@patch('bitcast.validator.platforms.youtube.evaluation.video.evaluate_content_against_brief')
+@patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.ThreadPoolExecutor')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
-async def test_process_video_vetting(mock_evaluate_content, mock_check_injection, mock_mark_video_as_scored, 
+async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_check_injection, mock_mark_video_as_scored, 
                         mock_is_video_already_scored, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data_batch, mock_build):
     """Test the complete video vetting process."""
@@ -355,6 +356,23 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
     # Mock video scoring state management
     mock_is_video_already_scored.return_value = False  # Video hasn't been scored yet
     mock_mark_video_as_scored.return_value = None      # Mark as scored (void function)
+    
+    # Mock ThreadPoolExecutor to execute synchronously
+    def sync_submit(fn, *args, **kwargs):
+        from concurrent.futures import Future
+        future = Future()
+        try:
+            result = fn(*args, **kwargs)
+            future.set_result(result)
+        except Exception as e:
+            future.set_exception(e)
+        return future
+    
+    mock_executor_instance = MagicMock()
+    mock_executor_instance.submit = sync_submit
+    mock_executor_instance.__enter__ = MagicMock(return_value=mock_executor_instance)
+    mock_executor_instance.__exit__ = MagicMock(return_value=None)
+    mock_executor.return_value = mock_executor_instance
 
     # Process the video - pass individual video data and analytics, not dictionaries
     process_video_vetting(

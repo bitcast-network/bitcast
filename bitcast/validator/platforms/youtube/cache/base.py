@@ -6,10 +6,11 @@ established in validator/utils for consistent cache management.
 """
 
 from abc import ABC, abstractmethod
-from diskcache import Cache
+import atexit
 import os
 from threading import Lock
-import atexit
+
+from diskcache import Cache
 
 
 class BaseCache(ABC):
@@ -27,7 +28,6 @@ class BaseCache(ABC):
     @abstractmethod
     def get_cache_dir(cls) -> str:
         """Return the cache directory path for this cache implementation."""
-        pass
     
     @classmethod
     def initialize_cache(cls) -> None:

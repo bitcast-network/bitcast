@@ -1,14 +1,16 @@
-import bittensor as bt
-import time
 from datetime import datetime, timedelta, timezone
 import hashlib
-from tenacity import retry, stop_after_attempt, wait_fixed
+import time
+
+import bittensor as bt
 from googleapiclient.errors import HttpError
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 from bitcast.validator.utils.config import YOUTUBE_SEARCH_CACHE_EXPIRY, YT_MAX_VIDEOS
+
 from ..cache.search import YouTubeSearchCache
-from .channel import _query_multiple_metrics
 from ..utils import _format_error
+from .channel import _query_multiple_metrics
 
 # Retry configuration for YouTube API calls
 YT_API_RETRY_CONFIG = {
@@ -35,7 +37,6 @@ def _get_uploads_playlist_id(youtube):
 
 def _fallback_via_search(youtube, channel_id, cutoff_iso):
     """Quota-heavy fallback path (100 units per request). Uses caching to reduce API calls."""
-    from ..utils.state import data_api_call_count
     
     # Create cache key from channel_id and cutoff_iso
     cache_key = f"{channel_id}"

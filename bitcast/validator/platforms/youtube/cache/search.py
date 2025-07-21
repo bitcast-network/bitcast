@@ -5,11 +5,12 @@ This module provides caching for YouTube search API results to reduce
 expensive API calls and improve performance.
 """
 
-import bittensor as bt
-from diskcache import Cache
+import atexit
 import os
 from threading import Lock
-import atexit
+
+from diskcache import Cache
+
 from bitcast.validator.utils.config import CACHE_DIRS
 
 

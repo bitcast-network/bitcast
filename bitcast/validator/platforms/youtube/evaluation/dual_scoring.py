@@ -5,10 +5,14 @@ This module provides functions for calculating video scores using different
 methods based on account type and available data.
 """
 
+from typing import Any, Dict, List, Optional
+
 import bittensor as bt
-from typing import List, Dict, Any, Optional
+
+from bitcast.validator.platforms.youtube.cache.ratio_cache import (
+    ViewsToRevenueRatioCache,
+)
 from bitcast.validator.utils.config import YT_ROLLING_WINDOW
-from bitcast.validator.platforms.youtube.cache.ratio_cache import ViewsToRevenueRatioCache
 
 
 def _apply_median_cap(total_value: float, median_cap: Optional[float], metric_name: str) -> tuple[float, bool, float]:

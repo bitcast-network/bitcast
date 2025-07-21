@@ -70,16 +70,17 @@ class TestBriefPreScreening:
         assert "preScreeningCheck" in details
         assert details["preScreeningCheck"] == []
 
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.evaluate_content_against_brief')
-    def test_vet_video_prescreening_filters_briefs(self, mock_evaluate_content, mock_check_injection, mock_get_transcript):
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
+    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.ThreadPoolExecutor')
+    def test_vet_video_prescreening_filters_briefs(self, mock_executor, mock_evaluate_content, mock_check_injection, mock_get_transcript):
         """Test that pre-screening filters out briefs without matching unique identifiers."""
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "unique_identifier": "MATCH123", "start_date": "2023-01-01"},
-            {"id": "brief2", "unique_identifier": "NOMATCH456", "start_date": "2023-01-01"}
+            {"id": "brief1", "unique_identifier": "MATCH123", "start_date": "2023-01-01", "brief": "Test brief 1 content"},
+            {"id": "brief2", "unique_identifier": "NOMATCH456", "start_date": "2023-01-01", "brief": "Test brief 2 content"}
         ]
         video_data = {
             "bitcastVideoId": video_id,
@@ -99,6 +100,23 @@ class TestBriefPreScreening:
         mock_get_transcript.return_value = "Test transcript content"
         mock_check_injection.return_value = False  # No prompt injection
         mock_evaluate_content.return_value = (True, "Content meets brief")
+        
+        # Mock ThreadPoolExecutor to execute synchronously
+        def sync_submit(fn, *args, **kwargs):
+            from concurrent.futures import Future
+            future = Future()
+            try:
+                result = fn(*args, **kwargs)
+                future.set_result(result)
+            except Exception as e:
+                future.set_exception(e)
+            return future
+        
+        mock_executor_instance = MagicMock()
+        mock_executor_instance.submit = sync_submit
+        mock_executor_instance.__enter__ = MagicMock(return_value=mock_executor_instance)
+        mock_executor_instance.__exit__ = MagicMock(return_value=None)
+        mock_executor.return_value = mock_executor_instance
 
         # Call vet_video
         result = vet_video(video_id, briefs, video_data, video_analytics)
@@ -117,16 +135,16 @@ class TestBriefPreScreening:
         assert brief_reasonings[0] == "Content meets brief"
         assert brief_reasonings[1] == "Video description does not contain required unique identifier"
 
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.evaluate_content_against_brief')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
+    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+    @patch('bitcast.validator.clients.OpenaiClient.evaluate_content_against_brief')
     def test_vet_video_no_briefs_pass_prescreening(self, mock_evaluate_content, mock_check_injection, mock_get_transcript):
         """Test that LLM evaluation is skipped when no briefs pass pre-screening."""
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "unique_identifier": "NOTFOUND1", "start_date": "2023-01-01"},
-            {"id": "brief2", "unique_identifier": "NOTFOUND2", "start_date": "2023-01-01"}
+            {"id": "brief1", "unique_identifier": "NOTFOUND1", "start_date": "2023-01-01", "brief": "Test brief 1 content"},
+            {"id": "brief2", "unique_identifier": "NOTFOUND2", "start_date": "2023-01-01", "brief": "Test brief 2 content"}
         ]
         video_data = {
             "bitcastVideoId": video_id,
@@ -162,14 +180,14 @@ class TestBriefPreScreening:
         assert len(brief_reasonings) == 2
         assert all("does not contain required unique identifier" in reasoning for reasoning in brief_reasonings)
 
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
+    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
     def test_vet_video_brief_validation_error(self, mock_check_injection, mock_get_transcript):
         """Test that brief validation errors are handled correctly - only the invalid brief fails."""
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "start_date": "2023-01-01"},  # Missing unique_identifier field
+            {"id": "brief1", "start_date": "2023-01-01", "brief": "Test brief 1 content"},  # Missing unique_identifier field
         ]
         video_data = {
             "bitcastVideoId": video_id,
@@ -203,17 +221,18 @@ class TestBriefPreScreening:
         assert len(brief_reasonings) == 1
         assert brief_reasonings[0] == "Video description does not contain required unique identifier"
 
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.check_for_prompt_injection')
-    @patch('bitcast.validator.platforms.youtube.evaluation.video.evaluate_content_against_brief')
-    def test_vet_video_mixed_valid_invalid_briefs(self, mock_evaluate_content, mock_check_injection, mock_get_transcript):
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
+    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.ThreadPoolExecutor')
+    def test_vet_video_mixed_valid_invalid_briefs(self, mock_executor, mock_evaluate_content, mock_check_injection, mock_get_transcript):
         """Test that evaluation continues for valid briefs even when some briefs have validation errors."""
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "unique_identifier": "VALID123", "start_date": "2023-01-01"},  # Valid brief
-            {"id": "brief2", "start_date": "2023-01-01"},  # Missing unique_identifier field
-            {"id": "brief3", "unique_identifier": "NOMATCH456", "start_date": "2023-01-01"}  # Valid but no match
+            {"id": "brief1", "unique_identifier": "VALID123", "start_date": "2023-01-01", "brief": "Test brief 1 content"},  # Valid brief
+            {"id": "brief2", "start_date": "2023-01-01", "brief": "Test brief 2 content"},  # Missing unique_identifier field
+            {"id": "brief3", "unique_identifier": "NOMATCH456", "start_date": "2023-01-01", "brief": "Test brief 3 content"}  # Valid but no match
         ]
         video_data = {
             "bitcastVideoId": video_id,
@@ -233,6 +252,23 @@ class TestBriefPreScreening:
         mock_get_transcript.return_value = "Test transcript content"
         mock_check_injection.return_value = False  # No prompt injection
         mock_evaluate_content.return_value = (True, "Content meets brief")
+        
+        # Mock ThreadPoolExecutor to execute synchronously
+        def sync_submit(fn, *args, **kwargs):
+            from concurrent.futures import Future
+            future = Future()
+            try:
+                result = fn(*args, **kwargs)
+                future.set_result(result)
+            except Exception as e:
+                future.set_exception(e)
+            return future
+        
+        mock_executor_instance = MagicMock()
+        mock_executor_instance.submit = sync_submit
+        mock_executor_instance.__enter__ = MagicMock(return_value=mock_executor_instance)
+        mock_executor_instance.__exit__ = MagicMock(return_value=None)
+        mock_executor.return_value = mock_executor_instance
 
         # Call vet_video
         result = vet_video(video_id, briefs, video_data, video_analytics)
@@ -259,10 +295,10 @@ class TestBriefPreScreening:
     def test_prescreen_briefs_for_video_with_validation_errors(self):
         """Test that prescreen_briefs_for_video handles validation errors gracefully."""
         briefs = [
-            {"id": "brief1", "unique_identifier": "VALID123"},  # Valid brief
-            {"id": "brief2"},  # Missing unique_identifier field
-            {"id": "brief3", "unique_identifier": ""},  # Empty unique_identifier field
-            {"id": "brief4", "unique_identifier": "NOMATCH456"}  # Valid but no match
+            {"id": "brief1", "unique_identifier": "VALID123", "brief": "Test brief 1 content"},  # Valid brief
+            {"id": "brief2", "brief": "Test brief 2 content"},  # Missing unique_identifier field
+            {"id": "brief3", "unique_identifier": "", "brief": "Test brief 3 content"},  # Empty unique_identifier field
+            {"id": "brief4", "unique_identifier": "NOMATCH456", "brief": "Test brief 4 content"}  # Valid but no match
         ]
         video_description = "This video contains VALID123 for testing"
         

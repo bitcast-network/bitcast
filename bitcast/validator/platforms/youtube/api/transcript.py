@@ -1,6 +1,7 @@
 import bittensor as bt
 import requests
-from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
+from tenacity import retry, RetryError, stop_after_attempt, wait_fixed
+
 from bitcast.validator.utils.config import TRANSCRIPT_MAX_RETRY
 
 # ============================================================================

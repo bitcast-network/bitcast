@@ -1,6 +1,6 @@
-import bittensor as bt
 from googleapiclient.discovery import build
-from bitcast.validator.utils.error_handling import log_and_raise_config_error
+
+from ..utils.error_handlers import handle_authentication_error
 
 
 def initialize_youtube_clients(creds):
@@ -20,7 +20,4 @@ def initialize_youtube_clients(creds):
         youtube_analytics_client = build("youtubeAnalytics", "v2", credentials=creds)
         return youtube_data_client, youtube_analytics_client
     except Exception as e:
-        log_and_raise_config_error(
-            message="Failed to initialize YouTube API clients",
-            config_key="YouTube OAuth credentials"
-        ) 
+        handle_authentication_error(e, "youtube_oauth") 
