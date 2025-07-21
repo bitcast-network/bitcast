@@ -127,12 +127,16 @@ def get_all_uploads(youtube, max_age_days: int = 365):
                 bt.logging.info(
                     f"Found {len(vids)} uploads in last {max_age_days} days (playlist)"
                 )
+                if len(vids) > YT_MAX_VIDEOS:
+                    bt.logging.info(f"Processing latest ({YT_MAX_VIDEOS}) videos only")
                 return vids[:YT_MAX_VIDEOS]
             vids.append(item["contentDetails"]["videoId"])
 
         req = youtube.playlistItems().list_next(req, resp)
 
     bt.logging.info(f"Found {len(vids)} uploads in last {max_age_days} days (playlist)")
+    if len(vids) > YT_MAX_VIDEOS:
+        bt.logging.info(f"Processing latest ({YT_MAX_VIDEOS}) videos only")
     return vids[:YT_MAX_VIDEOS]
 
 # ============================================================================

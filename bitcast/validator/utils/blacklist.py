@@ -80,7 +80,6 @@ def get_blacklist() -> list[str]:
         
         # Extract items from response
         blacklist_items = blacklist_data.get("items", [])
-        bt.logging.info(f"Fetched {len(blacklist_items)} blacklisted items from API.")
 
         # Store the successful API response in cache with 10-minute expiration
         cache.set(cache_key, blacklist_items, expire=BLACKLIST_CACHE_EXPIRY)

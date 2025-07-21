@@ -78,9 +78,7 @@ def prescreen_briefs_for_video(briefs, video_description):
         else:
             filtered_brief_ids.append(brief["id"])
             bt.logging.info(f"Meets brief '{brief['id']}': False ❌ (pre-screen)")
-    
-    bt.logging.info(f"Prescreening: {len(eligible_briefs)}/{len(briefs)} briefs eligible for evaluation")
-    
+        
     return eligible_briefs, prescreening_results, filtered_brief_ids
 
 
