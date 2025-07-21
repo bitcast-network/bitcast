@@ -8,7 +8,7 @@ from ..models.score_matrix import ScoreMatrix
 from ..models.emission_target import EmissionTarget
 from ...utils.config import (
     YT_SCALING_FACTOR_DEDICATED, 
-    YT_SCALING_FACTOR_PRE_ROLL, 
+    YT_SCALING_FACTOR_AD_READ, 
     YT_SMOOTHING_FACTOR
 )
 from ...utils.token_pricing import get_bitcast_alpha_price, get_total_miner_emissions
@@ -140,7 +140,7 @@ class EmissionCalculationService(EmissionCalculator):
         
         scaling_factors = {
             "dedicated": YT_SCALING_FACTOR_DEDICATED,
-            "pre-roll": YT_SCALING_FACTOR_PRE_ROLL
+            "ad-read": YT_SCALING_FACTOR_AD_READ
         }
         
         factor = scaling_factors.get(brief_format, YT_SCALING_FACTOR_DEDICATED)

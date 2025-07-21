@@ -41,7 +41,7 @@ class TestForwardIntegration:
         mock_get_uids.return_value = self.test_uids
         mock_get_briefs.return_value = [
             {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Test Brief 2", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
         ]
         mock_publish_stats.return_value = None
         

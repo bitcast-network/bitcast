@@ -33,7 +33,7 @@ class TestYouTubeIntegration:
         self.uids = [123, 456]
         self.briefs = [
             {"id": "brief1", "title": "Gaming Content", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Tech Reviews", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "title": "Tech Reviews", "format": "ad-read", "weight": 100}
         ]
     
     def test_youtube_evaluator_can_evaluate(self):

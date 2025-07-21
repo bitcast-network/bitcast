@@ -27,7 +27,7 @@ class TestRewardOrchestratorBasic:
         self.uids = [123, 456, 789]
         self.briefs = [
             {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Test Brief 2", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
         ]
     
     @pytest.mark.asyncio

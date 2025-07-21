@@ -28,7 +28,7 @@ def mock_external_apis():
         # Mock briefs API
         mock_briefs.return_value = [
             {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Test Brief 2", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
         ]
         
         # Mock token pricing APIs
@@ -153,7 +153,7 @@ def fast_test_data():
         'uids': [0, 123, 456, 789],
         'briefs': [
             {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Test Brief 2", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
         ],
         'mock_rewards': np.array([0.4, 0.3, 0.2, 0.1]),
         'mock_stats': [

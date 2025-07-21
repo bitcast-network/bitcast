@@ -19,7 +19,7 @@ class TestEmissionCalculationService:
         """Sample briefs for testing."""
         return [
             {"id": "brief1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "format": "ad-read", "weight": 100}
         ]
     
     @pytest.fixture
@@ -27,7 +27,7 @@ class TestEmissionCalculationService:
         """Sample briefs with Boost field for testing."""
         return [
             {"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 2.0},
-            {"id": "brief2", "format": "pre-roll", "weight": 100, "Boost": 1.5}
+            {"id": "brief2", "format": "ad-read", "weight": 100, "Boost": 1.5}
         ]
     
     @pytest.fixture
@@ -81,7 +81,7 @@ class TestEmissionCalculationService:
         score_matrix = ScoreMatrix(np.array([[10.0, 5.0], [8.0, 12.0]]))
         briefs = [
             {"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 3.0},
-            {"id": "brief2", "format": "pre-roll", "weight": 100, "Boost": 0.5}
+            {"id": "brief2", "format": "ad-read", "weight": 100, "Boost": 0.5}
         ]
         
         with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \

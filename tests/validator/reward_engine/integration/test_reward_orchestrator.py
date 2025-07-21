@@ -31,7 +31,7 @@ class TestRewardOrchestrator:
         self.uids = [0, 123, 456, 789]  # Include UID 0 for community reserve
         self.briefs = [
             {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Test Brief 2", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
         ]
     
     @pytest.mark.asyncio
@@ -194,7 +194,7 @@ class TestRewardOrchestoratorIntegration:
         # Setup comprehensive test scenario
         briefs = [
             {"id": "brief1", "title": "Gaming Content", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Tech Reviews", "format": "pre-roll", "weight": 100}
+            {"id": "brief2", "title": "Tech Reviews", "format": "ad-read", "weight": 100}
         ]
         uids = [0, 123, 456]  # Include burn UID
         
@@ -306,7 +306,7 @@ def mock_brief_data():
         {
             "id": "brief_tech", 
             "title": "Tech Review Brief",
-            "format": "pre-roll",
+            "format": "ad-read",
             "weight": 100,
             "description": "Review latest tech products"
         }
