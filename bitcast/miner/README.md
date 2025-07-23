@@ -24,14 +24,14 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
    - ≥ 10% retention  
    - Auto-generated captions only  
    - Matches at least one [content brief](http://dashboard.bitcast.network/briefs)  
-   - Published no more than **3 days** before the brief content window starts
+   - Published during the content window
 
 **Tip:** Test your script against any brief in our [dashboard tool](http://dashboard.bitcast.network/).
 
 > **Note: YouTube Partner Program (YPP) Requirement**  
 > Channels must either:
 > - Be enrolled in the YouTube Partner Program (with CPM > 0 within last 90 days)
-> - **OR** have 10k alpha staked against hotkey
+> - **OR** have 2k alpha staked against your mining hotkey
 > 
 > This filter is in place as a barrier for low quality or exploitative miners. Minimum stake indicates investment in the long term success of the subnet.
 > If you connot personally meet the minimum stake threshold reach out to the subnet owner or another significant holder of Bitcast alpha token for sponsorship - acceptance may depend on the quality of your YouTube channel and content.
@@ -40,10 +40,11 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
 
 ## 💻 System Requirements
 
-- **CPU:** 2 cores  
-- **RAM:** 4 GB  
+- **Operating System:** Linux (required)
+- **CPU:** 1 core
+- **RAM:** 2 GB
 
-Make sure your server meets these before you start.
+Bitcast Miner is designed to run 24/7. For best results, use a reliable remote Linux server or VPS (such as AWS EC2, DigitalOcean, or Hetzner) to ensure continuous uptime. Avoid running on a laptop or desktop that may be powered off or disconnected.
 
 ---
 
@@ -207,7 +208,7 @@ This allows you to aggregate multiple creators under a single mining UID while m
 
 - **3-day emissions delay:** You'll begin receiving miner emissions **3 days** after the miner starts.  
 - **Validator polling:** Each validator sends a request roughly every **4 hours**.  
-- **Video processing limit:** A maximum of **50 recent videos** will be processed per YouTube account.  
+- **Video processing limit:** A maximum of **75 recent videos** will be processed per YouTube account.  
 - **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)  
 - **Single YouTube account:** Each miner instance supports only **one** YouTube account. To connect multiple accounts, run multiple miners.  
 - **Auto-updates:** The codebase has auto-update enabled by default.

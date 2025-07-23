@@ -17,6 +17,7 @@ Validators are crucial network participants that:
 
 ## 💻 System Requirements
 
+- **Operating System**: Linux
 - **CPU**: 2 cores
 - **RAM**: 8 GB
 
