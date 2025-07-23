@@ -22,6 +22,7 @@ from .orchestration import (
 # Video validation functions
 from .validation import (
     check_manual_captions,
+    check_video_age_limit,
     check_video_privacy,
     check_video_publish_date,
     check_video_retention,
@@ -59,6 +60,7 @@ __all__ = [
     "initialize_decision_details",
     "check_video_privacy",
     "check_video_publish_date", 
+    "check_video_age_limit",
     "check_video_retention",
     "check_manual_captions",
     

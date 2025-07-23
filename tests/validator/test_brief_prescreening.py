@@ -2,6 +2,7 @@
 Tests for brief pre-screening functionality.
 """
 import pytest
+from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
 from bitcast.validator.platforms.youtube.evaluation.video import (
@@ -11,6 +12,12 @@ from bitcast.validator.platforms.youtube.evaluation.video import (
     prescreen_briefs_for_video
 )
 from bitcast.validator.utils.config import YT_MIN_VIDEO_RETENTION
+
+# Calculate recent dates for tests
+current_date = datetime.now()
+brief_start = (current_date - timedelta(days=10)).strftime("%Y-%m-%d")
+brief_end = (current_date + timedelta(days=10)).strftime("%Y-%m-%d")
+video_publish_date = (current_date - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class TestBriefPreScreening:
@@ -79,14 +86,14 @@ class TestBriefPreScreening:
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "unique_identifier": "MATCH123", "start_date": "2023-01-01", "brief": "Test brief 1 content"},
-            {"id": "brief2", "unique_identifier": "NOMATCH456", "start_date": "2023-01-01", "brief": "Test brief 2 content"}
+            {"id": "brief1", "unique_identifier": "MATCH123", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 1 content"},
+            {"id": "brief2", "unique_identifier": "NOMATCH456", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 2 content"}
         ]
         video_data = {
             "bitcastVideoId": video_id,
             "title": "Test Video",
             "description": "This video contains MATCH123 but not the other code",
-            "publishedAt": "2023-01-15T00:00:00Z",
+            "publishedAt": video_publish_date,
             "duration": "PT10M",
             "caption": False,
             "privacyStatus": "public"
@@ -143,14 +150,14 @@ class TestBriefPreScreening:
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "unique_identifier": "NOTFOUND1", "start_date": "2023-01-01", "brief": "Test brief 1 content"},
-            {"id": "brief2", "unique_identifier": "NOTFOUND2", "start_date": "2023-01-01", "brief": "Test brief 2 content"}
+            {"id": "brief1", "unique_identifier": "NOTFOUND1", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 1 content"},
+            {"id": "brief2", "unique_identifier": "NOTFOUND2", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 2 content"}
         ]
         video_data = {
             "bitcastVideoId": video_id,
-            "title": "Test Video", 
+            "title": "Test Video",
             "description": "This video doesn't contain any of the required codes",
-            "publishedAt": "2023-01-15T00:00:00Z",
+            "publishedAt": video_publish_date,
             "duration": "PT10M",
             "caption": False,
             "privacyStatus": "public"
@@ -187,13 +194,13 @@ class TestBriefPreScreening:
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "start_date": "2023-01-01", "brief": "Test brief 1 content"},  # Missing unique_identifier field
+            {"id": "brief1", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 1 content"},  # Missing unique_identifier field
         ]
         video_data = {
             "bitcastVideoId": video_id,
             "title": "Test Video",
             "description": "Some description",
-            "publishedAt": "2023-01-15T00:00:00Z",
+            "publishedAt": video_publish_date,
             "duration": "PT10M",
             "caption": False,
             "privacyStatus": "public"
@@ -230,15 +237,15 @@ class TestBriefPreScreening:
         # Setup mock data
         video_id = "test_video"
         briefs = [
-            {"id": "brief1", "unique_identifier": "VALID123", "start_date": "2023-01-01", "brief": "Test brief 1 content"},  # Valid brief
-            {"id": "brief2", "start_date": "2023-01-01", "brief": "Test brief 2 content"},  # Missing unique_identifier field
-            {"id": "brief3", "unique_identifier": "NOMATCH456", "start_date": "2023-01-01", "brief": "Test brief 3 content"}  # Valid but no match
+            {"id": "brief1", "unique_identifier": "VALID123", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 1 content"},  # Valid brief
+            {"id": "brief2", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 2 content"},  # Missing unique_identifier field
+            {"id": "brief3", "unique_identifier": "NOMATCH456", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief 3 content"}  # Valid but no match
         ]
         video_data = {
             "bitcastVideoId": video_id,
             "title": "Test Video",
             "description": "This video contains VALID123 for testing",
-            "publishedAt": "2023-01-15T00:00:00Z",
+            "publishedAt": video_publish_date,
             "duration": "PT10M",
             "caption": False,
             "privacyStatus": "public"
@@ -295,15 +302,20 @@ class TestBriefPreScreening:
     def test_prescreen_briefs_for_video_with_validation_errors(self):
         """Test that prescreen_briefs_for_video handles validation errors gracefully."""
         briefs = [
-            {"id": "brief1", "unique_identifier": "VALID123", "brief": "Test brief 1 content"},  # Valid brief
-            {"id": "brief2", "brief": "Test brief 2 content"},  # Missing unique_identifier field
-            {"id": "brief3", "unique_identifier": "", "brief": "Test brief 3 content"},  # Empty unique_identifier field
-            {"id": "brief4", "unique_identifier": "NOMATCH456", "brief": "Test brief 4 content"}  # Valid but no match
+            {"id": "brief1", "unique_identifier": "VALID123", "brief": "Test brief 1 content", 
+             "start_date": brief_start, "end_date": brief_end},  # Valid brief
+            {"id": "brief2", "brief": "Test brief 2 content",
+             "start_date": brief_start, "end_date": brief_end},  # Missing unique_identifier field
+            {"id": "brief3", "unique_identifier": "", "brief": "Test brief 3 content",
+             "start_date": brief_start, "end_date": brief_end},  # Empty unique_identifier field
+            {"id": "brief4", "unique_identifier": "NOMATCH456", "brief": "Test brief 4 content",
+             "start_date": brief_start, "end_date": brief_end}  # Valid but no match
         ]
         video_description = "This video contains VALID123 for testing"
+        video_data = {"publishedAt": video_publish_date}  # Valid publish date within range
         
         # Call prescreen_briefs_for_video
-        eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(briefs, video_description)
+        eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(briefs, video_description, video_data)
         
         # Verify only the first brief passed pre-screening
         assert len(eligible_briefs) == 1

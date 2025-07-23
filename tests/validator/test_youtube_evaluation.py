@@ -316,11 +316,16 @@ async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_
     """Test the complete video vetting process."""
     # Setup test data
     video_id = "test_video_1"
+    from datetime import datetime, timedelta
+    current_date = datetime.now()
+    brief_start = (current_date - timedelta(days=10)).strftime("%Y-%m-%d")
+    brief_end = (current_date + timedelta(days=10)).strftime("%Y-%m-%d")
     briefs = [{
-        "id": "brief1", 
+        "id": "brief1",
         "title": "Test Brief 1",
         "brief": "Test Brief Description",  # Added missing brief field
-        "start_date": "2023-01-01",
+        "start_date": brief_start,
+        "end_date": brief_end,
         "unique_identifier": "TESTCODE123"
     }]
     youtube_data_client = MagicMock()
@@ -329,11 +334,12 @@ async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_
     video_decision_details = {}
 
     # Mock video data
+    video_publish_date = (current_date - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
     video_data = {
         "bitcastVideoId": video_id,
         "title": "Test Video",
         "description": "Test Description with TESTCODE123 for pre-screening",
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False,
         "privacyStatus": "public",

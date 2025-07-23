@@ -95,7 +95,8 @@ Bitcast employs a dynamic, multi-layered scoring and rewards mechanism to fairly
     - YouTube audit and remove engagement that they deem to be fake within 1 month. The lookback factors this audit in a prevents exploitation.
 - **Reward Timing:**  
   - Only videos matching active briefs are considered.
-  - There is a **3-day delay** in rewards (to align with YouTube’s engagement verification), so rewards always lag behind video engagement by 3 days.
+  - Videos earn rewards for the first 14 days after they are published.
+  - There is a **3-day delay** in rewards (to align with YouTube's engagement verification), so rewards always lag behind video engagement by 3 days.
 
 ### 4. Emissions Model
 

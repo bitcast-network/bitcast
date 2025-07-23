@@ -1,5 +1,6 @@
 import pytest
 import bittensor as bt
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from bitcast.validator.platforms.youtube.evaluation import (
@@ -13,8 +14,14 @@ from bitcast.validator.platforms.youtube.evaluation import (
 )
 from bitcast.validator.utils.config import (
     YT_MIN_VIDEO_RETENTION,
-    YT_VIDEO_RELEASE_BUFFER
+    ECO_MODE
 )
+
+# Calculate recent dates for tests
+current_date = datetime.now()
+brief_start = (current_date - timedelta(days=10)).strftime("%Y-%m-%d")
+brief_end = (current_date + timedelta(days=10)).strftime("%Y-%m-%d")
+video_publish_date = (current_date - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # Mock functions to isolate testing of ECO_MODE
 class Mocks:
@@ -62,11 +69,11 @@ def test_eco_mode_enabled_early_return():
     """Test that ECO_MODE causes early return when a check fails."""
     # Setup
     video_id = "test_video_1"
-    briefs = [{"id": "brief1", "start_date": "2023-01-01"}, {"id": "brief2", "start_date": "2023-01-01"}]
+    briefs = [{"id": "brief1", "start_date": brief_start}, {"id": "brief2", "start_date": brief_start}]
     video_data = {
         "bitcastVideoId": video_id,
         "privacyStatus": "public",  # Set to public, the mock will make it fail
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False
     }
@@ -106,11 +113,11 @@ def test_eco_mode_disabled_continues_despite_early_return():
     """Test that when ECO_MODE is disabled, the function continues execution through all checks."""
     # Setup
     video_id = "test_video_1"
-    briefs = [{"id": "brief1", "start_date": "2023-01-01"}, {"id": "brief2", "start_date": "2023-01-01"}]
+    briefs = [{"id": "brief1", "start_date": brief_start}, {"id": "brief2", "start_date": brief_start}]
     video_data = {
         "bitcastVideoId": video_id,
         "privacyStatus": "public",  # Set to public so the real check passes initially
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False
     }
@@ -156,11 +163,11 @@ def test_eco_mode_disabled_continues_despite_early_return():
 def test_eco_mode_early_return_at_each_stage():
     """Test early return at each stage of the validation pipeline with ECO_MODE enabled."""
     video_id = "test_video_1"
-    briefs = [{"id": "brief1", "start_date": "2023-01-01", "brief": "Test brief content"}]
+    briefs = [{"id": "brief1", "start_date": brief_start, "brief": "Test brief content"}]
     video_data = {
         "bitcastVideoId": video_id,
         "privacyStatus": "public",
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False
     }
@@ -224,12 +231,12 @@ def test_eco_mode_early_return_at_each_stage():
 def test_eco_mode_disabled_full_pipeline():
     """Test the full validation pipeline executes with ECO_MODE disabled."""
     video_id = "test_video_1"
-    briefs = [{"id": "brief1", "unique_identifier": "TEST123", "start_date": "2023-01-01", "brief": "Test brief content"}]
+    briefs = [{"id": "brief1", "unique_identifier": "TEST123", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief content"}]
     video_data = {
         "bitcastVideoId": video_id, 
         "description": "Video contains TEST123 identifier",
-        "privacyStatus": "public",
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "privacyStatus": "private",  # This should fail privacy check
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False
     }
@@ -280,12 +287,12 @@ def test_eco_mode_disabled_full_pipeline():
 def test_early_return_flag():
     """Test that the early_return flag is properly set when checks fail."""
     video_id = "test_video_1"
-    briefs = [{"id": "brief1", "unique_identifier": "TEST123", "start_date": "2023-01-01", "brief": "Test brief content"}]
+    briefs = [{"id": "brief1", "unique_identifier": "TEST123", "start_date": brief_start, "end_date": brief_end, "brief": "Test brief content"}]
     video_data = {
         "bitcastVideoId": video_id, 
         "description": "Video contains TEST123 identifier",
-        "privacyStatus": "public",
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "privacyStatus": "private",  # This should fail privacy check
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False
     }
@@ -327,11 +334,11 @@ def test_early_return_flag():
 def test_eco_mode_multiple_failures():
     """Test for multiple failures in different checks with ECO_MODE enabled."""
     video_id = "test_video_1"
-    briefs = [{"id": "brief1", "start_date": "2023-01-01", "brief": "Test brief content"}]
+    briefs = [{"id": "brief1", "start_date": brief_start, "brief": "Test brief content"}]
     video_data = {
         "bitcastVideoId": video_id,
-        "privacyStatus": "public",
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "privacyStatus": "private",  # This should fail privacy check
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False
     }

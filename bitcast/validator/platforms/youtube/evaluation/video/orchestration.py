@@ -30,6 +30,7 @@ from .brief_matching import (
 from .transcript import check_prompt_injection, get_video_transcript
 from .validation import (
     check_manual_captions,
+    check_video_age_limit,
     check_video_privacy,
     check_video_publish_date,
     check_video_retention,
@@ -143,13 +144,24 @@ def _run_video_validation_checks(video_id, video_data, video_analytics, briefs, 
         if handle_check_failure():
             return False
     
-    # Check if video was published after brief start date
+    # Check if video was published after earliest brief start date
     try:
         if not check_video_publish_date(video_data, briefs, decision_details):
             if handle_check_failure():
                 return False
     except RuntimeError as e:
         bt.logging.error(f"System error during publish date check: {e}")
+        decision_details["video_vet_result"] = False
+        decision_details["publishDateCheck"] = False
+        return False
+    
+    # Check if video is not older than YT_SCORING_WINDOW + YT_REWARD_DELAY days
+    try:
+        if not check_video_age_limit(video_data, decision_details):
+            if handle_check_failure():
+                return False
+    except RuntimeError as e:
+        bt.logging.error(f"System error during video age limit check: {e}")
         decision_details["video_vet_result"] = False
         decision_details["publishDateCheck"] = False
         return False
@@ -183,7 +195,28 @@ def _process_video_transcript_and_briefs(video_id, video_data, briefs, decision_
     met_brief_ids = []
     brief_reasonings = []
     
-    # Get transcript only when needed
+    # Pre-screen briefs FIRST based on unique_identifier and publish date before expensive operations
+    eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(
+        briefs, video_data.get("description", ""), video_data
+    )
+    decision_details["preScreeningCheck"] = prescreening_results
+    
+    # Update publishDateCheck based on individual brief validation results
+    # If any brief passed prescreening (including date validation), then publishDateCheck = True
+    decision_details["publishDateCheck"] = any(prescreening_results) if prescreening_results else False
+    
+    # If no briefs passed pre-screening, skip expensive transcript and LLM operations
+    if not eligible_briefs:
+        # Set default pass for checks that were skipped
+        decision_details["promptInjectionCheck"] = True  
+        decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
+        brief_reasonings = [
+            "Video description does not contain required unique identifier"
+            for brief in briefs
+        ]
+        return [], brief_reasonings
+    
+    # Get transcript only when needed (briefs passed pre-screening)
     try:
         transcript = get_video_transcript(video_id, video_data)
     except ConnectionError as e:
@@ -196,19 +229,13 @@ def _process_video_transcript_and_briefs(video_id, video_data, briefs, decision_
     if transcript is None:
         return [], ["Failed to get video transcript"] * len(briefs)
     
-    # Check for prompt injection
+    # Check for prompt injection (only when briefs passed pre-screening)
     if not check_prompt_injection(video_id, video_data, transcript, decision_details):
         decision_details["video_vet_result"] = False
         decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
         return [], ["Video failed prompt injection check"] * len(briefs)
     
-    # Pre-screen briefs based on unique_identifier before expensive LLM evaluation
-    eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(
-        briefs, video_data.get("description", "")
-    )
-    decision_details["preScreeningCheck"] = prescreening_results
-    
-    # Only evaluate eligible briefs against content if any passed pre-screening
+    # Evaluate eligible briefs against content (all pre-screening and safety checks passed)
     if eligible_briefs:
         try:
             # Create a temporary decision_details for eligible briefs only
@@ -230,13 +257,6 @@ def _process_video_transcript_and_briefs(video_id, video_data, briefs, decision_
             decision_details["video_vet_result"] = False
             decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
             return [], ["Brief evaluation system error"] * len(briefs)
-    else:
-        # No briefs passed pre-screening, create appropriate reasonings
-        brief_reasonings = [
-            "Video description does not contain required unique identifier"
-            for brief in briefs
-        ]
-        decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
     
     return met_brief_ids, brief_reasonings
 

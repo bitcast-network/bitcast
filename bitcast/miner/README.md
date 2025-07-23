@@ -24,7 +24,7 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
    - ≥ 10% retention  
    - Auto-generated captions only  
    - Matches at least one [content brief](http://dashboard.bitcast.network/briefs)  
-   - Published during the content window
+   - Published during the brief content window
 
 **Tip:** Test your script against any brief in our [dashboard tool](http://dashboard.bitcast.network/).
 
@@ -207,6 +207,7 @@ This allows you to aggregate multiple creators under a single mining UID while m
 ## ℹ️ General Notes
 
 - **3-day emissions delay:** You'll begin receiving miner emissions **3 days** after the miner starts.  
+- **Video age limit:** Each video will be rewarded for its first 14 days of engagement as long as it is posted during the active brief window.
 - **Validator polling:** Each validator sends a request roughly every **4 hours**.  
 - **Video processing limit:** A maximum of **75 recent videos** will be processed per YouTube account.  
 - **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)  

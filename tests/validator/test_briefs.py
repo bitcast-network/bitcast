@@ -112,14 +112,16 @@ def test_get_briefs_date_parsing_error(monkeypatch):
 
 def test_get_briefs_with_reward_delay(monkeypatch):
     """
-    Test that get_briefs correctly includes briefs that ended within YT_REWARD_DELAY days.
+    Test that get_briefs correctly includes briefs that ended within YT_SCORING_WINDOW + YT_REWARD_DELAY days.
     """
     # Calculate dates for testing
     current_date = datetime.now(timezone.utc).date()
+    from bitcast.validator.utils.config import YT_SCORING_WINDOW, YT_REWARD_DELAY
+    window = YT_SCORING_WINDOW + YT_REWARD_DELAY
     end_date = current_date - timedelta(days=1)  # Yesterday
     start_date = end_date - timedelta(days=5)    # 5 days before end date
     
-    # Create a brief that ended yesterday (should be included due to reward delay)
+    # Create a brief that ended yesterday (should be included due to scoring window + reward delay)
     mock_data = {
         "items": [
             {
@@ -141,19 +143,19 @@ def test_get_briefs_with_reward_delay(monkeypatch):
     monkeypatch.setattr(requests, "get", mock_get)
     briefs = get_briefs()  # Default is all=False, so it filters active briefs.
     
-    # The 'recently_ended' brief should be included because it ended within YT_REWARD_DELAY days
+    # The 'recently_ended' brief should be included because it ended within the window
     assert isinstance(briefs, list)
     assert len(briefs) == 1
     assert briefs[0]["id"] == "recently_ended"
     
-    # Test with a brief that ended beyond the reward delay period
-    old_end_date = current_date - timedelta(days=YT_REWARD_DELAY + 1)
+    # Test with a brief that ended beyond the scoring window + reward delay period
+    old_end_date = current_date - timedelta(days=window + 1)
     old_start_date = old_end_date - timedelta(days=5)
     
     mock_data = {
         "items": [
             {
-                "id": "beyond_delay", 
+                "id": "beyond_window", 
                 "start_date": old_start_date.strftime("%Y-%m-%d"), 
                 "end_date": old_end_date.strftime("%Y-%m-%d")
             }
@@ -161,7 +163,7 @@ def test_get_briefs_with_reward_delay(monkeypatch):
     }
     
     briefs = get_briefs()
-    assert len(briefs) == 0  # Should not be included as it's beyond the reward delay period
+    assert len(briefs) == 0  # Should not be included as it's beyond the window
 
 def test_get_briefs_caching_success(monkeypatch):
     """

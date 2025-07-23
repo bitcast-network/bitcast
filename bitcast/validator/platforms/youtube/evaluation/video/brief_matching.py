@@ -12,6 +12,7 @@ import bittensor as bt
 
 from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief
 from bitcast.validator.utils.error_handling import log_and_raise_processing_error
+from .validation import check_brief_publish_date_range
 
 
 def check_brief_unique_identifier(brief, video_description):
@@ -49,13 +50,14 @@ def check_brief_unique_identifier(brief, video_description):
         return False
 
 
-def prescreen_briefs_for_video(briefs, video_description):
+def prescreen_briefs_for_video(briefs, video_description, video_data):
     """
-    Pre-screen briefs based on unique identifier before expensive LLM evaluation.
+    Pre-screen briefs based on unique identifier and publish date before expensive LLM evaluation.
     
     Args:
         briefs (list): List of brief dictionaries
         video_description (str): Video description text
+        video_data (dict): Video metadata containing publishedAt
         
     Returns:
         tuple: (eligible_briefs, prescreening_results, filtered_brief_ids)
@@ -65,11 +67,26 @@ def prescreen_briefs_for_video(briefs, video_description):
     filtered_brief_ids = []
     
     for brief in briefs:
+        passes_prescreen = False
+        reason = ""
+        
         try:
-            passes_prescreen = check_brief_unique_identifier(brief, video_description)
+            # Check unique identifier first
+            passes_unique_id = check_brief_unique_identifier(brief, video_description)
+            if not passes_unique_id:
+                reason = "unique identifier"
+            else:
+                # Check publish date if unique ID passes
+                passes_date_validation = check_brief_publish_date_range(video_data, brief)
+                if not passes_date_validation:
+                    reason = "publish date"
+                else:
+                    passes_prescreen = True
+                    
         except ValueError as e:
             bt.logging.warning(f"Brief validation error during prescreening: {e}")
             passes_prescreen = False
+            reason = "validation error"
         
         prescreening_results.append(passes_prescreen)
         
@@ -77,7 +94,7 @@ def prescreen_briefs_for_video(briefs, video_description):
             eligible_briefs.append(brief)
         else:
             filtered_brief_ids.append(brief["id"])
-            bt.logging.info(f"Meets brief '{brief['id']}': False ❌ (pre-screen)")
+            bt.logging.info(f"Meets brief '{brief['id']}': False ❌ (pre-screen: {reason})")
         
     return eligible_briefs, prescreening_results, filtered_brief_ids
 

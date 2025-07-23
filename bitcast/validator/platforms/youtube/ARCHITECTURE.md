@@ -110,17 +110,19 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids) -> dict
 **Performance Impact**: Reduces LLM API calls by ~60-80% through intelligent filtering
 
 ```python
-# Prescreening workflow
+# Optimized prescreening workflow (moved before expensive operations)
 1. Extract unique_identifier from brief
-2. Search video description (case-insensitive)
-3. Filter out non-matching briefs before LLM evaluation
-4. Only process eligible briefs through expensive content analysis
+2. Search video description (case-insensitive)  
+3. Check publish date validation
+4. Filter out non-matching briefs before transcript fetch and LLM evaluation
+5. Only process eligible briefs through expensive transcript and content analysis
 ```
 
 **Benefits**:
-- Significant cost reduction for OpenAI API usage
-- Faster evaluation cycles
+- Significant cost reduction for OpenAI API usage and transcript API calls
+- Faster evaluation cycles with early exit for non-matching videos
 - Maintained accuracy with intelligent filtering
+- Skips both transcript fetch and prompt injection check when no briefs match
 
 ### **Advanced Brief Matching & Priority Selection**
 
