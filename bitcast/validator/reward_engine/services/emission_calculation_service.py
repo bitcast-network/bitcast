@@ -24,8 +24,6 @@ class EmissionCalculationService(EmissionCalculator):
     ) -> List[EmissionTarget]:
         """
         Calculate emission targets from score matrix.
-        
-        This replaces the calculate_emission_targets() function.
         """
         # Optimize: Work directly with the matrix to avoid copies
         emission_targets_matrix = self._calculate_emission_targets_matrix(
@@ -53,7 +51,7 @@ class EmissionCalculationService(EmissionCalculator):
                 },
                 scaling_factors={
                     "scaling_factor": self._get_scaling_factor(brief),
-                    "boost_factor": brief.get("Boost", 1.0),
+                    "boost_factor": brief.get("boost", 1.0),
                     "smoothing_factor": YT_SMOOTHING_FACTOR
                 }
             )
@@ -86,7 +84,7 @@ class EmissionCalculationService(EmissionCalculator):
             emission_targets[:, brief_idx] *= scaling_factor
             
             # Apply boost multiplier (before smoothing and clipping)
-            boost_factor = brief.get("Boost", 1.0)
+            boost_factor = brief.get("boost", 1.0)
             if boost_factor != 1.0:
                 bt.logging.info(f"Applying boost {boost_factor}x to brief {brief.get('id', 'unknown')}")
             emission_targets[:, brief_idx] *= boost_factor

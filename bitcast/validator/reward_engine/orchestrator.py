@@ -66,7 +66,7 @@ class RewardOrchestrator:
             # 3. Aggregate scores across platforms
             score_matrix = self.score_aggregator.aggregate_scores(evaluation_results, briefs)
             
-            # 3.5. Update global views-to-revenue ratio for Non-YPP scoring (every 4-hour cycle)
+            # 3.5. Update global views-to-revenue ratio for Non-YPP scoring
             self._update_global_ratio(evaluation_results)
             
             # 4. Reset state for next evaluation cycle

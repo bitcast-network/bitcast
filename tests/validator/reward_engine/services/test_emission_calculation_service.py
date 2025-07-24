@@ -26,8 +26,8 @@ class TestEmissionCalculationService:
     def sample_briefs_with_boost(self):
         """Sample briefs with Boost field for testing."""
         return [
-            {"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 2.0},
-            {"id": "brief2", "format": "ad-read", "weight": 100, "Boost": 1.5}
+            {"id": "brief1", "format": "dedicated", "weight": 100, "boost": 2.0},
+            {"id": "brief2", "format": "ad-read", "weight": 100, "boost": 1.5}
         ]
     
     @pytest.fixture
@@ -62,9 +62,9 @@ class TestEmissionCalculationService:
         score_matrix = ScoreMatrix(np.array([[10.0], [5.0]]))
         
         # Brief without boost
-        briefs_no_boost = [{"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 1.0}]
+        briefs_no_boost = [{"id": "brief1", "format": "dedicated", "weight": 100, "boost": 1.0}]
         # Brief with 2x boost  
-        briefs_with_boost = [{"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 2.0}]
+        briefs_with_boost = [{"id": "brief1", "format": "dedicated", "weight": 100, "boost": 2.0}]
         
         with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \
              patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_total_miner_emissions', return_value=1000.0):
@@ -80,8 +80,8 @@ class TestEmissionCalculationService:
         """Test multiple briefs with different boost values work correctly."""
         score_matrix = ScoreMatrix(np.array([[10.0, 5.0], [8.0, 12.0]]))
         briefs = [
-            {"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 3.0},
-            {"id": "brief2", "format": "ad-read", "weight": 100, "Boost": 0.5}
+            {"id": "brief1", "format": "dedicated", "weight": 100, "boost": 3.0},
+            {"id": "brief2", "format": "ad-read", "weight": 100, "boost": 0.5}
         ]
         
         with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \
@@ -102,7 +102,7 @@ class TestEmissionCalculationService:
         """Test that boost is applied after scaling but before smoothing."""
         # This test verifies the order of operations by checking the implementation
         score_matrix = ScoreMatrix(np.array([[100.0]]))
-        briefs = [{"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 2.0}]
+        briefs = [{"id": "brief1", "format": "dedicated", "weight": 100, "boost": 2.0}]
         
         with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \
              patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_total_miner_emissions', return_value=1000.0):
@@ -120,7 +120,7 @@ class TestEmissionCalculationService:
         boost_values = [0.5, 1.0, 2.5, 10.0]
         
         for boost_val in boost_values:
-            briefs = [{"id": "test_brief", "format": "dedicated", "weight": 100, "Boost": boost_val}]
+            briefs = [{"id": "test_brief", "format": "dedicated", "weight": 100, "boost": boost_val}]
             
             with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \
                  patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_total_miner_emissions', return_value=1000.0):
@@ -154,7 +154,7 @@ class TestEmissionCalculationService:
     def test_zero_score_matrix_handling(self):
         """Test handling of zero score matrix."""
         zero_matrix = ScoreMatrix(np.zeros((2, 1)))  # 2 miners, 1 brief, all zeros
-        briefs = [{"id": "brief1", "format": "dedicated", "weight": 100, "Boost": 2.0}]
+        briefs = [{"id": "brief1", "format": "dedicated", "weight": 100, "boost": 2.0}]
         
         with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \
              patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_total_miner_emissions', return_value=1000.0):

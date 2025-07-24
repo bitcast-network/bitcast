@@ -155,7 +155,7 @@ def select_highest_priority_brief(matching_briefs, brief_results):
     for i, (brief, matched) in enumerate(zip(matching_briefs, brief_results)):
         if matched:
             weight = brief.get("weight", 0)
-            boost = brief.get("Boost", 1.0)
+            boost = brief.get("boost", 1.0)
             priority = weight * boost
             
             if priority > best_priority:
@@ -238,7 +238,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
         # Log the selection with weight and boost information
         total_matches = sum(brief_results)
         selected_weight = selected_brief.get("weight", 0)
-        selected_boost = selected_brief.get("Boost", 1.0)
+        selected_boost = selected_brief.get("boost", 1.0)
         priority_value = selected_weight * selected_boost
         bt.logging.info(
             f"Selected brief '{selected_brief['id']}' (weight: {selected_weight}, boost: {selected_boost}, priority: {priority_value}) "
