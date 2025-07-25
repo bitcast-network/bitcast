@@ -6,10 +6,9 @@ import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
-from bitcast.validator.platforms.youtube.youtube_evaluation import vet_video
-from bitcast.validator.platforms.youtube import youtube_utils
-from bitcast.validator.utils.config import RAPID_API_KEY
+from bitcast.validator.platforms.youtube.evaluation.video.orchestration import vet_video
 import asyncio
+import json
 
 # Configure logging to show all logs
 logging.basicConfig(
@@ -35,19 +34,40 @@ class VideoRequest(BaseModel):
 @app.post("/vet_video/")
 async def vet_video_endpoint(request: VideoRequest):
     try:
+        # Log the incoming request
+        logging.info(f"Incoming /vet_video/ request: {request.json()}")
+        
         # Verify bt.logging mock is working
         logging.debug("=== Starting vet_video_endpoint ===")
         
-        # Add debug logs
-        logging.debug(f"Received request for video: {request.video_id}")
-        logging.debug(f"Request contains {len(request.briefs)} briefs")
+        # Spoof video data for testing - always override publish date to bypass date validation
+        spoofed_video_data = request.video_data.copy()
+        # Always set a recent date (within the last 30 days) to ensure it passes date validation
+        from datetime import datetime, timedelta
+        recent_date = (datetime.now() - timedelta(days=15)).isoformat() + "Z"
+        spoofed_video_data["publishedAt"] = recent_date
+        
+        # Spoof brief dates for testing - override start_date and end_date to bypass date validation
+        spoofed_briefs = []
+        for brief in request.briefs:
+            spoofed_brief = brief.copy()
+            
+            # Set brief dates to current timeframe to ensure date validation passes
+            # Brief should start before video publish date and end after it
+            brief_start = (datetime.now() - timedelta(days=20)).strftime("%Y-%m-%d")
+            brief_end = (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d")
+            
+            spoofed_brief["start_date"] = brief_start
+            spoofed_brief["end_date"] = brief_end
+            
+            spoofed_briefs.append(spoofed_brief)
         
         # Offload synchronous vet_video call to a thread to avoid blocking
         result = await asyncio.to_thread(
             vet_video,
             video_id=request.video_id,
-            briefs=request.briefs,
-            video_data=request.video_data,
+            briefs=spoofed_briefs,
+            video_data=spoofed_video_data,
             video_analytics=request.video_analytics
         )
         
