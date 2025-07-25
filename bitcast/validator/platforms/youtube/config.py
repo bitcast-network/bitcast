@@ -31,13 +31,13 @@ Example usage:
 # Core metrics for general analytics
 CORE_METRICS = {
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
-    "views": ("views", "", None, None, None),
+    "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
     "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "", None, None, None),
 }
 
 # Additional metrics for full analytics (when not in ECO_MODE)
 ADDITIONAL_METRICS = {
-    "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
+    "views": ("views", "", None, None, None),
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType", None, None, None),
     "averageViewDuration": ("averageViewDuration", "", None, None, None),
     "countryMinutes": ("estimatedMinutesWatched", "country", None, None, "-estimatedMinutesWatched"),
@@ -61,7 +61,7 @@ ADVANCED_METRICS = {
 # Core daily metrics - all metrics with day dimension
 CORE_DAILY_METRICS = {
     "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
-    "views": ("views", "day", None, None, "day"),
+    "estimatedMinutesWatched": ("estimatedMinutesWatched", "day", None, None, "day"),
 }
 
 # Additional daily metrics for ECO_MODE
@@ -79,7 +79,7 @@ ADDITIONAL_DAILY_METRICS = {
     "videosAddedToPlaylists": ("videosAddedToPlaylists", "day", None, None, "day"),
     "estimatedAdRevenue": ("estimatedAdRevenue", "day", None, None, "day"),
     "cpm": ("cpm", "day", None, None, "day"),
-    "estimatedMinutesWatched": ("estimatedMinutesWatched", "day", None, None, "day"),
+    "views": ("views", "day", None, None, "day"),
     "trafficSourceMinutes": ("estimatedMinutesWatched", "insightTrafficSourceType,day", None, None, "day"),
 }
 

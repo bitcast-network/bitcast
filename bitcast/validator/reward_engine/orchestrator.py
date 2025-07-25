@@ -66,7 +66,7 @@ class RewardOrchestrator:
             # 3. Aggregate scores across platforms
             score_matrix = self.score_aggregator.aggregate_scores(evaluation_results, briefs)
             
-            # 3.5. Update global views-to-revenue ratio for Non-YPP scoring
+            # 3.5. Update global minutes-watched-to-revenue ratio for Non-YPP scoring
             self._update_global_ratio(evaluation_results)
             
             # 4. Reset state for next evaluation cycle
@@ -177,14 +177,14 @@ class RewardOrchestrator:
     
     def _update_global_ratio(self, evaluation_results: EvaluationResultCollection) -> None:
         """
-        Update global views-to-revenue ratio for Non-YPP scoring.
+        Update global minutes-watched-to-revenue ratio for Non-YPP scoring.
         
         This method calculates a new global ratio from evaluation results and caches it
         for use in Non-YPP scoring in the next cycle.
         """
         try:
             update_cached_ratio(evaluation_results)
-            bt.logging.info("Successfully updated global views-to-revenue ratio for next cycle")
+            bt.logging.info("Successfully updated global minutes-watched-to-revenue ratio for next cycle")
             
         except Exception as e:
             bt.logging.error(f"Failed to update global ratio: {e}")

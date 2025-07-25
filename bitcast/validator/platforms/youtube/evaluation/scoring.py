@@ -30,7 +30,7 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
         video_publish_date (str): Video publish date in ISO format
         existing_analytics (dict): Existing analytics data
         is_ypp_account (bool): Whether this is a YPP account
-        cached_ratio (Optional[float]): Global cached views-to-revenue ratio for Non-YPP accounts
+        cached_ratio (Optional[float]): Global cached minutes-watched-to-revenue ratio for Non-YPP accounts
         channel_analytics (Optional[dict]): Channel analytics for median cap calculation
         
     Returns:
@@ -62,20 +62,20 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     
     # Calculate median caps
     median_revenue_cap = None
-    median_views_cap = None
+    median_minutes_watched_cap = None
     
     if channel_analytics is not None:
-        metric_key = 'estimatedRedPartnerRevenue' if is_ypp_account else 'views'
+        metric_key = 'estimatedRedPartnerRevenue' if is_ypp_account else 'estimatedMinutesWatched'
         try:
             median_cap = calculate_median_from_analytics(channel_analytics, metric_key)
             if is_ypp_account:
                 median_revenue_cap = median_cap
                 bt.logging.debug(f"Calculated median revenue cap: {median_cap:.4f} for video {video_id}")
             else:
-                median_views_cap = median_cap
-                bt.logging.debug(f"Calculated median views cap: {median_cap:.0f} for video {video_id}")
+                median_minutes_watched_cap = median_cap
+                bt.logging.debug(f"Calculated median minutes watched cap: {median_cap:.0f} for video {video_id}")
         except Exception as e:
             bt.logging.warning(f"Failed to calculate median cap for video {video_id}: {e}")
     
     # Calculate score using dual scoring logic with optional median capping
-    return calculate_dual_score(daily_analytics, start_date, end_date, is_ypp_account, cached_ratio, median_revenue_cap, median_views_cap) 
+    return calculate_dual_score(daily_analytics, start_date, end_date, is_ypp_account, cached_ratio, median_revenue_cap, median_minutes_watched_cap) 

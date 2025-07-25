@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 import bittensor as bt
 
 from bitcast.validator.platforms.youtube.cache.ratio_cache import (
-    ViewsToRevenueRatioCache,
+    MinutesToRevenueRatioCache,
 )
 from bitcast.validator.utils.config import YT_ROLLING_WINDOW
 
@@ -33,7 +33,7 @@ def _apply_median_cap(total_value: float, median_cap: Optional[float], metric_na
 def calculate_dual_score(daily_analytics: List[Dict[str, Any]], start_date: str, end_date: str, 
                         is_ypp_account: bool, cached_ratio: Optional[float] = None,
                         median_revenue_cap: Optional[float] = None,
-                        median_views_cap: Optional[float] = None) -> Dict[str, Any]:
+                        median_minutes_watched_cap: Optional[float] = None) -> Dict[str, Any]:
     """
     Calculate video score using either YPP (revenue) or Non-YPP (predicted) scoring.
     
@@ -42,9 +42,9 @@ def calculate_dual_score(daily_analytics: List[Dict[str, Any]], start_date: str,
         start_date: Start date for scoring window  
         end_date: End date for scoring window
         is_ypp_account: Whether this is a YPP account
-        cached_ratio: Global cached views-to-revenue ratio for Non-YPP accounts
+        cached_ratio: Global cached minutes-watched-to-revenue ratio for Non-YPP accounts
         median_revenue_cap: Optional median daily revenue cap (YPP only)
-        median_views_cap: Optional median daily views cap (Non-YPP only)
+        median_minutes_watched_cap: Optional median daily minutes watched cap (Non-YPP only)
         
     Returns:
         Dict with score, daily_analytics, scoring_method, and cap debugging info
@@ -74,18 +74,18 @@ def calculate_dual_score(daily_analytics: List[Dict[str, Any]], start_date: str,
         }
         
     else:
-        # Non-YPP: Use predicted revenue with optional views capping or fallback to 0
+        # Non-YPP: Use predicted revenue with optional minutes watched capping or fallback to 0
         if cached_ratio is not None:
-            total_views = sum(
-                item.get('views', 0) 
+            total_minutes_watched = sum(
+                item.get('estimatedMinutesWatched', 0) 
                 for item in daily_analytics 
                 if start_date <= item.get('day', '') <= end_date
             )
             
-            # Apply median views cap if provided (anti-exploitation measure)
-            total_views, applied_cap, original_views = _apply_median_cap(total_views, median_views_cap, "views")
+            # Apply median minutes watched cap if provided (anti-exploitation measure)
+            total_minutes_watched, applied_cap, original_minutes_watched = _apply_median_cap(total_minutes_watched, median_minutes_watched_cap, "minutes_watched")
             
-            predicted_revenue = total_views * cached_ratio
+            predicted_revenue = total_minutes_watched * cached_ratio
             score = predicted_revenue / YT_ROLLING_WINDOW
             scoring_method = "non_ypp_predicted"
             
@@ -94,9 +94,9 @@ def calculate_dual_score(daily_analytics: List[Dict[str, Any]], start_date: str,
                 "daily_analytics": daily_analytics,
                 "scoring_method": scoring_method,
                 "applied_cap": applied_cap,
-                "original_views": original_views,
-                "capped_views": total_views,
-                "median_views_cap": median_views_cap,
+                "original_minutes_watched": original_minutes_watched,
+                "capped_minutes_watched": total_minutes_watched,
+                "median_minutes_watched_cap": median_minutes_watched_cap,
                 "predicted_revenue": predicted_revenue
             }
         else:
@@ -109,16 +109,16 @@ def calculate_dual_score(daily_analytics: List[Dict[str, Any]], start_date: str,
                 "daily_analytics": daily_analytics,
                 "scoring_method": scoring_method,
                 "applied_cap": False,
-                "original_views": None,
-                "capped_views": None,
-                "median_views_cap": None,
+                "original_minutes_watched": None,
+                "capped_minutes_watched": None,
+                "median_minutes_watched_cap": None,
                 "predicted_revenue": None
             }
 
 
 def calculate_global_ratio(evaluation_results) -> Optional[float]:
     """
-    Calculate global views-to-revenue ratio from all YPP videos in evaluation results.
+    Calculate global minutes-watched-to-revenue ratio from all YPP videos in evaluation results.
     
     Args:
         evaluation_results: EvaluationResultCollection with all miner results
@@ -126,7 +126,7 @@ def calculate_global_ratio(evaluation_results) -> Optional[float]:
     Returns:
         Global ratio or None if insufficient data
     """
-    total_views = 0
+    total_minutes_watched = 0
     total_revenue = 0
     
     for uid, result in evaluation_results.results.items():
@@ -141,25 +141,25 @@ def calculate_global_ratio(evaluation_results) -> Optional[float]:
             if not is_ypp:
                 continue
                 
-            # Extract views and revenue from YPP videos
+            # Extract minutes watched and revenue from YPP videos
             for video_id, video_data in account_result.videos.items():
                 if "daily_analytics" in video_data and video_data.get("score", 0) > 0:
                     # FIXED: Use video-level analytics instead of daily_analytics
                     video_analytics = video_data.get("analytics", {})
                     
-                    video_views = video_analytics.get("views", 0)
+                    video_minutes_watched = video_analytics.get("estimatedMinutesWatched", 0)
                     video_revenue = video_analytics.get("estimatedRedPartnerRevenue", 0)
                     
-                    if video_views > 0 and video_revenue >= 0:
-                        total_views += video_views
+                    if video_minutes_watched > 0 and video_revenue >= 0:
+                        total_minutes_watched += video_minutes_watched
                         total_revenue += video_revenue
 
-    if total_views == 0:
-        bt.logging.warning("No valid YPP videos with views and revenue data found")
+    if total_minutes_watched == 0:
+        bt.logging.warning("No valid YPP videos with minutes watched and revenue data found")
         return None
         
-    ratio = total_revenue / total_views
-    bt.logging.info(f"Calculated global ratio: total_views={total_views}, total_revenue={total_revenue}, ratio={ratio}")
+    ratio = total_revenue / total_minutes_watched
+    bt.logging.info(f"Calculated global ratio: total_minutes_watched={total_minutes_watched}, total_revenue={total_revenue}, ratio={ratio}")
     return ratio
 
 
@@ -173,7 +173,7 @@ def update_cached_ratio(evaluation_results) -> None:
     ratio = calculate_global_ratio(evaluation_results)
     
     if ratio is not None:
-        cache = ViewsToRevenueRatioCache()
+        cache = MinutesToRevenueRatioCache()
         cache.store_ratio(ratio)
         bt.logging.info(f"Updated cached global ratio: {ratio}")
     else:
@@ -187,5 +187,5 @@ def get_cached_ratio() -> Optional[float]:
     Returns:
         Cached ratio or None if not available
     """
-    cache = ViewsToRevenueRatioCache()
+    cache = MinutesToRevenueRatioCache()
     return cache.get_current_ratio() 

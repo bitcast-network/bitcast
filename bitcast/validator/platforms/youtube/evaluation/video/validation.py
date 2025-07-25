@@ -198,6 +198,10 @@ def check_video_retention(video_data, video_analytics, decision_details):
     """
     average_view_percentage = video_analytics.get("averageViewPercentage", 0)
     
+    # Handle case where averageViewPercentage is None (API returns null)
+    if average_view_percentage is None:
+        average_view_percentage = 0
+
     if average_view_percentage < YT_MIN_VIDEO_RETENTION:
         bt.logging.warning(f"Video retention too low: {average_view_percentage}% < {YT_MIN_VIDEO_RETENTION}%")
         decision_details["averageViewPercentageCheck"] = False

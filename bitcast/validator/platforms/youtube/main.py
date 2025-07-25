@@ -313,7 +313,7 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         
         # Add debugging fields based on account type  
         ypp_fields = ["original_revenue", "capped_revenue", "median_revenue_cap"]
-        non_ypp_fields = ["original_views", "capped_views", "median_views_cap", "predicted_revenue"]
+        non_ypp_fields = ["original_minutes_watched", "capped_minutes_watched", "median_minutes_watched_cap", "predicted_revenue"]
         
         fields = ypp_fields if scoring_method == "ypp" else non_ypp_fields
         cap_info_dict.update({field: video_score_result.get(field) for field in fields})

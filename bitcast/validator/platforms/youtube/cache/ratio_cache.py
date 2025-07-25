@@ -1,7 +1,7 @@
 """
-Views-to-revenue ratio cache implementation.
+Minutes-watched-to-revenue ratio cache implementation.
 
-This module provides caching for the global views-to-revenue ratio used
+This module provides caching for the global minutes-watched-to-revenue ratio used
 for Non-YPP account scoring. The ratio is calculated from YPP accounts
 and cached for use in predicting revenue for Non-YPP accounts.
 """
@@ -15,30 +15,30 @@ from bitcast.validator.utils.config import CACHE_DIRS
 from .base import BaseCache
 
 
-class ViewsToRevenueRatioCache(BaseCache):
+class MinutesToRevenueRatioCache(BaseCache):
     """
-    Cache for storing global views-to-revenue ratio for Non-YPP scoring.
+    Cache for storing global minutes-watched-to-revenue ratio for Non-YPP scoring.
     
     This cache stores a single global ratio value that represents the
-    average views-to-revenue ratio calculated from all YPP accounts.
+    average minutes-watched-to-revenue ratio calculated from all YPP accounts.
     The ratio is updated every 4-hour validation cycle.
     """
     
     @classmethod
     def get_cache_dir(cls) -> str:
         """Return the cache directory path for ratio cache."""
-        return CACHE_DIRS["views_revenue_ratio"]
+        return CACHE_DIRS["minutes_revenue_ratio"]
     
     def store_ratio(self, ratio: float) -> None:
         """
         Store the calculated global ratio (overwrites previous).
         
         Args:
-            ratio: The global views-to-revenue ratio to cache
+            ratio: The global minutes-watched-to-revenue ratio to cache
         """
         cache = self.get_cache()
-        cache.set("global_views_revenue_ratio", ratio)
-        bt.logging.info(f"Stored global views-to-revenue ratio: {ratio}")
+        cache.set("global_minutes_revenue_ratio", ratio)
+        bt.logging.info(f"Stored global minutes-watched-to-revenue ratio: {ratio}")
     
     def get_current_ratio(self) -> Optional[float]:
         """
@@ -48,11 +48,11 @@ class ViewsToRevenueRatioCache(BaseCache):
             The cached global ratio or None if not available
         """
         cache = self.get_cache()
-        ratio = cache.get("global_views_revenue_ratio")
+        ratio = cache.get("global_minutes_revenue_ratio")
         if ratio is not None:
-            bt.logging.debug(f"Retrieved cached views-to-revenue ratio: {ratio}")
+            bt.logging.debug(f"Retrieved cached minutes-watched-to-revenue ratio: {ratio}")
         else:
-            bt.logging.debug("No cached views-to-revenue ratio available")
+            bt.logging.debug("No cached minutes-watched-to-revenue ratio available")
         return ratio
     
     def has_cached_ratio(self) -> bool:
@@ -67,5 +67,5 @@ class ViewsToRevenueRatioCache(BaseCache):
     def clear_ratio(self) -> None:
         """Clear the cached ratio."""
         cache = self.get_cache()
-        cache.pop("global_views_revenue_ratio", None)
-        bt.logging.info("Cleared cached views-to-revenue ratio") 
+        cache.pop("global_minutes_revenue_ratio", None)
+        bt.logging.info("Cleared cached minutes-watched-to-revenue ratio") 
