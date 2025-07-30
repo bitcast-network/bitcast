@@ -24,20 +24,17 @@ def check_brief_unique_identifier(brief, video_description):
         video_description (str): Video description text
         
     Returns:
-        bool: True if unique identifier found, False otherwise
-        
-    Raises:
-        ValueError: If unique_identifier field is missing or empty
+        bool: True if unique identifier found or not required, False otherwise
     """
-    # Check if unique_identifier field exists
-    if "unique_identifier" not in brief:
-        raise ValueError(f"Brief '{brief.get('id', 'unknown')}' is missing required unique_identifier field")
+    # Check if unique_identifier field exists or is None - if so, pass the check
+    if "unique_identifier" not in brief or brief["unique_identifier"] is None:
+        return True
     
     unique_identifier = brief["unique_identifier"].strip()
     
-    # Check if unique_identifier field is empty
+    # Check if unique_identifier field is empty - if so, pass the check
     if not unique_identifier:
-        raise ValueError(f"Brief '{brief.get('id', 'unknown')}' has empty unique_identifier field")
+        return True
     
     # Handle None video description
     if video_description is None:

@@ -55,21 +55,29 @@ class TestBriefPreScreening:
         result = check_brief_unique_identifier(brief, description)
         assert result is False
 
+    def test_check_brief_unique_identifier_none_field(self):
+        """Test that None unique_identifier field passes the check."""
+        brief = {"id": "test7", "unique_identifier": None}
+        description = "Some description"
+        
+        result = check_brief_unique_identifier(brief, description)
+        assert result is True
+
     def test_check_brief_unique_identifier_missing_field(self):
-        """Test that missing unique_identifier field raises ValueError."""
+        """Test that missing unique_identifier field passes the check."""
         brief = {"id": "test5"}
         description = "Some description"
         
-        with pytest.raises(ValueError, match="missing required unique_identifier field"):
-            check_brief_unique_identifier(brief, description)
+        result = check_brief_unique_identifier(brief, description)
+        assert result is True
 
     def test_check_brief_unique_identifier_empty_field(self):
-        """Test that empty unique_identifier field raises ValueError."""
+        """Test that empty unique_identifier field passes the check."""
         brief = {"id": "test6", "unique_identifier": ""}
         description = "Some description"
         
-        with pytest.raises(ValueError, match="has empty unique_identifier field"):
-            check_brief_unique_identifier(brief, description)
+        result = check_brief_unique_identifier(brief, description)
+        assert result is True
 
     def test_initialize_decision_details_includes_prescreening(self):
         """Test that decision details includes preScreeningCheck field."""
@@ -189,7 +197,8 @@ class TestBriefPreScreening:
 
     @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
     @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
-    def test_vet_video_brief_validation_error(self, mock_check_injection, mock_get_transcript):
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
+    def test_vet_video_brief_validation_error(self, mock_evaluate_content, mock_check_injection, mock_get_transcript):
         """Test that brief validation errors are handled correctly - only the invalid brief fails."""
         # Setup mock data
         video_id = "test_video"
@@ -213,6 +222,7 @@ class TestBriefPreScreening:
         # Mock dependencies
         mock_get_transcript.return_value = "Test transcript content"
         mock_check_injection.return_value = False  # No prompt injection
+        mock_evaluate_content.return_value = (True, "Content meets brief")  # LLM evaluation result
 
         # Call vet_video
         result = vet_video(video_id, briefs, video_data, video_analytics)
@@ -220,13 +230,13 @@ class TestBriefPreScreening:
         # Verify that the video evaluation doesn't fail entirely due to brief validation error
         decision_details = result["decision_details"]
         assert decision_details["video_vet_result"] is True  # Video evaluation should still succeed
-        assert decision_details["preScreeningCheck"] == [False]  # Brief fails pre-screening
-        assert decision_details["contentAgainstBriefCheck"] == [False]  # Brief fails content check
+        assert decision_details["preScreeningCheck"] == [True]  # Brief passes pre-screening now (missing unique_identifier allowed)
+        assert decision_details["contentAgainstBriefCheck"] == [True]  # Brief passes content check (LLM evaluation mocked)
         
-        # Verify error reasoning - should contain the default message since we just log validation errors
+        # Verify reasoning - should contain the mocked LLM evaluation result
         brief_reasonings = result["brief_reasonings"]
         assert len(brief_reasonings) == 1
-        assert brief_reasonings[0] == "Video description does not contain required unique identifier"
+        assert brief_reasonings[0] == "Content meets brief"  # Mocked LLM evaluation result
 
     @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
     @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
@@ -283,20 +293,20 @@ class TestBriefPreScreening:
         # Verify that the video evaluation succeeds and processes valid briefs
         decision_details = result["decision_details"]
         assert decision_details["video_vet_result"] is True
-        assert decision_details["preScreeningCheck"] == [True, False, False]  # Only first brief passes
-        assert decision_details["contentAgainstBriefCheck"] == [True, False, False]  # Only first brief evaluated
+        assert decision_details["preScreeningCheck"] == [True, True, False]  # First two briefs pass (missing unique_identifier now allowed)
+        assert decision_details["contentAgainstBriefCheck"] == [True, False, False]  # Only first brief selected (priority-based)
         
-        # Verify only the valid brief was evaluated by LLM
-        assert mock_evaluate_content.call_count == 1
+        # Verify both briefs that passed prescreening were evaluated by LLM
+        assert mock_evaluate_content.call_count == 2
         
         # Verify reasoning for each brief
         brief_reasonings = result["brief_reasonings"]
         assert len(brief_reasonings) == 3
-        assert brief_reasonings[0] == "Content meets brief"  # Valid brief that passed
-        assert brief_reasonings[1] == "Video description does not contain required unique identifier"  # Default message
+        assert brief_reasonings[0] == "Content meets brief"  # Valid brief that was selected
+        assert brief_reasonings[1] == "Content meets brief"  # Valid brief that was evaluated but not selected
         assert brief_reasonings[2] == "Video description does not contain required unique identifier"  # No match
         
-        # Verify met_brief_ids contains only the valid brief
+        # Verify met_brief_ids contains only the selected brief (priority-based selection)
         assert result["met_brief_ids"] == ["brief1"]
 
     def test_prescreen_briefs_for_video_with_validation_errors(self):
@@ -317,12 +327,12 @@ class TestBriefPreScreening:
         # Call prescreen_briefs_for_video
         eligible_briefs, prescreening_results, filtered_brief_ids = prescreen_briefs_for_video(briefs, video_description, video_data)
         
-        # Verify only the first brief passed pre-screening
-        assert len(eligible_briefs) == 1
-        assert eligible_briefs[0]["id"] == "brief1"
+        # Verify first three briefs passed pre-screening (missing/empty unique_identifier now allowed)
+        assert len(eligible_briefs) == 3
+        assert [brief["id"] for brief in eligible_briefs] == ["brief1", "brief2", "brief3"]
         
         # Verify prescreening results for all briefs
-        assert prescreening_results == [True, False, False, False]
+        assert prescreening_results == [True, True, True, False]
         
-        # Verify filtered brief IDs (validation errors and non-matches are both filtered)
-        assert set(filtered_brief_ids) == {"brief2", "brief3", "brief4"} 
+        # Verify filtered brief IDs (only the non-matching brief is filtered)
+        assert filtered_brief_ids == ["brief4"] 
