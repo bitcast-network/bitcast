@@ -148,8 +148,8 @@ class TestEmissionCalculationService:
             
             # Should have proper structure
             assert "scaling_factor" in targets[0].scaling_factors
-            assert "smoothing_factor" in targets[0].scaling_factors
-            assert "boost_factor" in targets[0].scaling_factors  # New field present
+            assert "boost_factor" in targets[0].scaling_factors
+            # Note: smoothing_factor removed - curve-based scoring handles diminishing returns
     
     def test_zero_score_matrix_handling(self):
         """Test handling of zero score matrix."""

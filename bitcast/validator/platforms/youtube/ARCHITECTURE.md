@@ -22,8 +22,11 @@ bitcast/validator/platforms/youtube/
 │   └── ratio_cache.py          # Views-to-revenue ratio persistent caching
 ├── evaluation/                  # Business logic and evaluation orchestration
 │   ├── channel.py              # Channel vetting and qualification logic
-│   ├── dual_scoring.py         # YPP/Non-YPP scoring with anti-exploitation caps
-│   ├── score_cap.py            # T-60 to T-30 median cap calculations
+│   ├── curve_based_scoring.py  # Main curve-based scoring orchestration
+│   ├── curve_scoring.py        # Core curve calculation functions
+│   ├── data_processing.py      # Data utilities for curve scoring
+│   ├── median_capping.py       # T-60 to T-30 median cap calculations
+│   ├── score_cap.py            # Legacy median cap utilities
 │   ├── scoring.py              # Video scoring orchestration
 │   └── video/                  # Modular video evaluation pipeline
 │       ├── validation.py       # Privacy, retention, captions, publish date checks
@@ -43,7 +46,7 @@ The YouTube evaluation system implements a sophisticated multi-stage pipeline:
 2. **Video Discovery**: Recent uploads retrieval → batch data fetching → basic validation filtering
 3. **Video Validation Pipeline**: Privacy → Publish date → Retention → Manual captions → Security checks
 4. **Content Evaluation**: Brief prescreening → Transcript analysis → LLM evaluation → Priority selection
-5. **Scoring & Anti-Exploitation**: Dual scoring (YPP/Non-YPP) → Median capping → Final aggregation
+5. **Scoring & Anti-Exploitation**: Curve-based scoring (YPP/Non-YPP) → Median capping → Diminishing returns calculation
 
 ## Key Architectural Improvements
 
@@ -155,7 +158,7 @@ def check_for_prompt_injection(description, transcript):
     # Examples: "this is relevant...", "the brief has been met...", etc.
 ```
 
-## Dual Scoring Architecture
+## Curve-Based Scoring Architecture
 
 ### **Account Type Detection & Scoring Strategy**
 
@@ -163,40 +166,49 @@ def check_for_prompt_injection(description, transcript):
 Channel Analytics Query → YPP Status Detection → Scoring Method Selection
                               ↓
                     ┌─────────────────────────┐
-                    │   YPP Account (Revenue)  │ → Revenue-based scoring
-                    │   Non-YPP (Views)       │ → Predicted revenue scoring  
-                    │   Non-YPP (No Ratio)    │ → Zero score (first cycle)
+                    │   YPP Account (Revenue)  │ → Revenue-based curve scoring
+                    │   Non-YPP (MinutesWatched)│ → Estimated revenue curve scoring
                     └─────────────────────────┘
                               ↓
                     Apply Anti-Exploitation Caps → Final Score
 ```
 
-### **YPP Account Scoring** (Revenue-based)
+### **Curve-Based Scoring Formula**
 ```python
-# YPP scoring with median capping
-total_revenue = sum(daily_revenue for day in scoring_window)
-if median_revenue_cap:
-    cap_limit = median_revenue_cap * YT_ROLLING_WINDOW
-    total_revenue = min(total_revenue, cap_limit)
-score = total_revenue / YT_ROLLING_WINDOW
+# Core diminishing returns curve formula
+def calculate_curve_value(value):
+    return SQRT(value) / (1 + DAMPENING_FACTOR * SQRT(value))
+
+# Score calculation: difference between two consecutive 7-day periods
+day1_avg = 7_day_cumulative_average(T-10 to T-4)  # Earlier period
+day2_avg = 7_day_cumulative_average(T-9 to T-3)   # Later period  
+score = calculate_curve_value(day2_avg) - calculate_curve_value(day1_avg)
 ```
 
-### **Non-YPP Account Scoring** (Predicted revenue)
-```python  
-# Non-YPP scoring with cached ratio and median capping
-total_views = sum(daily_views for day in scoring_window)
-if median_views_cap:
-    cap_limit = median_views_cap * YT_ROLLING_WINDOW  
-    total_views = min(total_views, cap_limit)
-predicted_revenue = total_views * cached_ratio
-score = predicted_revenue / YT_ROLLING_WINDOW
+### **YPP Account Scoring** (Actual Revenue)
+```python
+# 1. Apply median capping to daily revenue (T-60 to T-30 median)
+# 2. Calculate cumulative revenue totals
+# 3. Calculate 7-day rolling averages for both periods
+# 4. Apply curve formula to difference
+metric = "estimatedRedPartnerRevenue"
+day1_avg, day2_avg = get_period_averages(daily_analytics, metric, ...)
+score = calculate_curve_difference(day1_avg, day2_avg)
 ```
 
-### **Global Ratio Management**
-- **Calculation**: `global_ratio = total_revenue_all_ypp / total_views_all_ypp`
-- **Update Frequency**: Every 4-hour validation cycle
-- **Storage**: Persistent cache with simple overwrite strategy
-- **Integration**: Updated automatically via `RewardOrchestrator`
+### **Non-YPP Account Scoring** (Estimated Revenue)
+```python
+# 1. Apply median capping to daily minutes watched (T-60 to T-30 median)  
+# 2. Calculate cumulative minutes watched totals
+# 3. Calculate 7-day rolling averages for both periods
+# 4. Convert to estimated revenue using hardcoded multiplier
+# 5. Apply curve formula to difference
+metric = "estimatedMinutesWatched"
+day1_avg, day2_avg = get_period_averages(daily_analytics, metric, ...)
+day1_revenue = day1_avg * YT_NON_YPP_REVENUE_MULTIPLIER  # 0.00005
+day2_revenue = day2_avg * YT_NON_YPP_REVENUE_MULTIPLIER
+score = calculate_curve_difference(day1_revenue, day2_revenue)
+```
 
 ## Anti-Exploitation Scoring Protection
 
@@ -263,29 +275,29 @@ from bitcast.validator.platforms.youtube.evaluation.video import check_prompt_in
 is_safe = check_prompt_injection(video_id, video_data, transcript, decision_details)
 ```
 
-### **Dual Scoring Implementation**
+### **Curve-Based Scoring Implementation**
 ```python
-from bitcast.validator.platforms.youtube.evaluation import calculate_dual_score, get_cached_ratio
+from bitcast.validator.platforms.youtube.evaluation import calculate_video_score
 
 # Get scoring components
 is_ypp_account = channel_analytics.get("ypp", False)
-cached_ratio = get_cached_ratio()
+channel_analytics = result["yt_account"]["analytics"]
 
-# Calculate score with anti-exploitation protection
-score_result = calculate_dual_score(
-    daily_analytics=video_analytics,
-    start_date=start_date,
-    end_date=end_date,
+# Calculate score with integrated anti-exploitation protection and curve formula
+score_result = calculate_video_score(
+    video_id=video_id,
+    youtube_analytics_client=analytics_client,
+    video_publish_date=video_publish_date,
+    existing_analytics=existing_analytics,
     is_ypp_account=is_ypp_account,
-    cached_ratio=cached_ratio,
-    median_revenue_cap=median_revenue_cap,  # For YPP accounts
-    median_views_cap=median_views_cap       # For Non-YPP accounts
+    channel_analytics=channel_analytics
 )
 
 # Access scoring details
 final_score = score_result["score"]
-scoring_method = score_result["scoring_method"]  # "ypp", "non_ypp_predicted", "non_ypp_fallback"
-cap_applied = score_result.get("applied_cap", False)
+scoring_method = score_result["scoring_method"]  # "ypp_curve_based", "non_ypp_curve_based"
+day1_avg = score_result.get("day1_average", 0)
+day2_avg = score_result.get("day2_average", 0)
 ```
 
 ## Enhanced Result Structure
@@ -385,11 +397,12 @@ cap_applied = score_result.get("applied_cap", False)
 - `select_highest_priority_brief(briefs, brief_results) -> tuple` - Priority-based selection
 
 ### **Scoring & Anti-Exploitation**
-- `calculate_video_score(video_id, client, publish_date, analytics, is_ypp_account, cached_ratio, channel_analytics) -> dict` - Complete scoring
-- `calculate_dual_score(daily_analytics, start_date, end_date, is_ypp_account, cached_ratio, median_revenue_cap, median_views_cap) -> dict` - Core scoring logic
-- `calculate_median_from_analytics(channel_analytics, metric) -> float` - Anti-exploitation median calculation
-- `get_cached_ratio() -> float` - Retrieve global views-to-revenue ratio
-- `update_cached_ratio(total_revenue, total_views) -> None` - Update global ratio
+- `calculate_video_score(video_id, client, publish_date, analytics, is_ypp_account, channel_analytics) -> dict` - Complete curve-based scoring
+- `calculate_curve_based_score(daily_analytics, start_date, end_date, is_ypp_account, channel_analytics) -> dict` - Core curve scoring logic
+- `calculate_curve_value(value) -> float` - Diminishing returns curve calculation
+- `calculate_curve_difference(day1_avg, day2_avg) -> float` - Score difference on curve
+- `apply_median_caps_to_analytics(daily_analytics, channel_analytics, is_ypp_account) -> list` - Anti-exploitation capping
+- `get_period_averages(daily_analytics, metric_key, day1_start, day1_end, day2_start, day2_end, window_size, channel_analytics, is_ypp_account) -> tuple` - Rolling average calculation
 
 ## Performance & Reliability
 

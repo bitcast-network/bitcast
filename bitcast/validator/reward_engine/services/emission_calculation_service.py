@@ -8,8 +8,7 @@ from ..models.score_matrix import ScoreMatrix
 from ..models.emission_target import EmissionTarget
 from ...utils.config import (
     YT_SCALING_FACTOR_DEDICATED, 
-    YT_SCALING_FACTOR_AD_READ, 
-    YT_SMOOTHING_FACTOR
+    YT_SCALING_FACTOR_AD_READ
 )
 from ...utils.token_pricing import get_bitcast_alpha_price, get_total_miner_emissions
 
@@ -51,8 +50,7 @@ class EmissionCalculationService(EmissionCalculator):
                 },
                 scaling_factors={
                     "scaling_factor": self._get_scaling_factor(brief),
-                    "boost_factor": brief.get("boost", 1.0),
-                    "smoothing_factor": YT_SMOOTHING_FACTOR
+                    "boost_factor": brief.get("boost", 1.0)
                 }
             )
             targets.append(target)
@@ -88,23 +86,7 @@ class EmissionCalculationService(EmissionCalculator):
             if boost_factor != 1.0:
                 bt.logging.info(f"Applying boost {boost_factor}x to brief {brief.get('id', 'unknown')}")
             emission_targets[:, brief_idx] *= boost_factor
-            
-            # Store scaled scores before smoothing (for readjustment)
-            scaled_scores = emission_targets[:, brief_idx].copy()
-            
-            # Apply smoothing with optimization for positive values
-            positive_scores = np.maximum(emission_targets[:, brief_idx], 0)
-            smoothed_scores = np.power(positive_scores, YT_SMOOTHING_FACTOR)
-            
-            # Readjust to maintain scaled proportions
-            avg_scaled = np.mean(np.maximum(scaled_scores, 0))
-            avg_smoothed = np.mean(smoothed_scores)
-            
-            if avg_smoothed > 0:
-                emission_targets[:, brief_idx] = smoothed_scores * (avg_scaled / avg_smoothed)
-            else:
-                emission_targets[:, brief_idx] = smoothed_scores
-        
+                    
         return emission_targets
     
     def _calculate_raw_weights(self, emission_targets_matrix: np.ndarray) -> np.ndarray:

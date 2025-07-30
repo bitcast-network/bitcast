@@ -5,7 +5,6 @@ import numpy as np
 import bittensor as bt
 from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.platforms.youtube.utils import state
-from bitcast.validator.platforms.youtube.evaluation.dual_scoring import update_cached_ratio
 
 from .services.miner_query_service import MinerQueryService
 from .services.platform_registry import PlatformRegistry
@@ -65,10 +64,7 @@ class RewardOrchestrator:
             
             # 3. Aggregate scores across platforms
             score_matrix = self.score_aggregator.aggregate_scores(evaluation_results, briefs)
-            
-            # 3.5. Update global minutes-watched-to-revenue ratio for Non-YPP scoring
-            self._update_global_ratio(evaluation_results)
-            
+                        
             # 4. Reset state for next evaluation cycle
             state.reset_scored_videos()
             
@@ -174,18 +170,3 @@ class RewardOrchestrator:
         rewards = np.array([1.0 if uid == 0 else 0.0 for uid in uids])
         stats_list = [{"scores": {}, "uid": uid} for uid in uids]
         return rewards, stats_list
-    
-    def _update_global_ratio(self, evaluation_results: EvaluationResultCollection) -> None:
-        """
-        Update global minutes-watched-to-revenue ratio for Non-YPP scoring.
-        
-        This method calculates a new global ratio from evaluation results and caches it
-        for use in Non-YPP scoring in the next cycle.
-        """
-        try:
-            update_cached_ratio(evaluation_results)
-            bt.logging.info("Successfully updated global minutes-watched-to-revenue ratio for next cycle")
-            
-        except Exception as e:
-            bt.logging.error(f"Failed to update global ratio: {e}")
-            # Continue processing - ratio update failure shouldn't break reward calculation 

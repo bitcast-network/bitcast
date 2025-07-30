@@ -8,14 +8,6 @@ against various criteria and calculating scores.
 # Channel evaluation functions
 from .channel import calculate_channel_age, check_channel_criteria, vet_channel
 
-# Dual scoring utilities
-from .dual_scoring import (
-    calculate_dual_score,
-    calculate_global_ratio,
-    get_cached_ratio,
-    update_cached_ratio,
-)
-
 # Score capping
 from .score_cap import (
     calculate_median_from_analytics,
@@ -65,11 +57,7 @@ __all__ = [
     # Scoring
     'calculate_video_score',
     
-    # Dual scoring utilities
-    'calculate_dual_score',
-    'calculate_global_ratio',
-    'update_cached_ratio',
-    'get_cached_ratio',
+    # Note: Dual scoring utilities removed - replaced with curve-based scoring
     
     # Score capping
     'get_cap_period_dates',
