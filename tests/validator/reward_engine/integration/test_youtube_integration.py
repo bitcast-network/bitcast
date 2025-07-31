@@ -24,8 +24,7 @@ class TestYouTubeIntegration:
         self.mock_validator = Mock()
         self.mock_validator.metagraph = Mock()
         self.mock_validator.metagraph.S = [100.0, 200.0, 150.0]  # Proper list
-        self.mock_validator.metagraph.alpha = Mock()
-        self.mock_validator.metagraph.alpha.S = [50.0, 100.0, 75.0]  # Proper list
+        self.mock_validator.metagraph.alpha_stake = [50.0, 100.0, 75.0]  # Proper list
         self.mock_validator.metagraph.I = [0.1, 0.2, 0.15]  # Proper list
         self.mock_validator.metagraph.E = [0.05, 0.1, 0.075]  # Proper list
         

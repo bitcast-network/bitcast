@@ -51,8 +51,7 @@ class TestForwardIntegrationSimple:
         mock_n.item.return_value = 1000
         mock_validator.metagraph.n = mock_n
         mock_validator.metagraph.S = [100.0, 200.0]
-        mock_validator.metagraph.alpha = Mock()
-        mock_validator.metagraph.alpha.S = [50.0, 100.0]
+        mock_validator.metagraph.alpha_stake = [50.0, 100.0]
         
         # Mock orchestrator
         orchestrator = Mock()
@@ -98,8 +97,7 @@ class TestForwardIntegrationSimple:
         mock_n.item.return_value = 1000
         mock_validator.metagraph.n = mock_n
         mock_validator.metagraph.S = [100.0, 200.0, 300.0]
-        mock_validator.metagraph.alpha = Mock()
-        mock_validator.metagraph.alpha.S = [50.0, 100.0, 150.0]
+        mock_validator.metagraph.alpha_stake = [50.0, 100.0, 150.0]
         
         # Mock orchestrator
         orchestrator = Mock()
@@ -148,8 +146,7 @@ class TestForwardIntegrationSimple:
         mock_n.item.return_value = 1000
         mock_validator.metagraph.n = mock_n
         mock_validator.metagraph.S = [100.0, 200.0]
-        mock_validator.metagraph.alpha = Mock()
-        mock_validator.metagraph.alpha.S = [50.0, 100.0]
+        mock_validator.metagraph.alpha_stake = [50.0, 100.0]
         
         # Mock orchestrator that raises an exception
         orchestrator = Mock()

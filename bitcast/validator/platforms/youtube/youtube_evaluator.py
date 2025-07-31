@@ -115,5 +115,5 @@ class YouTubeEvaluator(PlatformEvaluator):
     
     def _check_min_stake(self, metagraph_info: Dict[str, Any]) -> bool:
         """Check if miner meets minimum alpha stake threshold."""
-        alpha_stake = metagraph_info.get("alpha_stake", 0)
+        alpha_stake = metagraph_info.get("alpha_stake", 0.0)
         return float(alpha_stake) >= YT_MIN_ALPHA_STAKE_THRESHOLD 

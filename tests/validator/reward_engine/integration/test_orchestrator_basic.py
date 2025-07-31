@@ -19,8 +19,7 @@ class TestRewardOrchestratorBasic:
         self.mock_validator = Mock()
         self.mock_validator.metagraph = Mock()
         self.mock_validator.metagraph.S = [100.0, 200.0, 150.0]
-        self.mock_validator.metagraph.alpha = Mock()
-        self.mock_validator.metagraph.alpha.S = [50.0, 100.0, 75.0]
+        self.mock_validator.metagraph.alpha_stake = [50.0, 100.0, 75.0]
         self.mock_validator.metagraph.I = [0.1, 0.2, 0.15]
         self.mock_validator.metagraph.E = [0.05, 0.1, 0.075]
         
@@ -104,7 +103,7 @@ class TestRewardOrchestratorBasic:
         mock_metagraph = MockMetagraph()
         
         info = self.orchestrator._extract_metagraph_info(mock_metagraph, 0)
-        assert info == {'stake': 100.0}
+        assert info == {'stake': 100.0, 'alpha_stake': 0.0}
     
     @pytest.mark.asyncio
     @patch('bitcast.validator.utils.briefs.get_briefs')

@@ -27,8 +27,7 @@ class TestForwardIntegration:
         mock_n.item.return_value = 1000
         self.mock_validator.metagraph.n = mock_n
         self.mock_validator.metagraph.S = [100.0, 200.0, 150.0]
-        self.mock_validator.metagraph.alpha = Mock()
-        self.mock_validator.metagraph.alpha.S = [50.0, 100.0, 75.0]
+        self.mock_validator.metagraph.alpha_stake = [50.0, 100.0, 75.0]
     
     @pytest.mark.asyncio
     @patch('bitcast.validator.forward.get_all_uids')
@@ -204,8 +203,7 @@ class TestForwardIntegrationPerformance:
         mock_n.item.return_value = 1000
         mock_validator.metagraph.n = mock_n
         mock_validator.metagraph.S = [100.0] * len(many_uids)
-        mock_validator.metagraph.alpha = Mock()
-        mock_validator.metagraph.alpha.S = [50.0] * len(many_uids)
+        mock_validator.metagraph.alpha_stake = [50.0] * len(many_uids)
         
         orchestrator = get_reward_orchestrator()
         

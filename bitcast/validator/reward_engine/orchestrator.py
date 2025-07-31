@@ -148,8 +148,10 @@ class RewardOrchestrator:
             if hasattr(metagraph, 'S') and len(metagraph.S) > uid:
                 info['stake'] = float(metagraph.S[uid])
             
-            if hasattr(metagraph, 'alpha') and hasattr(metagraph.alpha, 'S') and len(metagraph.alpha.S) > uid:
-                info['alpha_stake'] = float(metagraph.alpha.S[uid])
+            if hasattr(metagraph, 'alpha_stake') and len(metagraph.alpha_stake) > uid:
+                info['alpha_stake'] = float(metagraph.alpha_stake[uid])
+            else:
+                info['alpha_stake'] = 0.0
             
             if hasattr(metagraph, 'I') and len(metagraph.I) > uid:
                 info['incentive'] = float(metagraph.I[uid])

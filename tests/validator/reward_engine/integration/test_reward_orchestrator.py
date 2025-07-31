@@ -22,8 +22,7 @@ class TestRewardOrchestrator:
         self.mock_validator = Mock()
         self.mock_validator.metagraph = Mock()
         self.mock_validator.metagraph.S = [100.0, 200.0, 200.0, 150.0]  # Stakes: UID 0=100, UID 1=200, UID 2=200, UID 3=150
-        self.mock_validator.metagraph.alpha = Mock()
-        self.mock_validator.metagraph.alpha.S = [50.0, 100.0, 100.0, 75.0]  # Alpha stakes: UID 1=100
+        self.mock_validator.metagraph.alpha_stake = [50.0, 100.0, 100.0, 75.0]  # Alpha stakes: UID 1=100
         self.mock_validator.metagraph.I = [0.1, 0.2, 0.2, 0.15]  # Incentives: UID 1=0.2
         self.mock_validator.metagraph.E = [0.05, 0.1, 0.1, 0.075]  # Emissions: UID 1=0.1
         
@@ -123,7 +122,7 @@ class TestRewardOrchestrator:
         
         info = self.orchestrator._extract_metagraph_info(mock_metagraph, 0)
         
-        assert info == {'stake': 100.0}
+        assert info == {'stake': 100.0, 'alpha_stake': 0.0}
     
     def test_get_metagraph_info_none(self):
         """Test metagraph info extraction with None metagraph."""
@@ -260,8 +259,7 @@ class TestRewardOrchestoratorIntegration:
         mock_validator = Mock()
         mock_validator.metagraph = Mock()
         mock_validator.metagraph.S = [0.0, 100.0, 50.0]  # Proper list instead of Mock
-        mock_validator.metagraph.alpha = Mock()
-        mock_validator.metagraph.alpha.S = [0.0, 80.0, 40.0]  # Proper list instead of Mock
+        mock_validator.metagraph.alpha_stake = [0.0, 80.0, 40.0]  # Proper list instead of Mock
         mock_validator.metagraph.I = [0.0, 0.2, 0.1]  # Add incentives
         mock_validator.metagraph.E = [0.0, 0.1, 0.05]  # Add emissions
         
