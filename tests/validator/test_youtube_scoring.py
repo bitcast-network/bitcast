@@ -328,7 +328,6 @@ def test_calculate_video_score_non_ypp_with_cached_ratio():
     video_id = "test_video_123"
     video_publish_date = "2024-01-01T00:00:00Z"
     existing_analytics = {}
-    cached_ratio = 0.001  # $0.001 per minute watched
     
     # Calculate realistic dates that would be within the scoring window
     # The scoring function calculates: 
@@ -361,8 +360,7 @@ def test_calculate_video_score_non_ypp_with_cached_ratio():
                     youtube_analytics_client=mock_analytics_client,
                     video_publish_date=video_publish_date,
                     existing_analytics=existing_analytics,
-                    is_ypp_account=False,  # Non-YPP account
-                    cached_ratio=cached_ratio
+                    is_ypp_account=False  # Non-YPP account
                 )
     
     # Verify get_youtube_metrics was called with is_ypp_account=False
@@ -394,7 +392,6 @@ def test_calculate_video_score_non_ypp_no_cached_ratio():
     video_id = "test_video_123"
     video_publish_date = "2024-01-01T00:00:00Z"
     existing_analytics = {}
-    cached_ratio = None  # No cached ratio - should use hardcoded multiplier
     
     # Mock get_video_analytics to return minutes watched data
     with patch('bitcast.validator.platforms.youtube.evaluation.scoring.get_video_analytics') as mock_get_analytics:
@@ -419,8 +416,7 @@ def test_calculate_video_score_non_ypp_no_cached_ratio():
                     youtube_analytics_client=mock_analytics_client,
                     video_publish_date=video_publish_date,
                     existing_analytics=existing_analytics,
-                    is_ypp_account=False,
-                    cached_ratio=cached_ratio  # None
+                    is_ypp_account=False
                 )
     
     # Should use curve-based Non-YPP scoring with hardcoded multiplier

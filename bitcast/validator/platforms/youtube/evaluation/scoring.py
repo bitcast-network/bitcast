@@ -14,15 +14,13 @@ from bitcast.validator.platforms.youtube.config import get_youtube_metrics
 from bitcast.validator.utils.config import ECO_MODE, YT_REWARD_DELAY, YT_ROLLING_WINDOW
 
 from .curve_based_scoring import calculate_curve_based_score
-from .score_cap import calculate_median_from_analytics
 
 
 def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, 
                          existing_analytics, is_ypp_account: bool = True, 
-                         cached_ratio: Optional[float] = None,
                          channel_analytics: Optional[dict] = None):
     """
-    Calculate the score for a video using appropriate strategy based on YPP status.
+    Calculate the score for a video using curve-based scoring strategy.
     
     Args:
         video_id (str): Video ID to calculate score for
@@ -30,7 +28,6 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
         video_publish_date (str): Video publish date in ISO format
         existing_analytics (dict): Existing analytics data
         is_ypp_account (bool): Whether this is a YPP account
-        cached_ratio (Optional[float]): Global cached minutes-watched-to-revenue ratio for Non-YPP accounts
         channel_analytics (Optional[dict]): Channel analytics for median cap calculation
         
     Returns:
