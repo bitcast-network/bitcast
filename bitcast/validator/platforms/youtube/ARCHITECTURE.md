@@ -102,10 +102,10 @@ def select_highest_priority_brief(briefs, brief_results) -> tuple
 
 ```python
 # Main orchestration functions
-def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client) -> tuple
+def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client, is_ypp_account=True) -> tuple
 def vet_video(video_id, briefs, video_data, video_analytics) -> dict
 def process_video_vetting(video_id, video_data, video_analytics, briefs) -> dict
-def get_video_analytics_batch(youtube_analytics_client, video_ids) -> dict
+def get_video_analytics_batch(youtube_analytics_client, video_ids, is_ypp_account=True) -> dict
 ```
 
 ### **Enhanced Brief Prescreening System**

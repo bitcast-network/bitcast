@@ -201,7 +201,7 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
         
         # Vet videos and store the results
         video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
-            video_ids, briefs, youtube_data_client, youtube_analytics_client
+            video_ids, briefs, youtube_data_client, youtube_analytics_client, is_ypp_account
         )
         
         # Get channel analytics for median cap calculation

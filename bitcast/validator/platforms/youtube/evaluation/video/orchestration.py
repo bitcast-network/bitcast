@@ -14,9 +14,7 @@ from bitcast.validator.platforms.youtube.api.video import (
     get_video_data_batch,
 )
 from bitcast.validator.platforms.youtube.config import (
-    get_advanced_metrics,
     get_youtube_metrics,
-    REVENUE_METRICS,
 )
 from bitcast.validator.platforms.youtube.utils import _format_error, state
 from bitcast.validator.utils.config import DISCRETE_MODE, ECO_MODE
@@ -38,13 +36,14 @@ from .validation import (
 )
 
 
-def get_video_analytics_batch(youtube_analytics_client, video_ids):
+def get_video_analytics_batch(youtube_analytics_client, video_ids, is_ypp_account=True):
     """
     Get analytics data for all videos in batch.
     
     Args:
         youtube_analytics_client: YouTube Analytics API client
         video_ids (list): List of video IDs
+        is_ypp_account (bool): Whether this is a YPP account (affects revenue metrics)
         
     Returns:
         dict: Dictionary mapping video_id to analytics data
@@ -53,33 +52,11 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids):
     
     for video_id in video_ids:
         try:
-            # Get all YouTube metrics for the video
-            all_metric_dims = get_youtube_metrics(ECO_MODE)
-            core_metrics_failed = False
+            # Get YouTube metrics for the video (already filtered for YPP status)
+            all_metric_dims = get_youtube_metrics(ECO_MODE, is_ypp_account=is_ypp_account)
             
-            try:
-                video_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
-            except Exception as e:
-                bt.logging.warning(f"Core metrics failed for video, retrying without revenue metrics: {_format_error(e)}")
-                core_metrics_failed = True
-            
-            if core_metrics_failed:
-                bt.logging.warning(f"Retrying without revenue metrics")
-                
-                # Filter out revenue metrics and retry
-                revenue_metric_names = {metric for key, (metric, _, _, _, _) in all_metric_dims.items() if key in REVENUE_METRICS}
-                non_revenue_metric_dims = {
-                    key: metric_config for key, metric_config in all_metric_dims.items() 
-                    if metric_config[0] not in revenue_metric_names
-                }
-                
-                # Retry without revenue metrics
-                video_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=non_revenue_metric_dims)
-                
-                # Add missing revenue metrics with default values
-                for key in REVENUE_METRICS:
-                    if key in all_metric_dims:
-                        video_analytics[key] = 0
+            # Get video analytics - no retry needed since metrics are pre-filtered
+            video_analytics = get_video_analytics(youtube_analytics_client, video_id, metric_dims=all_metric_dims)
             
             video_analytics_dict[video_id] = video_analytics
         except Exception as e:
@@ -93,24 +70,6 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids):
     
     return video_analytics_dict
 
-
-def _create_failed_result(decision_details, briefs, reason="Validation failed"):
-    """
-    Create a standardized failed result structure.
-    
-    Args:
-        decision_details (dict): Current decision details
-        briefs (list): List of briefs for sizing arrays
-        reason (str): Reason for failure
-        
-    Returns:
-        dict: Standardized failed result
-    """
-    return {
-        "met_brief_ids": [], 
-        "decision_details": decision_details, 
-        "brief_reasonings": [reason] * len(briefs)
-    }
 
 
 def _run_video_validation_checks(video_id, video_data, video_analytics, briefs, decision_details):
@@ -372,7 +331,7 @@ def process_video_vetting(video_id, briefs, youtube_data_client, youtube_analyti
         results[video_id] = [False] * len(briefs)
 
 
-def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client):
+def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client, is_ypp_account=True):
     """
     Vet multiple videos against briefs and return results.
     
@@ -381,6 +340,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
         briefs (list): List of brief dictionaries to evaluate against
         youtube_data_client: YouTube Data API client
         youtube_analytics_client: YouTube Analytics API client
+        is_ypp_account (bool): Whether this is a YPP account (affects revenue metrics)
         
     Returns:
         tuple: (results, video_data_dict, video_analytics_dict, video_decision_details)
@@ -399,7 +359,7 @@ def vet_videos(video_ids, briefs, youtube_data_client, youtube_analytics_client)
 
     start_time = time.time()
     try:
-        video_analytics_dict = get_video_analytics_batch(youtube_analytics_client, video_ids)
+        video_analytics_dict = get_video_analytics_batch(youtube_analytics_client, video_ids, is_ypp_account)
         bt.logging.info(f"Video analytics batch fetch took {time.time() - start_time:.2f} seconds")
     except ConnectionError as e:
         bt.logging.error(f"Failed to fetch video analytics batch: {e}")
