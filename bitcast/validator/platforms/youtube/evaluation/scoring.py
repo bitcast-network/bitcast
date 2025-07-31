@@ -18,17 +18,19 @@ from .curve_based_scoring import calculate_curve_based_score
 
 def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, 
                          existing_analytics, is_ypp_account: bool = True, 
-                         channel_analytics: Optional[dict] = None):
+                         channel_analytics: Optional[dict] = None,
+                         bitcast_video_id: Optional[str] = None):
     """
     Calculate the score for a video using curve-based scoring strategy.
     
     Args:
-        video_id (str): Video ID to calculate score for
+        video_id (str): YouTube video ID to calculate score for
         youtube_analytics_client: YouTube Analytics API client
         video_publish_date (str): Video publish date in ISO format
         existing_analytics (dict): Existing analytics data
         is_ypp_account (bool): Whether this is a YPP account
         channel_analytics (Optional[dict]): Channel analytics for median cap calculation
+        bitcast_video_id (Optional[str]): Bitcast video ID for logging (defaults to YouTube ID)
         
     Returns:
         dict: Dictionary containing score, daily_analytics, scoring_method, and cap info
@@ -58,4 +60,6 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     daily_analytics = sorted(analytics_result.get("day_metrics", {}).values(), key=lambda x: x.get("day", ""))
     
     # Calculate score using curve-based scoring with integrated median capping
-    return calculate_curve_based_score(daily_analytics, start_date, end_date, is_ypp_account, channel_analytics) 
+    # Use bitcast video ID for logging, fall back to YouTube video ID if not provided
+    log_video_id = bitcast_video_id if bitcast_video_id is not None else video_id
+    return calculate_curve_based_score(daily_analytics, start_date, end_date, is_ypp_account, channel_analytics, log_video_id) 

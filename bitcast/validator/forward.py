@@ -58,6 +58,12 @@ async def forward(self):
         orchestrator = get_reward_orchestrator()
         rewards, yt_stats_list = await orchestrator.calculate_rewards(self, miner_uids)
 
+        # Log the rewards for monitoring purposes
+        bt.logging.info("UID Rewards:")
+        for i, (uid, reward) in enumerate(zip(miner_uids, rewards)):
+            bt.logging.info(f"UID {uid}: {reward}")
+            yt_stats_list[i]["reward"] = float(reward)
+
         # Extract blacklisted UIDs from the stats
         blacklisted_uids = []
         for uid, yt_stats in zip(miner_uids, yt_stats_list):

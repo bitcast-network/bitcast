@@ -63,20 +63,26 @@ class RewardOrchestrator:
                 evaluation_results.add_result(uid, result)
             
             # 3. Aggregate scores across platforms
+            bt.logging.info("🔄 PHASE 3: Aggregating individual video scores into score matrix")
             score_matrix = self.score_aggregator.aggregate_scores(evaluation_results, briefs)
+            bt.logging.info(f"Score aggregation complete: {score_matrix.matrix.shape} matrix created")
                         
             # 4. Reset state for next evaluation cycle
             state.reset_scored_videos()
             
             # 5. Calculate emission targets
+            bt.logging.info("💰 PHASE 4: Converting scores to USD emission targets")
             emission_targets = self.emission_calculator.calculate_targets(score_matrix, briefs)
             
             # 6. Distribute final rewards
+            bt.logging.info("🎯 PHASE 5: Distributing final rewards to miners")
             rewards, stats_list = self.reward_distributor.calculate_distribution(
                 emission_targets, evaluation_results, briefs, uids
             )
             
-            bt.logging.info(f"Successfully calculated rewards for {len(uids)} miners")
+            total_rewards = float(np.sum(rewards))
+            non_zero_miners = np.count_nonzero(rewards)
+            bt.logging.info(f"✅ Successfully calculated rewards: {total_rewards:.6f} total, {non_zero_miners}/{len(uids)} miners rewarded")
             return rewards, stats_list
             
         except Exception as e:

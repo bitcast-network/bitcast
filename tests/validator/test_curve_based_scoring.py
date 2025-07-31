@@ -29,7 +29,7 @@ class TestCurveBasedScoring(unittest.TestCase):
         ]
         
         result = calculate_curve_based_score(
-            daily_analytics, "2024-01-01", "2024-01-15", True, None
+            daily_analytics, "2024-01-01", "2024-01-15", True, None, "test_video_ypp_001"
         )
         
         self.assertIn("score", result)
@@ -51,7 +51,7 @@ class TestCurveBasedScoring(unittest.TestCase):
         ]
         
         result = calculate_curve_based_score(
-            daily_analytics, "2024-01-01", "2024-01-15", False, None
+            daily_analytics, "2024-01-01", "2024-01-15", False, None, "test_video_non_ypp_001"
         )
         
         self.assertIn("score", result)
@@ -64,7 +64,7 @@ class TestCurveBasedScoring(unittest.TestCase):
 
     def test_calculate_curve_based_score_empty_analytics(self):
         """Test curve-based scoring with empty analytics."""
-        result = calculate_curve_based_score([], "2024-01-01", "2024-01-15", True, None)
+        result = calculate_curve_based_score([], "2024-01-01", "2024-01-15", True, None, "test_video_empty")
         
         self.assertIn("score", result)
         self.assertIsInstance(result["score"], (int, float))
@@ -75,7 +75,7 @@ class TestCurveBasedScoring(unittest.TestCase):
         invalid_analytics = [{"invalid": "data"}]
         
         result = calculate_curve_based_score(
-            invalid_analytics, "2024-01-01", "2024-01-15", True, None
+            invalid_analytics, "2024-01-01", "2024-01-15", True, None, "test_video_error"
         )
         
         # Should return error result but not crash

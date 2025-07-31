@@ -397,8 +397,8 @@ day2_avg = score_result.get("day2_average", 0)
 - `select_highest_priority_brief(briefs, brief_results) -> tuple` - Priority-based selection
 
 ### **Scoring & Anti-Exploitation**
-- `calculate_video_score(video_id, client, publish_date, analytics, is_ypp_account, channel_analytics) -> dict` - Complete curve-based scoring
-- `calculate_curve_based_score(daily_analytics, start_date, end_date, is_ypp_account, channel_analytics) -> dict` - Core curve scoring logic
+- `calculate_video_score(video_id, client, publish_date, analytics, is_ypp_account, channel_analytics, bitcast_video_id) -> dict` - Complete curve-based scoring
+- `calculate_curve_based_score(daily_analytics, start_date, end_date, is_ypp_account, channel_analytics, video_id) -> dict` - Core curve scoring logic
 - `calculate_curve_value(value) -> float` - Diminishing returns curve calculation
 - `calculate_curve_difference(day1_avg, day2_avg) -> float` - Score difference on curve
 - `apply_median_caps_to_analytics(daily_analytics, channel_analytics, is_ypp_account) -> list` - Anti-exploitation capping

@@ -45,17 +45,37 @@ class RewardDistributionService:
         num_miners: int
     ) -> np.ndarray:
         """Extract raw weights matrix from emission targets."""
+        bt.logging.info("--- Extracting Raw Weights Matrix ---")
+        
         if not emission_targets:
+            bt.logging.warning("No emission targets - returning empty matrix")
             return np.zeros((num_miners, 0))
         
         num_briefs = len(emission_targets)
         matrix = np.zeros((num_miners, num_briefs), dtype=np.float64)
         
+        bt.logging.info(f"Step 1a: Created {num_miners}x{num_briefs} weights matrix")
+        
         for brief_idx, target in enumerate(emission_targets):
             weights = target.allocation_details.get("per_miner_weights", [])
+            brief_id = target.brief_id
+            brief_total = 0.0
+            non_zero_count = 0
+            
             for miner_idx, weight in enumerate(weights):
-                if miner_idx < num_miners:
+                if miner_idx < num_miners and weight != 0:
                     matrix[miner_idx, brief_idx] = weight
+                    brief_total += weight
+                    non_zero_count += 1
+            
+            bt.logging.info(
+                f"Brief {brief_id}: {non_zero_count}/{len(weights)} miners with weights, "
+                f"total_weight={brief_total:.6f}, usd_target=${target.usd_target:.2f}"
+            )
+        
+        total_weights = float(np.sum(matrix))
+        total_non_zero = np.count_nonzero(matrix)
+        bt.logging.info(f"Step 1b: Matrix populated - Total weights: {total_weights:.6f}, Non-zero entries: {total_non_zero}")
         
         return matrix
     
@@ -66,20 +86,44 @@ class RewardDistributionService:
         uids: List[int]
     ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float]]:
         """Normalize weights into final reward distribution."""
+        bt.logging.info("--- Normalizing Weights to Final Rewards ---")
+        
         if weights_matrix.size == 0:
+            bt.logging.warning("Empty weights matrix - returning zero rewards")
             return np.zeros(len(uids)), np.zeros((len(uids), 0)), {}
         
+        input_total = float(np.sum(weights_matrix))
+        input_non_zero = np.count_nonzero(weights_matrix)
+        bt.logging.info(f"Step 2a: Input weights - Total: {input_total:.6f}, Non-zero entries: {input_non_zero}")
+        
         # Step 1: Apply caps and global constraints directly (skip redundant clipping)
+        bt.logging.info("Step 2b: Applying emission constraints and caps")
         normalized = self._apply_emission_constraints(weights_matrix, briefs)
         
+        normalized_total = float(np.sum(normalized))
+        bt.logging.info(f"Step 2c: After constraints - Total: {normalized_total:.6f} (change: {normalized_total - input_total:+.6f})")
+        
         # Step 2: Sum to get final rewards
+        bt.logging.info("Step 2d: Summing across briefs for final rewards")
         rewards = self._sum_to_final_rewards(normalized, uids)
         
+        final_total = float(np.sum(rewards))
+        final_non_zero = np.count_nonzero(rewards)
+        max_reward = float(np.max(rewards)) if len(rewards) > 0 else 0.0
+        
+        bt.logging.info(
+            f"Step 2e: Final rewards - Total: {final_total:.6f}, "
+            f"Non-zero miners: {final_non_zero}/{len(uids)}, Max reward: {max_reward:.6f}"
+        )
+        
         # Step 3: Calculate brief emission percentages for stats
+        bt.logging.info("Step 2f: Calculating brief emission percentages")
         brief_emission_percentages = {}
         for brief_idx, brief in enumerate(briefs):
             brief_percentage = normalized[:, brief_idx].sum()
-            brief_emission_percentages[brief.get('id', f'brief_{brief_idx}')] = brief_percentage
+            brief_id = brief.get('id', f'brief_{brief_idx}')
+            brief_emission_percentages[brief_id] = brief_percentage
+            bt.logging.info(f"Brief {brief_id}: {brief_percentage:.6f} total emission percentage")
         
         return rewards, normalized, brief_emission_percentages
     

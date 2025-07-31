@@ -10,6 +10,7 @@ from bitcast.validator.reward_engine.services.emission_calculation_service impor
 from bitcast.validator.reward_engine.services.score_aggregation_service import ScoreAggregationService
 from bitcast.validator.reward_engine.models.evaluation_result import EvaluationResultCollection, EvaluationResult, AccountResult
 from bitcast.validator.reward_engine.models.score_matrix import ScoreMatrix
+from bitcast.validator.reward_engine.models.emission_target import EmissionTarget
 
 
 class TestCapsIntegration:
@@ -25,8 +26,18 @@ class TestCapsIntegration:
         """Test complete workflow from evaluation results to final rewards with caps."""
         # Create emission targets directly (simpler approach)
         emission_targets = [
-            Mock(brief_id="brief_gaming", allocation_details={"per_miner_weights": [1.0, 0.3, 0.2, 0.1]}),  # Include UID 0
-            Mock(brief_id="brief_tech", allocation_details={"per_miner_weights": [0.0, 0.2, 0.3, 0.1]})      # Include UID 0
+            EmissionTarget(
+                brief_id="brief_gaming", 
+                usd_target=1000.0,
+                allocation_details={"per_miner_weights": [1.0, 0.3, 0.2, 0.1]},
+                scaling_factors={}
+            ),  # Include UID 0
+            EmissionTarget(
+                brief_id="brief_tech", 
+                usd_target=800.0,
+                allocation_details={"per_miner_weights": [0.0, 0.2, 0.3, 0.1]},
+                scaling_factors={}
+            )  # Include UID 0
         ]
         
         # Create briefs with caps
@@ -63,8 +74,18 @@ class TestCapsIntegration:
         """Test that caps behave differently from original weight-based system."""
         # Create scenario where caps would behave differently than weights
         emission_targets = [
-            Mock(brief_id="brief1", allocation_details={"per_miner_weights": [0.1, 0.6, 0.3]}),  # Include UID 0
-            Mock(brief_id="brief2", allocation_details={"per_miner_weights": [0.0, 0.2, 0.4]})   # Include UID 0
+            EmissionTarget(
+                brief_id="brief1", 
+                usd_target=500.0,
+                allocation_details={"per_miner_weights": [0.1, 0.6, 0.3]},
+                scaling_factors={}
+            ),  # Include UID 0
+            EmissionTarget(
+                brief_id="brief2", 
+                usd_target=300.0,
+                allocation_details={"per_miner_weights": [0.0, 0.2, 0.4]},
+                scaling_factors={}
+            )  # Include UID 0
         ]
         
         briefs_with_caps = [
@@ -91,7 +112,12 @@ class TestCapsIntegration:
     def test_integration_logging_verification(self, mock_logging):
         """Test that logging works correctly in integration scenario."""
         emission_targets = [
-            Mock(brief_id="test_brief", allocation_details={"per_miner_weights": [0.1, 0.8]})  # Include UID 0
+            EmissionTarget(
+                brief_id="test_brief", 
+                usd_target=400.0,
+                allocation_details={"per_miner_weights": [0.1, 0.8]},
+                scaling_factors={}
+            )  # Include UID 0
         ]
         
         briefs = [{"id": "test_brief", "cap": 0.5}]  # Will trigger cap scaling
@@ -117,10 +143,30 @@ class TestCapsIntegration:
         """Test complex scenario with multiple briefs and various cap constraints."""
         # Create complex emission targets
         emission_targets = [
-            Mock(brief_id="brief_1", allocation_details={"per_miner_weights": [0.0, 0.3, 0.2, 0.1]}),  # Include UID 0
-            Mock(brief_id="brief_2", allocation_details={"per_miner_weights": [0.0, 0.2, 0.3, 0.2]}),  # Include UID 0
-            Mock(brief_id="brief_3", allocation_details={"per_miner_weights": [0.0, 0.1, 0.1, 0.4]}),  # Include UID 0
-            Mock(brief_id="brief_4", allocation_details={"per_miner_weights": [0.0, 0.0, 0.1, 0.0]})   # Include UID 0
+            EmissionTarget(
+                brief_id="brief_1", 
+                usd_target=600.0,
+                allocation_details={"per_miner_weights": [0.0, 0.3, 0.2, 0.1]},
+                scaling_factors={}
+            ),  # Include UID 0
+            EmissionTarget(
+                brief_id="brief_2", 
+                usd_target=700.0,
+                allocation_details={"per_miner_weights": [0.0, 0.2, 0.3, 0.2]},
+                scaling_factors={}
+            ),  # Include UID 0
+            EmissionTarget(
+                brief_id="brief_3", 
+                usd_target=600.0,
+                allocation_details={"per_miner_weights": [0.0, 0.1, 0.1, 0.4]},
+                scaling_factors={}
+            ),  # Include UID 0
+            EmissionTarget(
+                brief_id="brief_4", 
+                usd_target=100.0,
+                allocation_details={"per_miner_weights": [0.0, 0.0, 0.1, 0.0]},
+                scaling_factors={}
+            )  # Include UID 0
         ]
         
         briefs = [
@@ -153,8 +199,18 @@ class TestCapsIntegration:
     def test_edge_case_all_zero_caps(self):
         """Test edge case where all briefs have zero caps."""
         emission_targets = [
-            Mock(brief_id="brief1", allocation_details={"per_miner_weights": [0.9, 0.5]}),  # Include UID 0
-            Mock(brief_id="brief2", allocation_details={"per_miner_weights": [0.1, 0.3]})   # Include UID 0
+            EmissionTarget(
+                brief_id="brief1", 
+                usd_target=500.0,
+                allocation_details={"per_miner_weights": [0.9, 0.5]},
+                scaling_factors={}
+            ),  # Include UID 0
+            EmissionTarget(
+                brief_id="brief2", 
+                usd_target=300.0,
+                allocation_details={"per_miner_weights": [0.1, 0.3]},
+                scaling_factors={}
+            )  # Include UID 0
         ]
         
         briefs = [
@@ -178,7 +234,12 @@ class TestCapsIntegration:
     def test_single_brief_exceeds_one(self):
         """Test scenario where single brief would exceed 1.0 without cap."""
         emission_targets = [
-            Mock(brief_id="mega_brief", allocation_details={"per_miner_weights": [0.1, 1.5, 0.8]})  # Include UID 0
+            EmissionTarget(
+                brief_id="mega_brief", 
+                usd_target=2000.0,
+                allocation_details={"per_miner_weights": [0.1, 1.5, 0.8]},
+                scaling_factors={}
+            )  # Include UID 0
         ]
         
         briefs = [{"id": "mega_brief", "cap": 0.9}]  # Cap at 90%
@@ -212,7 +273,12 @@ class TestCapsIntegration:
         for i in range(num_briefs):
             weights = np.random.rand(num_miners) * 0.1  # Small random weights
             emission_targets.append(
-                Mock(brief_id=f"brief_{i}", allocation_details={"per_miner_weights": weights.tolist()})
+                EmissionTarget(
+                    brief_id=f"brief_{i}", 
+                    usd_target=float(np.random.rand() * 1000),
+                    allocation_details={"per_miner_weights": weights.tolist()},
+                    scaling_factors={}
+                )
             )
             briefs.append({"id": f"brief_{i}", "cap": np.random.rand() * 0.5})  # Random caps
         
@@ -238,7 +304,12 @@ class TestCapsIntegration:
     def test_caps_with_community_reserve(self):
         """Test that caps work correctly with community reserve allocation."""
         emission_targets = [
-            Mock(brief_id="brief1", allocation_details={"per_miner_weights": [0.0, 0.5, 0.3]})  # UID 0 gets 0
+            EmissionTarget(
+                brief_id="brief1", 
+                usd_target=400.0,
+                allocation_details={"per_miner_weights": [0.0, 0.5, 0.3]},
+                scaling_factors={}
+            )  # UID 0 gets 0
         ]
         
         briefs = [{"id": "brief1", "cap": 0.6}]

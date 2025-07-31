@@ -24,7 +24,8 @@ def calculate_curve_based_score(
     start_date: str, 
     end_date: str,
     is_ypp_account: bool, 
-    channel_analytics: Optional[Dict[str, Any]] = None
+    channel_analytics: Optional[Dict[str, Any]] = None,
+    video_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Calculate video score using curve-based methodology.
@@ -42,6 +43,7 @@ def calculate_curve_based_score(
         end_date: End date for scoring window (not used in curve calculation)
         is_ypp_account: Whether this is a YPP account
         channel_analytics: Optional channel analytics for median capping
+        video_id: Optional video ID for logging identification
         
     Returns:
         Dict with score, daily_analytics, scoring_method, and debugging info
@@ -49,50 +51,57 @@ def calculate_curve_based_score(
     Examples:
         >>> result = calculate_curve_based_score(
         ...     daily_data, "2023-01-01", "2023-01-07", 
-        ...     is_ypp_account=True, channel_analytics=channel_data
+        ...     is_ypp_account=True, channel_analytics=channel_data, video_id="abc123"
         ... )
         >>> score = result["score"]
         >>> method = result["scoring_method"]
     """
+    video_info = f" [Video: {video_id}]" if video_id else ""
+    bt.logging.info(f"=== CURVE-BASED SCORING START{video_info} ===")
+    bt.logging.info(f"Input: YPP={is_ypp_account}, analytics_entries={len(daily_analytics)}, has_channel_analytics={channel_analytics is not None}")
+    
     try:
-        # Calculate the two periods needed for curve scoring
-        # day 1 avg = (T - YT_REWARD_DELAY - YT_ROLLING_WINDOW - 1) to (T - YT_REWARD_DELAY - 1)
-        # day 2 avg = (T - YT_REWARD_DELAY - YT_ROLLING_WINDOW) to (T - YT_REWARD_DELAY)
+        # Step 1: Calculate the two periods needed for curve scoring
+        bt.logging.info("Step 1: Calculating scoring periods")
+        bt.logging.info(f"Config: ROLLING_WINDOW={YT_ROLLING_WINDOW}, REWARD_DELAY={YT_REWARD_DELAY}")
         
         today = datetime.now()
+        bt.logging.info(f"Current date: {today.strftime('%Y-%m-%d')}")
         
-        # Day 1 period (earlier period): 7 days ending YT_REWARD_DELAY days ago
-        # day 1 avg = (T - YT_REWARD_DELAY - YT_ROLLING_WINDOW + 1) to (T - YT_REWARD_DELAY)
-        day1_start_offset = YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1  # T - 3 - 7 + 1 = T - 9
-        day1_end_offset = YT_REWARD_DELAY  # T - 3
+        # Day 1 period (earlier period): 7 days ending (YT_REWARD_DELAY + 1) days ago
+        day1_start_offset = YT_REWARD_DELAY + 1 + YT_ROLLING_WINDOW - 1  # T - 4 - 7 + 1 = T - 10
+        day1_end_offset = YT_REWARD_DELAY + 1  # T - 4
         day1_start = (today - timedelta(days=day1_start_offset)).strftime('%Y-%m-%d')
         day1_end = (today - timedelta(days=day1_end_offset)).strftime('%Y-%m-%d')
         
-        # Day 2 period (later period): 7 days ending (YT_REWARD_DELAY - 1) days ago
-        # day 2 avg = (T - YT_REWARD_DELAY - YT_ROLLING_WINDOW + 2) to (T - YT_REWARD_DELAY + 1)
-        day2_start_offset = YT_REWARD_DELAY + YT_ROLLING_WINDOW - 2  # T - 3 - 7 + 2 = T - 8
-        day2_end_offset = YT_REWARD_DELAY - 1  # T - 3 + 1 = T - 2
+        # Day 2 period (later period): 7 days ending YT_REWARD_DELAY days ago  
+        day2_start_offset = YT_REWARD_DELAY + YT_ROLLING_WINDOW - 1  # T - 3 - 7 + 1 = T - 9
+        day2_end_offset = YT_REWARD_DELAY  # T - 3
         day2_start = (today - timedelta(days=day2_start_offset)).strftime('%Y-%m-%d')
         day2_end = (today - timedelta(days=day2_end_offset)).strftime('%Y-%m-%d')
         
-        bt.logging.debug(
-            f"Curve scoring periods: Day1={day1_start} to {day1_end}, "
-            f"Day2={day2_start} to {day2_end}"
-        )
+        bt.logging.info(f"Period 1 (Day1): {day1_start} to {day1_end} (offset T-{day1_start_offset} to T-{day1_end_offset})")
+        bt.logging.info(f"Period 2 (Day2): {day2_start} to {day2_end} (offset T-{day2_start_offset} to T-{day2_end_offset})")
         
+        # Step 2: Route to appropriate scoring method
         if is_ypp_account:
-            return _calculate_ypp_curve_score(
+            bt.logging.info("Step 2: Routing to YPP curve scoring (using estimatedRedPartnerRevenue)")
+            result = _calculate_ypp_curve_score(
                 daily_analytics, day1_start, day1_end, day2_start, day2_end,
                 channel_analytics
             )
         else:
-            return _calculate_non_ypp_curve_score(
+            bt.logging.info(f"Step 2: Routing to Non-YPP curve scoring (using estimatedMinutesWatched * {YT_NON_YPP_REVENUE_MULTIPLIER})")
+            result = _calculate_non_ypp_curve_score(
                 daily_analytics, day1_start, day1_end, day2_start, day2_end,
                 channel_analytics
             )
+        
+        bt.logging.info(f"=== CURVE-BASED SCORING COMPLETE{video_info}: Final score={result.get('score', 0):.6f} ===")
+        return result
             
     except Exception as e:
-        bt.logging.error(f"Error in curve-based scoring calculation: {e}")
+        bt.logging.error(f"=== CURVE-BASED SCORING ERROR{video_info}: {e} ===")
         return {
             "score": 0.0,
             "daily_analytics": daily_analytics,
@@ -123,8 +132,12 @@ def _calculate_ypp_curve_score(
     Returns:
         Scoring result dictionary
     """
+    bt.logging.info("--- YPP Curve Scoring ---")
     try:
-        # Get period averages with median capping applied
+        # Step 3: Get period averages with median capping applied
+        bt.logging.info(f"Step 3a: Processing data for metric 'estimatedRedPartnerRevenue'")
+        bt.logging.info(f"Step 3b: Will apply median capping: {channel_analytics is not None}")
+        
         day1_avg, day2_avg = get_period_averages(
             daily_analytics,
             "estimatedRedPartnerRevenue",
@@ -135,13 +148,16 @@ def _calculate_ypp_curve_score(
             is_ypp_account=True
         )
         
-        # Calculate curve difference (this is the score)
+        bt.logging.info(f"Step 3c: Data processing complete - Day1 avg: {day1_avg:.6f}, Day2 avg: {day2_avg:.6f}")
+        
+        # Step 4: Calculate curve difference (this is the score)
+        bt.logging.info(f"Step 4a: Applying curve formula to averages")
+        bt.logging.info(f"Step 4b: Formula: SQRT(day2_avg)/(1+0.1*SQRT(day2_avg)) - SQRT(day1_avg)/(1+0.1*SQRT(day1_avg))")
+        
         score = calculate_curve_difference(day1_avg, day2_avg)
         
-        bt.logging.info(
-            f"YPP curve score: day1_avg={day1_avg:.4f}, day2_avg={day2_avg:.4f}, "
-            f"score_difference={score:.6f}"
-        )
+        bt.logging.info(f"Step 4c: Curve calculation complete - Final score: {score:.6f}")
+        bt.logging.info(f"YPP Summary: day1_avg={day1_avg:.6f} -> day2_avg={day2_avg:.6f} = score_diff={score:.6f}")
         
         return {
             "score": score,
@@ -157,7 +173,7 @@ def _calculate_ypp_curve_score(
         }
         
     except Exception as e:
-        bt.logging.error(f"Error calculating YPP curve score: {e}")
+        bt.logging.error(f"YPP Curve Scoring Error: {e}")
         return {
             "score": 0.0,
             "daily_analytics": daily_analytics,
@@ -191,8 +207,12 @@ def _calculate_non_ypp_curve_score(
     Returns:
         Scoring result dictionary
     """
+    bt.logging.info("--- Non-YPP Curve Scoring ---")
     try:
-        # Get period averages for minutes watched with median capping applied
+        # Step 3: Get period averages for minutes watched with median capping applied
+        bt.logging.info(f"Step 3a: Processing data for metric 'estimatedMinutesWatched'")
+        bt.logging.info(f"Step 3b: Will apply median capping: {channel_analytics is not None}")
+        
         day1_minutes_avg, day2_minutes_avg = get_period_averages(
             daily_analytics,
             "estimatedMinutesWatched",
@@ -203,19 +223,27 @@ def _calculate_non_ypp_curve_score(
             is_ypp_account=False
         )
         
-        # Convert minutes watched to estimated revenue using hardcoded multiplier
+        bt.logging.info(f"Step 3c: Minutes data processing complete - Day1 avg: {day1_minutes_avg:.2f}, Day2 avg: {day2_minutes_avg:.2f}")
+        
+        # Step 4: Convert minutes watched to estimated revenue using hardcoded multiplier
+        bt.logging.info(f"Step 4a: Converting minutes to revenue using multiplier {YT_NON_YPP_REVENUE_MULTIPLIER}")
+        
         day1_revenue_avg = day1_minutes_avg * YT_NON_YPP_REVENUE_MULTIPLIER
         day2_revenue_avg = day2_minutes_avg * YT_NON_YPP_REVENUE_MULTIPLIER
         
-        # Calculate curve difference (this is the score)
+        bt.logging.info(f"Step 4b: Revenue conversion complete - Day1: {day1_minutes_avg:.2f}min -> ${day1_revenue_avg:.6f}")
+        bt.logging.info(f"Step 4c: Revenue conversion complete - Day2: {day2_minutes_avg:.2f}min -> ${day2_revenue_avg:.6f}")
+        
+        # Step 5: Calculate curve difference (this is the score)
+        bt.logging.info(f"Step 5a: Applying curve formula to revenue estimates")
+        bt.logging.info(f"Step 5b: Formula: SQRT(day2_revenue)/(1+0.1*SQRT(day2_revenue)) - SQRT(day1_revenue)/(1+0.1*SQRT(day1_revenue))")
+        
         score = calculate_curve_difference(day1_revenue_avg, day2_revenue_avg)
         
+        bt.logging.info(f"Step 5c: Curve calculation complete - Final score: {score:.6f}")
         bt.logging.info(
-            f"Non-YPP curve score: day1_minutes={day1_minutes_avg:.0f}, "
-            f"day2_minutes={day2_minutes_avg:.0f}, "
-            f"day1_revenue_est={day1_revenue_avg:.6f}, "
-            f"day2_revenue_est={day2_revenue_avg:.6f}, "
-            f"score_difference={score:.6f}"
+            f"Non-YPP Summary: {day1_minutes_avg:.0f}min(${day1_revenue_avg:.6f}) -> "
+            f"{day2_minutes_avg:.0f}min(${day2_revenue_avg:.6f}) = score_diff={score:.6f}"
         )
         
         return {
@@ -235,7 +263,7 @@ def _calculate_non_ypp_curve_score(
         }
         
     except Exception as e:
-        bt.logging.error(f"Error calculating Non-YPP curve score: {e}")
+        bt.logging.error(f"Non-YPP Curve Scoring Error: {e}")
         return {
             "score": 0.0,
             "daily_analytics": daily_analytics,

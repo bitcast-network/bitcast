@@ -282,9 +282,13 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
     video_publish_date = result["videos"][video_id]["details"].get("publishedAt")
     existing_analytics = result["videos"][video_id]["analytics"]
     
+    # Get bitcast video ID for logging (falls back to YouTube ID if not available)
+    bitcast_video_id = result["videos"][video_id]["details"].get("bitcastVideoId", video_id)
+    
     video_score_result = calculate_video_score(
         video_id, youtube_analytics_client, video_publish_date, existing_analytics,
-        is_ypp_account=is_ypp_account, channel_analytics=channel_analytics
+        is_ypp_account=is_ypp_account, channel_analytics=channel_analytics, 
+        bitcast_video_id=bitcast_video_id
     )
     video_score = video_score_result["score"]
     scoring_method = video_score_result["scoring_method"]
