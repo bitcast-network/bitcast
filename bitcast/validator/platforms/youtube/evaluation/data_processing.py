@@ -259,6 +259,72 @@ def extract_date_range(
     return filtered_data
 
 
+def _replace_period_data(
+    daily_analytics: List[Dict[str, Any]], 
+    scaled_period_data: List[Dict[str, Any]], 
+    period_start: str, 
+    period_end: str
+) -> List[Dict[str, Any]]:
+    """
+    Replace data for a specific period with scaled values.
+    
+    Updates the daily analytics list by replacing entries within the specified
+    period with the scaled values while preserving all other data.
+    
+    Args:
+        daily_analytics: Original daily analytics data
+        scaled_period_data: Scaled data for the specific period
+        period_start: Start date of the period (inclusive)
+        period_end: End date of the period (inclusive)
+        
+    Returns:
+        Updated daily analytics with scaled period data
+        
+    Examples:
+        >>> original = [{"day": "2023-01-01", "revenue": 5.0}, {"day": "2023-01-02", "revenue": 3.0}]
+        >>> scaled = [{"day": "2023-01-01", "revenue": 2.5}]
+        >>> result = _replace_period_data(original, scaled, "2023-01-01", "2023-01-01")
+        >>> result[0]["revenue"]
+        2.5
+    """
+    if not daily_analytics or not scaled_period_data:
+        return daily_analytics
+    
+    # Create a mapping of date -> scaled data for quick lookup
+    scaled_data_map = {item.get("day"): item for item in scaled_period_data}
+    
+    try:
+        start_dt = datetime.strptime(period_start, '%Y-%m-%d')
+        end_dt = datetime.strptime(period_end, '%Y-%m-%d')
+    except ValueError as e:
+        bt.logging.error(f"Invalid date format in _replace_period_data: {e}")
+        return daily_analytics
+    
+    updated_data = []
+    
+    for item in daily_analytics:
+        day_str = item.get("day", "")
+        if not day_str:
+            updated_data.append(item)
+            continue
+            
+        try:
+            day_dt = datetime.strptime(day_str, '%Y-%m-%d')
+            if start_dt <= day_dt <= end_dt and day_str in scaled_data_map:
+                # Use scaled data for this date
+                updated_data.append(scaled_data_map[day_str])
+                bt.logging.debug(f"Replaced data for {day_str} with scaled values")
+            else:
+                # Keep original data
+                updated_data.append(item)
+        except ValueError:
+            bt.logging.warning(f"Invalid date format in data: {day_str}")
+            updated_data.append(item)
+    
+    bt.logging.debug(f"Replaced period data from {period_start} to {period_end}")
+    return updated_data
+
+
 def get_period_averages(
     daily_analytics: List[Dict[str, Any]],
     metric_key: str,
@@ -278,7 +344,7 @@ def get_period_averages(
     - Day 1 average: (T - YT_REWARD_DELAY - YT_ROLLING_WINDOW - 1) to (T - YT_REWARD_DELAY - 1)
     - Day 2 average: (T - YT_REWARD_DELAY - YT_ROLLING_WINDOW) to (T - YT_REWARD_DELAY)
     
-    Includes median capping for anti-exploitation if channel analytics are provided.
+    Includes proportional scaling for period 2 anti-exploitation if channel analytics are provided.
     
     Args:
         daily_analytics: Raw daily analytics data
@@ -288,8 +354,8 @@ def get_period_averages(
         day2_start: Start date for period 2  
         day2_end: End date for period 2
         window_size: Rolling window size (typically YT_ROLLING_WINDOW = 7)
-        channel_analytics: Channel analytics for median capping (optional)
-        is_ypp_account: Whether this is a YPP account (affects capping metric)
+        channel_analytics: Channel analytics for proportional scaling threshold (optional)
+        is_ypp_account: Whether this is a YPP account (affects scaling metric)
         
     Returns:
         Tuple of (day1_average, day2_average)
@@ -320,13 +386,23 @@ def get_period_averages(
         # Fill missing dates
         filled_data = fill_missing_dates(daily_analytics, overall_start, overall_end)
         
-        # Apply median capping if channel analytics are provided
+        # Apply proportional scaling to period 2 data if channel analytics are provided
         if channel_analytics is not None:
             # Import here to avoid circular dependency
-            from .median_capping import apply_median_caps_to_analytics
-            filled_data = apply_median_caps_to_analytics(filled_data, channel_analytics, is_ypp_account)
+            from .proportional_scaling import apply_proportional_scaling_to_period
+            
+            # Extract period 2 data from raw daily values for scaling
+            period2_raw_data = extract_date_range(filled_data, day2_start, day2_end)
+            if period2_raw_data:
+                # Apply proportional scaling to period 2 daily values
+                scaled_period2_data = apply_proportional_scaling_to_period(
+                    period2_raw_data, channel_analytics, metric_key, is_ypp_account
+                )
+                
+                # Replace period 2 data in the filled data with scaled values
+                filled_data = _replace_period_data(filled_data, scaled_period2_data, day2_start, day2_end)
         
-        # Calculate cumulative totals after capping
+        # Calculate cumulative totals after scaling
         cumulative_data = calculate_cumulative_totals(filled_data, metric_key)
         
         # Extract period 1 data and calculate rolling average
