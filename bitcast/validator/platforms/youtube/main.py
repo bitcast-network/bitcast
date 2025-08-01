@@ -21,6 +21,7 @@ from bitcast.validator.utils.config import (
     ECO_MODE,
     YT_LOOKBACK,
     YT_MAX_VIDEOS_PER_DEDICATED_BRIEF,
+    YT_MAX_VIDEOS_PER_AD_READ_BRIEF,
 )
 
 
@@ -118,10 +119,10 @@ def get_channel_information(youtube_data_client, youtube_analytics_client):
 
 def apply_video_limits(briefs, result):
     """
-    Apply video scoring limits for dedicated briefs.
+    Apply video scoring limits for dedicated and ad-read briefs using FIFO selection.
     
-    For each dedicated brief, limits the number of videos that can receive scores per account.
-    Only the top N scoring videos keep their scores, the rest are set to 0.
+    For each brief with limits, limits the number of videos that can receive scores per account.
+    Only the oldest N videos (by publish date) keep their scores, the rest are set to 0.
     
     Args:
         briefs (list): List of brief dictionaries
@@ -131,8 +132,14 @@ def apply_video_limits(briefs, result):
         brief_id = brief["id"]
         brief_format = brief.get("format", "dedicated")
         
-        # Only apply limits to dedicated briefs
-        if brief_format != "dedicated":
+        # Determine the limit based on brief format
+        max_videos = None
+        if brief_format == "dedicated":
+            max_videos = YT_MAX_VIDEOS_PER_DEDICATED_BRIEF
+        elif brief_format == "ad-read":
+            max_videos = YT_MAX_VIDEOS_PER_AD_READ_BRIEF
+        else:
+            # No limits for other formats (integrated, etc.)
             continue
             
         # Find all videos that scored > 0 for this brief
@@ -148,14 +155,14 @@ def apply_video_limits(briefs, result):
                     })
         
         # Check if we need to apply limits
-        if len(scored_videos) <= YT_MAX_VIDEOS_PER_DEDICATED_BRIEF:
+        if len(scored_videos) <= max_videos:
             continue
             
-        # Sort videos by score (descending) - ties handled by natural list order (doesn't matter which)
-        scored_videos.sort(key=lambda x: x["score"], reverse=True)
+        # Sort videos by publish date (ascending) - oldest videos get priority (FIFO)
+        scored_videos.sort(key=lambda x: result["videos"][x["video_id"]]["details"]["publishedAt"])
         
-        # Keep top N videos, zero out the rest
-        videos_to_limit = scored_videos[YT_MAX_VIDEOS_PER_DEDICATED_BRIEF:]
+        # Keep first N videos (oldest), zero out the rest (newest)
+        videos_to_limit = scored_videos[max_videos:]
         original_total_score = result["scores"][brief_id]
         score_reduction = 0
         
@@ -171,7 +178,7 @@ def apply_video_limits(briefs, result):
                 result["videos"][video_id]["score_limited"] = {}
             result["videos"][video_id]["score_limited"][brief_id] = {
                 "original_score": original_score,
-                "reason": "exceeded_dedicated_brief_limit"
+                "reason": f"exceeded_{brief_format}_brief_limit_fifo"
             }
             
             score_reduction += original_score
@@ -182,9 +189,9 @@ def apply_video_limits(briefs, result):
         # Log the limiting action
         limited_video_ids = [v["bitcast_video_id"] for v in videos_to_limit]
         bt.logging.info(
-            f"Applied video limit for dedicated brief '{brief_id}': "
-            f"kept top {YT_MAX_VIDEOS_PER_DEDICATED_BRIEF} of {len(scored_videos)} videos, "
-            f"limited {len(videos_to_limit)} videos: {limited_video_ids}, "
+            f"Applied video limit for {brief_format} brief '{brief_id}': "
+            f"kept oldest {max_videos} of {len(scored_videos)} videos (FIFO), "
+            f"limited {len(videos_to_limit)} newest videos: {limited_video_ids}, "
             f"score reduced by {score_reduction:.4f}"
         )
 

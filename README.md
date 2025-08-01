@@ -70,7 +70,7 @@ Bitcast employs a dynamic, multi-layered scoring and rewards mechanism to fairly
   Each brief specifies a required video format, which determines both eligibility and reward scaling:
   - **Dedicated:**  
     - Sponsor’s topic is the main focus (≥80% of video).
-    - Each YouTube account can be rewarded for up to **2 videos per dedicated brief** (top 2 by score).
+    - Each YouTube account can be rewarded for up to **2 videos per dedicated brief** (oldest 2 by publish date).
     - Receives **100% of the reward**.
   - **Integrated:**  
     - Sponsor’s content is woven into the main video.
@@ -78,7 +78,7 @@ Bitcast employs a dynamic, multi-layered scoring and rewards mechanism to fairly
     - Receives **60% of the dedicated reward**.
   - **Ad-Read:**  
     - Sponsor’s message appears as a short, distinct segment.
-    - **No limit** to the number of ad-read videos per account.
+    - Each YouTube account can be rewarded for up to **5 videos per ad-read brief** (oldest 5 by publish date).
     - Receives **20% of the dedicated reward**.
 
 ### 3. Performance Metrics & Anti-Exploitation Controls
