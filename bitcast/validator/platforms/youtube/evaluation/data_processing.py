@@ -304,11 +304,18 @@ def get_period_averages(
         ... )
     """
     try:
-        # Determine the full date range needed
-        all_dates = [day1_start, day1_end, day2_start, day2_end]
-        date_objs = [datetime.strptime(d, '%Y-%m-%d') for d in all_dates]
-        overall_start = min(date_objs).strftime('%Y-%m-%d')
-        overall_end = max(date_objs).strftime('%Y-%m-%d')
+        # Determine the date range needed from averaging windows
+        window_dates = [day1_start, day1_end, day2_start, day2_end]
+        window_date_objs = [datetime.strptime(d, '%Y-%m-%d') for d in window_dates]
+        window_start = min(window_date_objs).strftime('%Y-%m-%d')
+        overall_end = max(window_date_objs).strftime('%Y-%m-%d')
+        
+        # Find earliest date from analytics data and use the earlier of the two
+        analytics_dates = [item.get("day") for item in daily_analytics if item.get("day")]
+        if analytics_dates:
+            overall_start = min(window_start, min(analytics_dates))
+        else:
+            overall_start = window_start
         
         # Fill missing dates
         filled_data = fill_missing_dates(daily_analytics, overall_start, overall_end)
