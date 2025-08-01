@@ -245,6 +245,11 @@ def get_channel_analytics(youtube_analytics_client, start_date, end_date=None):
 
     # Handle daily metrics separately if they exist
     if daily_metrics:
+        # Filter out revenue metrics for non-YPP accounts from daily metrics too
+        if not ypp:
+            revenue_metric_names = {metric for key, (metric, _, _, _, _) in metrics_config.items() if key in REVENUE_METRICS}
+            daily_metrics = [m for m in daily_metrics if m not in revenue_metric_names]
+            
         try:
             daily_data = _query_multiple_metrics(
                 youtube_analytics_client, start_date, end,

@@ -123,7 +123,7 @@ CHANNEL_CORE_METRICS = {
     "cpm": ("cpm", "", None, None, None),
     "views": ("views", "day", None, None, "day"),
     "averageViewPercentage": ("averageViewPercentage", "", None, None, None),
-    "estimatedMinutesWatched": ("estimatedMinutesWatched", "", None, None, None),
+    "estimatedMinutesWatched": ("estimatedMinutesWatched", "day", None, None, "day"),
     "estimatedRedPartnerRevenue": ("estimatedRedPartnerRevenue", "day", None, None, "day"),
 }
 

@@ -56,7 +56,11 @@ def test_check_channel_criteria():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        },
         "ypp": True  # Add this to pass acceptance filter
     }
     channel_age_days = YT_MIN_CHANNEL_AGE + 10
@@ -79,11 +83,19 @@ def test_check_channel_criteria():
 
     # Test case 5: Insufficient minutes watched
     channel_analytics["averageViewPercentage"] = YT_MIN_CHANNEL_RETENTION + 5
-    channel_analytics["estimatedMinutesWatched"] = YT_MIN_MINS_WATCHED - 100
+    channel_analytics["estimatedMinutesWatched"] = {
+        "2025-07-01": 100,
+        "2025-07-02": 200,
+        "2025-07-03": 200  # Total: 500 < 1000 threshold
+    }
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == False
 
     # Test case 6: Too many subscribers (exceeds maximum)
-    channel_analytics["estimatedMinutesWatched"] = YT_MIN_MINS_WATCHED + 1000
+    channel_analytics["estimatedMinutesWatched"] = {
+        "2025-07-01": 400,
+        "2025-07-02": 400,
+        "2025-07-03": 400  # Total: 1200 > 1000 threshold
+    }
     channel_data["subCount"] = str(YT_MAX_SUBS + 1000)  # 201k subscribers
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == False
 
@@ -97,7 +109,11 @@ def test_vet_channel_blacklisted(mock_blacklist):
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        }
     }
     
     # Mock blacklist to include our test channel
@@ -119,7 +135,11 @@ def test_vet_channel_not_blacklisted(mock_blacklist):
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        },
         "ypp": True  # Add this to pass acceptance filter
     }
     
@@ -142,7 +162,11 @@ def test_vet_channel():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        },
         "ypp": True  # Add this to pass acceptance filter
     }
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
@@ -165,7 +189,11 @@ def test_acceptance_filter():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        }
     }
     
     # Test case 1: Channel passes with YPP membership
@@ -349,7 +377,11 @@ async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_
     # Mock video analytics
     video_analytics = {
         "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
-        "estimatedMinutesWatched": 1000
+        "estimatedMinutesWatched": {
+            "2025-07-01": 400,
+            "2025-07-02": 300,
+            "2025-07-03": 300  # Total: 1000 = threshold
+        }
     }
 
     # Mock OpenAI client functions at the high level

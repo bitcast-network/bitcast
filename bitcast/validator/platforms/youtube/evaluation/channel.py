@@ -127,8 +127,11 @@ def check_channel_criteria(channel_data, channel_analytics, channel_age_days, mi
         bt.logging.warning(f"Avg retention check failed (last {YT_LOOKBACK} days): {channel_data['bitcastChannelId']}. {channel_analytics['averageViewPercentage']} < {YT_MIN_CHANNEL_RETENTION}%.")
         criteria_met = False
         
-    if float(channel_analytics["estimatedMinutesWatched"]) < YT_MIN_MINS_WATCHED:
-        bt.logging.warning(f"Minutes watched check failed (last {YT_LOOKBACK} days): {channel_data['bitcastChannelId']}. {channel_analytics['estimatedMinutesWatched']} < {YT_MIN_MINS_WATCHED}.")
+    # Sum daily minutes watched values
+    total_minutes_watched = sum(channel_analytics["estimatedMinutesWatched"].values())
+    
+    if total_minutes_watched < YT_MIN_MINS_WATCHED:
+        bt.logging.warning(f"Minutes watched check failed (last {YT_LOOKBACK} days): {channel_data['bitcastChannelId']}. {total_minutes_watched} < {YT_MIN_MINS_WATCHED}.")
         criteria_met = False
 
     return criteria_met 
