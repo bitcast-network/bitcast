@@ -208,10 +208,9 @@ This allows you to aggregate multiple creators under a single mining UID while m
 
 - **3-day emissions delay:** You'll begin receiving miner emissions **3 days** after the miner starts.  
 - **Video age limit:** Each video will be rewarded for its first 14 days of engagement as long as it is posted during the active brief window.
-- **Validator polling:** Each validator sends a request roughly every **4 hours**.  
+- **Validator polling:** Each validator sends a request roughly every **4-5 hours**.  
 - **Video processing limit:** A maximum of **75 recent videos** will be processed per YouTube account.  
 - **Process visibility:** Validator logs can be viewed in the [bitcast wandb project](https://wandb.ai/bitcast_network/bitcast_vali_logs?nw=nwuserwill_bitcast)  
-- **Single YouTube account:** Each miner instance supports only **one** YouTube account. To connect multiple accounts, run multiple miners.  
 - **Auto-updates:** The codebase has auto-update enabled by default.
 
 ---
