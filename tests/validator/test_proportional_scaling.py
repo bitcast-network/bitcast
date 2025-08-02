@@ -237,26 +237,22 @@ class TestProportionalScaling(unittest.TestCase):
         
         apply_proportional_scaling(daily_data, 0.5, "estimatedRedPartnerRevenue")
         
-        # Verify info level logging was called
+        # Verify info level logging was called (but not debug - we removed excessive debug logging)
         mock_logging.info.assert_called()
-        # Verify debug level logging was called
-        mock_logging.debug.assert_called()
 
-    @patch('bitcast.validator.platforms.youtube.evaluation.proportional_scaling.bt.logging')
-    def test_logging_no_scaling_needed(self, mock_logging):
-        """Test that appropriate logging occurs when no scaling is needed."""
-        calculate_scaling_factor(3.0, 5.0)  # No scaling needed
+    def test_scaling_factor_no_scaling_needed(self):
+        """Test that scaling factor returns None when no scaling is needed."""
+        result = calculate_scaling_factor(3.0, 5.0)  # No scaling needed
         
-        # Verify debug level logging was called
-        mock_logging.debug.assert_called()
+        # Should return None when no scaling is needed
+        self.assertIsNone(result)
 
-    @patch('bitcast.validator.platforms.youtube.evaluation.proportional_scaling.bt.logging')
-    def test_logging_zero_threshold(self, mock_logging):
-        """Test that appropriate logging occurs with zero threshold."""
-        calculate_scaling_factor(10.0, 0.0)
+    def test_scaling_factor_zero_threshold(self):
+        """Test that scaling factor handles zero threshold correctly."""
+        result = calculate_scaling_factor(10.0, 0.0)
         
-        # Verify debug level logging was called
-        mock_logging.debug.assert_called()
+        # Should return 0.0 when threshold is zero
+        self.assertEqual(result, 0.0)
 
     @patch('bitcast.validator.platforms.youtube.evaluation.proportional_scaling.bt.logging')
     def test_logging_negative_threshold(self, mock_logging):

@@ -64,15 +64,15 @@ def calculate_scaling_factor(period_average: float, threshold: float) -> Optiona
         threshold = 0.0
     
     if threshold == 0.0:
-        bt.logging.debug("Zero threshold, scaling all values to 0")
+        # Zero threshold, scaling all values to 0
         return 0.0
     
     if period_average <= threshold:
-        bt.logging.debug(f"Period average {period_average:.4f} <= threshold {threshold:.4f}, no scaling needed")
+        # Period average within threshold, no scaling needed
         return None
     
     scaling_factor = threshold / period_average
-    bt.logging.debug(f"Scaling factor calculated: {scaling_factor:.4f} (threshold={threshold:.4f}, average={period_average:.4f})")
+    # Scaling factor calculated
     return scaling_factor
 
 
@@ -119,10 +119,7 @@ def apply_proportional_scaling(
         total_original += original_value
         total_scaled += scaled_value
         
-        bt.logging.debug(
-            f"Scaled value: date={item.get('day', 'unknown')}, "
-            f"original={original_value:.4f}, scaled={scaled_value:.4f}"
-        )
+        # Scaled value for proportional adjustment
         
         scaled_data.append(new_item)
     
@@ -157,7 +154,7 @@ def get_median_threshold_for_metric(
         >>> # Returns median revenue threshold for YPP account
     """
     if channel_analytics is None:
-        bt.logging.debug("No channel analytics available for threshold calculation")
+        # No channel analytics available for threshold calculation
         return None
     
     try:
@@ -165,10 +162,7 @@ def get_median_threshold_for_metric(
         median_threshold = calculate_median_from_analytics(channel_analytics, metric_key)
         
         if median_threshold >= 0:
-            account_type = "YPP" if is_ypp_account else "Non-YPP"
-            bt.logging.debug(
-                f"Calculated median threshold for {account_type} {metric_key}: {median_threshold:.4f}"
-            )
+            # Calculated median threshold for proportional scaling
             return median_threshold
         else:
             bt.logging.warning(f"Negative median threshold calculated for {metric_key}: {median_threshold}")
@@ -210,11 +204,11 @@ def apply_proportional_scaling_to_period(
         >>> # Applies revenue scaling to period 2 for YPP account
     """
     if not period_data:
-        bt.logging.debug("No period data provided for scaling")
+        # No period data provided for scaling
         return []
     
     if channel_analytics is None:
-        bt.logging.debug("No channel analytics available, skipping proportional scaling")
+        # No channel analytics available, skipping proportional scaling
         return period_data
     
     try:
@@ -225,14 +219,14 @@ def apply_proportional_scaling_to_period(
         threshold = get_median_threshold_for_metric(channel_analytics, metric_key, is_ypp_account)
         
         if threshold is None:
-            bt.logging.debug(f"No threshold available for {metric_key}, skipping scaling")
+            # No threshold available, skipping scaling
             return period_data
         
         # Calculate scaling factor
         scaling_factor = calculate_scaling_factor(period_average, threshold)
         
         if scaling_factor is None:
-            bt.logging.debug(f"No scaling needed for {metric_key} (average within threshold)")
+            # No scaling needed (average within threshold)
             return period_data
         
         # Apply proportional scaling

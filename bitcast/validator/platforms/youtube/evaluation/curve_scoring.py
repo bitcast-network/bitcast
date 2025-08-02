@@ -57,7 +57,7 @@ def calculate_curve_value(value: float) -> float:
             bt.logging.error(f"Non-finite curve result for value {value}")
             return 0.0
         
-        bt.logging.debug(f"Curve calculation: value={value:.4f}, sqrt={sqrt_value:.4f}, curve={curve_value:.6f}")
+        # Curve calculation completed
         return curve_value
         
     except (ValueError, ZeroDivisionError, OverflowError) as e:
@@ -92,11 +92,7 @@ def calculate_curve_difference(day1_avg: float, day2_avg: float) -> float:
     
     difference = day2_curve - day1_curve
     
-    bt.logging.debug(
-        f"Curve difference: day1_avg={day1_avg:.4f} -> curve={day1_curve:.6f}, "
-        f"day2_avg={day2_avg:.4f} -> curve={day2_curve:.6f}, "
-        f"difference={difference:.6f}"
-    )
+    # Curve difference calculated
     
     return difference
 

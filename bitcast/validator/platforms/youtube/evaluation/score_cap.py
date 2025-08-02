@@ -95,7 +95,7 @@ def calculate_median_from_analytics(channel_analytics: Dict[str, Any], metric_ke
         
         median_value = statistics.median(values)
         
-        bt.logging.debug(f"{metric_key} median calculation: {len(values)} days, median={median_value}")
+        # Calculated median value for capping
         
         return float(median_value)
         

@@ -78,7 +78,7 @@ def fill_missing_dates(
         
         current_dt += timedelta(days=1)
     
-    bt.logging.debug(f"Filled missing dates: {len(daily_analytics)} -> {len(filled_analytics)} entries")
+    # Filled missing dates for analytics continuity
     return filled_analytics
 
 
@@ -131,7 +131,7 @@ def calculate_cumulative_totals(
         new_item[cumulative_field] = running_total
         result.append(new_item)
     
-    bt.logging.debug(f"Calculated cumulative totals for {metric_key}: final total = {running_total}")
+    # Calculated cumulative totals
     return result
 
 
@@ -194,7 +194,7 @@ def calculate_rolling_average(
         
         averages.append(average)
     
-    bt.logging.debug(f"Calculated {len(averages)} rolling averages with window size {window_size}")
+    # Calculated rolling averages
     return averages
 
 
@@ -255,7 +255,7 @@ def extract_date_range(
             bt.logging.warning(f"Invalid date format in data: {day_str}")
             continue
     
-    bt.logging.debug(f"Extracted {len(filtered_data)} entries from date range {start_date} to {end_date}")
+    # Extracted entries from date range
     return filtered_data
 
 
@@ -313,7 +313,7 @@ def _replace_period_data(
             if start_dt <= day_dt <= end_dt and day_str in scaled_data_map:
                 # Use scaled data for this date
                 updated_data.append(scaled_data_map[day_str])
-                bt.logging.debug(f"Replaced data for {day_str} with scaled values")
+                # Replaced with scaled values
             else:
                 # Keep original data
                 updated_data.append(item)
@@ -321,7 +321,7 @@ def _replace_period_data(
             bt.logging.warning(f"Invalid date format in data: {day_str}")
             updated_data.append(item)
     
-    bt.logging.debug(f"Replaced period data from {period_start} to {period_end}")
+    # Replaced period data with scaled values
     return updated_data
 
 
@@ -421,7 +421,7 @@ def get_period_averages(
         else:
             day2_average = 0.0
         
-        bt.logging.debug(f"Period averages: day1={day1_average:.4f}, day2={day2_average:.4f}")
+        # Period averages calculated
         return day1_average, day2_average
         
     except Exception as e:
