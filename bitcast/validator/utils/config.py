@@ -13,7 +13,8 @@ CACHE_DIRS = {
     "openai": os.path.join(CACHE_ROOT, "openai"),
     "briefs": os.path.join(CACHE_ROOT, "briefs"),
     "blacklist": os.path.join(CACHE_ROOT, "blacklist"),
-    "youtube_search": os.path.join(CACHE_ROOT, "youtube_search")
+    "youtube_search": os.path.join(CACHE_ROOT, "youtube_search"),
+    "minutes_revenue_ratio": os.path.join(CACHE_ROOT, "minutes_revenue_ratio")
 }
 
 # Cache expiry times (in seconds)
@@ -21,7 +22,7 @@ YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
 BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
 OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
-__version__ = "1.8.2"
+__version__ = "2.0.0"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -45,9 +46,23 @@ ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
 # youtube scoring
 YT_LOOKBACK = 90
 YT_ROLLING_WINDOW = 7
+YT_SCORING_WINDOW = 14
 YT_REWARD_DELAY = 3
 YT_VIDEO_RELEASE_BUFFER = 3
-YT_MAX_VIDEOS = 50
+YT_MAX_VIDEOS = 75
+YT_MAX_VIDEOS_PER_DEDICATED_BRIEF = 2
+YT_MAX_VIDEOS_PER_AD_READ_BRIEF = 5
+YT_SCALING_FACTOR_DEDICATED = 2000
+YT_SCALING_FACTOR_AD_READ = 400
+YT_MIN_EMISSIONS = 0
+
+# curve-based scoring
+YT_NON_YPP_REVENUE_MULTIPLIER = 0.00005
+YT_CURVE_DAMPENING_FACTOR = 0.1
+
+# score capping
+YT_SCORE_CAP_START_DAYS = 60  # T-60 days
+YT_SCORE_CAP_END_DAYS = 30    # T-30 days
 
 # youtube channel
 YT_MIN_CHANNEL_AGE = 21
@@ -93,12 +108,19 @@ bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")
 bt.logging.info(f"YT_MIN_MINS_WATCHED: {YT_MIN_MINS_WATCHED}")
 bt.logging.info(f"YT_MIN_CHANNEL_RETENTION: {YT_MIN_CHANNEL_RETENTION}")
 bt.logging.info(f"YT_MAX_VIDEOS: {YT_MAX_VIDEOS}")
+bt.logging.info(f"YT_MAX_VIDEOS_PER_DEDICATED_BRIEF: {YT_MAX_VIDEOS_PER_DEDICATED_BRIEF}")
+bt.logging.info(f"YT_MAX_VIDEOS_PER_AD_READ_BRIEF: {YT_MAX_VIDEOS_PER_AD_READ_BRIEF}")
 bt.logging.info(f"YT_MIN_VIDEO_RETENTION: {YT_MIN_VIDEO_RETENTION}")
 bt.logging.info(f"YT_MIN_ALPHA_STAKE_THRESHOLD: {YT_MIN_ALPHA_STAKE_THRESHOLD}")
 bt.logging.info(f"YT_VIDEO_RELEASE_BUFFER: {YT_VIDEO_RELEASE_BUFFER}")
 bt.logging.info(f"YT_ROLLING_WINDOW: {YT_ROLLING_WINDOW}")
+bt.logging.info(f"YT_SCORING_WINDOW: {YT_SCORING_WINDOW}")
 bt.logging.info(f"YT_REWARD_DELAY: {YT_REWARD_DELAY}")
 bt.logging.info(f"YT_LOOKBACK: {YT_LOOKBACK}")
+bt.logging.info(f"YT_NON_YPP_REVENUE_MULTIPLIER: {YT_NON_YPP_REVENUE_MULTIPLIER}")
+bt.logging.info(f"YT_CURVE_DAMPENING_FACTOR: {YT_CURVE_DAMPENING_FACTOR}")
+bt.logging.info(f"YT_SCORE_CAP_START_DAYS: {YT_SCORE_CAP_START_DAYS}")
+bt.logging.info(f"YT_SCORE_CAP_END_DAYS: {YT_SCORE_CAP_END_DAYS}")
 bt.logging.info(f"TRANSCRIPT_MAX_RETRY: {TRANSCRIPT_MAX_RETRY}")
 bt.logging.info(f"TRANSCRIPT_MAX_LENGTH: {TRANSCRIPT_MAX_LENGTH}")
 bt.logging.info(f"VALIDATOR_WAIT: {VALIDATOR_WAIT}")
