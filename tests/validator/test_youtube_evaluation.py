@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 import bittensor as bt
-from bitcast.validator.socials.youtube.evaluation import (
+from bitcast.validator.platforms.youtube.evaluation import (
     vet_channel,
     calculate_channel_age,
     check_channel_criteria,
@@ -56,8 +56,12 @@ def test_check_channel_criteria():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
-        "cpm": 1.5  # Add this to pass acceptance filter
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        },
+        "ypp": True  # Add this to pass acceptance filter
     }
     channel_age_days = YT_MIN_CHANNEL_AGE + 10
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == True
@@ -79,11 +83,19 @@ def test_check_channel_criteria():
 
     # Test case 5: Insufficient minutes watched
     channel_analytics["averageViewPercentage"] = YT_MIN_CHANNEL_RETENTION + 5
-    channel_analytics["estimatedMinutesWatched"] = YT_MIN_MINS_WATCHED - 100
+    channel_analytics["estimatedMinutesWatched"] = {
+        "2025-07-01": 100,
+        "2025-07-02": 200,
+        "2025-07-03": 200  # Total: 500 < 1000 threshold
+    }
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == False
 
     # Test case 6: Too many subscribers (exceeds maximum)
-    channel_analytics["estimatedMinutesWatched"] = YT_MIN_MINS_WATCHED + 1000
+    channel_analytics["estimatedMinutesWatched"] = {
+        "2025-07-01": 400,
+        "2025-07-02": 400,
+        "2025-07-03": 400  # Total: 1200 > 1000 threshold
+    }
     channel_data["subCount"] = str(YT_MAX_SUBS + 1000)  # 201k subscribers
     assert check_channel_criteria(channel_data, channel_analytics, channel_age_days) == False
 
@@ -97,7 +109,11 @@ def test_vet_channel_blacklisted(mock_blacklist):
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        }
     }
     
     # Mock blacklist to include our test channel
@@ -119,8 +135,12 @@ def test_vet_channel_not_blacklisted(mock_blacklist):
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
-        "cpm": 1.5  # Add this to pass acceptance filter
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        },
+        "ypp": True  # Add this to pass acceptance filter
     }
     
     # Mock blacklist to be empty
@@ -142,8 +162,12 @@ def test_vet_channel():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000,
-        "cpm": 1.5  # Add this to pass acceptance filter
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        },
+        "ypp": True  # Add this to pass acceptance filter
     }
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
     assert vet_result == True
@@ -165,23 +189,27 @@ def test_acceptance_filter():
     }
     channel_analytics = {
         "averageViewPercentage": YT_MIN_CHANNEL_RETENTION + 5,
-        "estimatedMinutesWatched": YT_MIN_MINS_WATCHED + 1000
+        "estimatedMinutesWatched": {
+            "2025-07-01": 700,
+            "2025-07-02": 700, 
+            "2025-07-03": 600  # Total: 2000 > 1000 threshold
+        }
     }
     
-    # Test case 1: Channel passes with YPP membership (cpm > 0)
-    channel_analytics["cpm"] = 1.5
+    # Test case 1: Channel passes with YPP membership
+    channel_analytics["ypp"] = True
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics)
     assert vet_result == True
     assert is_blacklisted == False
     
-    # Test case 2: Channel fails when not YPP member (cpm = 0) and min_stake = False
-    channel_analytics["cpm"] = 0
+    # Test case 2: Channel fails when not YPP member and min_stake = False
+    channel_analytics["ypp"] = False
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=False)
     assert vet_result == False
     assert is_blacklisted == False
     
-    # Test case 3: Channel fails when not YPP member (no cpm field) and min_stake = False
-    del channel_analytics["cpm"]
+    # Test case 3: Channel fails when not YPP member (no ypp field) and min_stake = False
+    del channel_analytics["ypp"]
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=False)
     assert vet_result == False
     assert is_blacklisted == False
@@ -197,7 +225,7 @@ def test_acceptance_filter():
     assert is_blacklisted == False
     
     # Test case 6: Channel passes with YPP membership even with min_stake = False
-    channel_analytics["cpm"] = 2.0
+    channel_analytics["ypp"] = True
     vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake=False)
     assert vet_result == True
     assert is_blacklisted == False
@@ -248,17 +276,18 @@ def test_check_video_publish_date():
     assert check_video_publish_date(video_data, briefs, decision_details) == True
     assert decision_details["publishDateCheck"] == True
 
-    # Test case 6: Invalid date format (should fail)
+    # Test case 6: Invalid date format (should raise RuntimeError)
     video_data["publishedAt"] = "invalid-date"
     decision_details = {"contentAgainstBriefCheck": []}
-    assert check_video_publish_date(video_data, briefs, decision_details) == False
-    assert decision_details["publishDateCheck"] == False
+    import pytest
+    with pytest.raises(RuntimeError, match="Processing operation 'video publish date validation' failed"):
+        check_video_publish_date(video_data, briefs, decision_details)
 
-    # Test case 7: Missing publishedAt field (should fail)
+    # Test case 7: Missing publishedAt field (should raise RuntimeError)
     video_data = {}
     decision_details = {"contentAgainstBriefCheck": []}
-    assert check_video_publish_date(video_data, briefs, decision_details) == False
-    assert decision_details["publishDateCheck"] == False
+    with pytest.raises(RuntimeError, match="Processing operation 'video publish date validation' failed"):
+        check_video_publish_date(video_data, briefs, decision_details)
 
     # Test case 8: Empty briefs list (should pass - no briefs means no date restrictions)
     video_data = {"publishedAt": "2023-01-15T00:00:00Z"}
@@ -266,12 +295,12 @@ def test_check_video_publish_date():
     assert check_video_publish_date(video_data, [], decision_details) == True
     assert decision_details["publishDateCheck"] == True
 
-    # Test case 9: Malformed brief date (should fail)
+    # Test case 9: Malformed brief date (should raise RuntimeError)
     malformed_briefs = [{"id": "brief1", "start_date": "invalid-date"}]
     video_data = {"publishedAt": "2023-01-15T00:00:00Z"}
     decision_details = {"contentAgainstBriefCheck": []}
-    assert check_video_publish_date(video_data, malformed_briefs, decision_details) == False
-    assert decision_details["publishDateCheck"] == False
+    with pytest.raises(RuntimeError, match="Processing operation 'video publish date validation' failed"):
+        check_video_publish_date(video_data, malformed_briefs, decision_details)
 
 def test_check_video_retention():
     """Test video retention validation with different scenarios."""
@@ -299,26 +328,33 @@ def test_check_video_retention():
     assert decision_details["averageViewPercentageCheck"] == False
 
 @pytest.mark.asyncio
-@patch('bitcast.validator.socials.youtube.api.clients.build')
-@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_data_batch')
-@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_analytics')
-@patch('bitcast.validator.socials.youtube.evaluation.video.get_video_transcript')
-@patch('bitcast.validator.socials.youtube.evaluation.video.state.is_video_already_scored')
-@patch('bitcast.validator.socials.youtube.evaluation.video.state.mark_video_as_scored')
-@patch('bitcast.validator.socials.youtube.evaluation.video.check_for_prompt_injection')
-@patch('bitcast.validator.socials.youtube.evaluation.video.evaluate_content_against_brief')
+@patch('bitcast.validator.platforms.youtube.api.clients.build')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_data_batch')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_analytics')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.state.is_video_already_scored')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.state.mark_video_as_scored')
+@patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.ThreadPoolExecutor')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)
-async def test_process_video_vetting(mock_evaluate_content, mock_check_injection, mock_mark_video_as_scored, 
+async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_check_injection, mock_mark_video_as_scored, 
                         mock_is_video_already_scored, mock_get_transcript,
                         mock_get_video_analytics, mock_get_video_data_batch, mock_build):
     """Test the complete video vetting process."""
     # Setup test data
     video_id = "test_video_1"
+    from datetime import datetime, timedelta
+    current_date = datetime.now()
+    brief_start = (current_date - timedelta(days=10)).strftime("%Y-%m-%d")
+    brief_end = (current_date + timedelta(days=10)).strftime("%Y-%m-%d")
     briefs = [{
-        "id": "brief1", 
+        "id": "brief1",
         "title": "Test Brief 1",
         "brief": "Test Brief Description",  # Added missing brief field
-        "start_date": "2023-01-01"
+        "start_date": brief_start,
+        "end_date": brief_end,
+        "unique_identifier": "TESTCODE123"
     }]
     youtube_data_client = MagicMock()
     youtube_analytics_client = MagicMock()
@@ -326,11 +362,12 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
     video_decision_details = {}
 
     # Mock video data
+    video_publish_date = (current_date - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
     video_data = {
         "bitcastVideoId": video_id,
         "title": "Test Video",
-        "description": "Test Description",
-        "publishedAt": "2023-01-15T00:00:00Z",
+        "description": "Test Description with TESTCODE123 for pre-screening",
+        "publishedAt": video_publish_date,
         "duration": "PT10M",
         "caption": False,
         "privacyStatus": "public",
@@ -340,7 +377,11 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
     # Mock video analytics
     video_analytics = {
         "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
-        "estimatedMinutesWatched": 1000
+        "estimatedMinutesWatched": {
+            "2025-07-01": 400,
+            "2025-07-02": 300,
+            "2025-07-03": 300  # Total: 1000 = threshold
+        }
     }
 
     # Mock OpenAI client functions at the high level
@@ -353,6 +394,23 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
     # Mock video scoring state management
     mock_is_video_already_scored.return_value = False  # Video hasn't been scored yet
     mock_mark_video_as_scored.return_value = None      # Mark as scored (void function)
+    
+    # Mock ThreadPoolExecutor to execute synchronously
+    def sync_submit(fn, *args, **kwargs):
+        from concurrent.futures import Future
+        future = Future()
+        try:
+            result = fn(*args, **kwargs)
+            future.set_result(result)
+        except Exception as e:
+            future.set_exception(e)
+        return future
+    
+    mock_executor_instance = MagicMock()
+    mock_executor_instance.submit = sync_submit
+    mock_executor_instance.__enter__ = MagicMock(return_value=mock_executor_instance)
+    mock_executor_instance.__exit__ = MagicMock(return_value=None)
+    mock_executor.return_value = mock_executor_instance
 
     # Process the video - pass individual video data and analytics, not dictionaries
     process_video_vetting(
@@ -375,4 +433,5 @@ async def test_process_video_vetting(mock_evaluate_content, mock_check_injection
     assert video_decision_details[video_id]["publishDateCheck"] == True
     assert video_decision_details[video_id]["averageViewPercentageCheck"] == True
     assert video_decision_details[video_id]["manualCaptionsCheck"] == True
-    assert video_decision_details[video_id]["promptInjectionCheck"] == True 
+    assert video_decision_details[video_id]["promptInjectionCheck"] == True
+    assert video_decision_details[video_id]["preScreeningCheck"] == [True] 

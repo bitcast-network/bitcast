@@ -47,7 +47,7 @@ def check_config(cls, config: "bt.Config"):
 
     full_path = os.path.expanduser(
         "{}/{}/{}/netuid{}/{}".format(
-            config.logging.logging_dir,  # TODO: change from ~/.bittensor/miners to ~/.bittensor/neurons
+            config.logging.logging_dir,
             config.wallet.name,
             config.wallet.hotkey,
             config.netuid,
@@ -95,12 +95,7 @@ def add_args(cls, parser):
         default=100,
     )
 
-    parser.add_argument(
-        "--mock",
-        action="store_true",
-        help="Mock neuron and all network components.",
-        default=False,
-    )
+
 
     parser.add_argument(
         "--neuron.events_retention_size",

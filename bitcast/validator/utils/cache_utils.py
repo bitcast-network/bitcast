@@ -6,7 +6,7 @@ from bitcast.validator.utils.config import CACHE_DIRS, CACHE_ROOT
 from bitcast.validator.clients.OpenaiClient import OpenaiClient
 from bitcast.validator.utils.briefs import BriefsCache
 from bitcast.validator.utils.blacklist import BlacklistCache
-from bitcast.validator.socials.youtube.cache.search import YouTubeSearchCache
+from bitcast.validator.platforms.youtube.cache.search import YouTubeSearchCache
 
 def clear_all_caches():
     """Clear all cache directories and instances."""

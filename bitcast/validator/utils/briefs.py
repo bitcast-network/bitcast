@@ -5,7 +5,8 @@ from diskcache import Cache
 import os
 from threading import Lock
 import atexit
-from bitcast.validator.utils.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY, CACHE_DIRS
+from bitcast.validator.utils.config import BITCAST_BRIEFS_ENDPOINT, YT_REWARD_DELAY, YT_SCORING_WINDOW, CACHE_DIRS
+from bitcast.validator.utils.error_handling import log_and_raise_api_error
 
 class BriefsCache:
     _instance = None
@@ -80,9 +81,11 @@ def get_briefs(all: bool = False):
                 try:
                     start_date = datetime.strptime(brief["start_date"], "%Y-%m-%d").date()
                     end_date = datetime.strptime(brief["end_date"], "%Y-%m-%d").date()
-                    end_date_with_delay = end_date + timedelta(days=YT_REWARD_DELAY)
+                    # Apply new window: start_date + YT_REWARD_DELAY, end_date + YT_SCORING_WINDOW + YT_REWARD_DELAY
+                    start_window = start_date + timedelta(days=YT_REWARD_DELAY)
+                    end_window = end_date + timedelta(days=YT_SCORING_WINDOW + YT_REWARD_DELAY)
                     
-                    if start_date <= current_date <= end_date_with_delay:
+                    if start_window <= current_date <= end_window:
                         filtered_briefs.append(brief)
                 except Exception as e:
                     bt.logging.error(f"Error parsing dates for brief {brief.get('id', 'unknown')}: {e}")
@@ -97,11 +100,15 @@ def get_briefs(all: bool = False):
         return filtered_briefs
 
     except requests.exceptions.RequestException as e:
-        bt.logging.error(f"Error fetching briefs: {e}")
         # Try to return cached data if available
         cached_briefs = cache.get(cache_key)
         if cached_briefs is not None:
             bt.logging.warning("Using cached briefs due to API error")
             return cached_briefs
-        bt.logging.error("No cached briefs available")
-        return []
+        
+        # No cached data available - this is a real error
+        log_and_raise_api_error(
+            error=e,
+            endpoint=BITCAST_BRIEFS_ENDPOINT,
+            context="Content briefs fetch"
+        )

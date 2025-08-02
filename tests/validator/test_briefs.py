@@ -68,9 +68,9 @@ def test_get_briefs_active(monkeypatch):
 
 def test_get_briefs_error(monkeypatch):
     """
-    Test that get_briefs returns cached data when available, or empty list when no cache exists.
+    Test that get_briefs returns cached data when available, or raises ConnectionError when no cache exists.
     """
-    # First test: No cache available
+    # First test: No cache available - should raise ConnectionError
     cache = BriefsCache.get_cache()
     cache.delete("briefs_True")  # Ensure no cache exists
     
@@ -78,8 +78,11 @@ def test_get_briefs_error(monkeypatch):
         raise requests.exceptions.RequestException("API error")
     
     monkeypatch.setattr(requests, "get", mock_get)
-    briefs = get_briefs(all=True)
-    assert briefs == []  # Should return empty list when no cache exists
+    
+    # Should raise ConnectionError when no cache exists
+    import pytest
+    with pytest.raises(ConnectionError, match="Content briefs fetch failed"):
+        get_briefs(all=True)
     
     # Second test: Cache available
     cache_data = [{"id": "cached_brief", "start_date": "2020-01-01", "end_date": "2020-01-02"}]
@@ -109,14 +112,16 @@ def test_get_briefs_date_parsing_error(monkeypatch):
 
 def test_get_briefs_with_reward_delay(monkeypatch):
     """
-    Test that get_briefs correctly includes briefs that ended within YT_REWARD_DELAY days.
+    Test that get_briefs correctly includes briefs that ended within YT_SCORING_WINDOW + YT_REWARD_DELAY days.
     """
     # Calculate dates for testing
     current_date = datetime.now(timezone.utc).date()
+    from bitcast.validator.utils.config import YT_SCORING_WINDOW, YT_REWARD_DELAY
+    window = YT_SCORING_WINDOW + YT_REWARD_DELAY
     end_date = current_date - timedelta(days=1)  # Yesterday
     start_date = end_date - timedelta(days=5)    # 5 days before end date
     
-    # Create a brief that ended yesterday (should be included due to reward delay)
+    # Create a brief that ended yesterday (should be included due to scoring window + reward delay)
     mock_data = {
         "items": [
             {
@@ -138,19 +143,19 @@ def test_get_briefs_with_reward_delay(monkeypatch):
     monkeypatch.setattr(requests, "get", mock_get)
     briefs = get_briefs()  # Default is all=False, so it filters active briefs.
     
-    # The 'recently_ended' brief should be included because it ended within YT_REWARD_DELAY days
+    # The 'recently_ended' brief should be included because it ended within the window
     assert isinstance(briefs, list)
     assert len(briefs) == 1
     assert briefs[0]["id"] == "recently_ended"
     
-    # Test with a brief that ended beyond the reward delay period
-    old_end_date = current_date - timedelta(days=YT_REWARD_DELAY + 1)
+    # Test with a brief that ended beyond the scoring window + reward delay period
+    old_end_date = current_date - timedelta(days=window + 1)
     old_start_date = old_end_date - timedelta(days=5)
     
     mock_data = {
         "items": [
             {
-                "id": "beyond_delay", 
+                "id": "beyond_window", 
                 "start_date": old_start_date.strftime("%Y-%m-%d"), 
                 "end_date": old_end_date.strftime("%Y-%m-%d")
             }
@@ -158,7 +163,7 @@ def test_get_briefs_with_reward_delay(monkeypatch):
     }
     
     briefs = get_briefs()
-    assert len(briefs) == 0  # Should not be included as it's beyond the reward delay period
+    assert len(briefs) == 0  # Should not be included as it's beyond the window
 
 def test_get_briefs_caching_success(monkeypatch):
     """
@@ -209,7 +214,7 @@ def test_get_briefs_caching_fallback(monkeypatch):
 
 def test_get_briefs_no_cache_fallback(monkeypatch):
     """
-    Test that get_briefs returns empty list when API fails and no cache exists.
+    Test that get_briefs raises ConnectionError when API fails and no cache exists.
     """
     # Ensure cache is empty
     cache = BriefsCache.get_cache()
@@ -221,6 +226,7 @@ def test_get_briefs_no_cache_fallback(monkeypatch):
     
     monkeypatch.setattr(requests, "get", mock_get)
     
-    # Call should return empty list
-    briefs = get_briefs(all=True)
-    assert briefs == []
+    # Call should raise ConnectionError
+    import pytest
+    with pytest.raises(ConnectionError, match="Content briefs fetch failed"):
+        get_briefs(all=True)

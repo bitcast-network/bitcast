@@ -16,7 +16,7 @@ Bitcast is a decentralized platform that incentivizes content creators to connec
 - **Validators**: Obtain temporary OAuth tokens to securely access YouTube Analytics and validate performance.  
 - **Brands**: Define and publish content briefs (initially focused on the Bittensor ecosystem).  
 - **Briefs Server**: Hosts the [active briefs](https://www.dashboard.bitcast.network/briefs).  
-- **Bittensor Network**: Manages on-chain compensation, disbursing Bitcast alpha tokens from Validators to Miners.
+- **Bittensor Network**: Manages on-chain compensation, rewarding Validators and Miners with the [Bitcast alpha token](https://www.coingecko.com/en/coins/bitcast).
 
 ---
 
@@ -31,7 +31,7 @@ Bitcast is a decentralized platform that incentivizes content creators to connec
    Create videos targeting one or more active briefs.
 
 3. **Earn Rewards**  
-   Videos that satisfy briefs are ranked by **total minutes watched**, and rewards are distributed evenly across briefs.
+   Videos that satisfy briefs are rewarded based on **YouTube Premium revenue** stats.
 
 4. **Agency Operations**  
    Run a single miner with up to 5 YouTube accounts to operate as a content agency, aggregating multiple creators under one mining operation.
@@ -53,29 +53,52 @@ Refer to the [Validator Setup Guide](bitcast/validator/README.md) for detailed i
 
 ---
 
-## 📊 Scoring Mechanism
+## 📊 Scoring & Rewards System
 
-The Bitcast network employs a sophisticated scoring and rewards system:
+Bitcast employs a dynamic, multi-layered scoring and rewards mechanism to fairly distribute emissions and incentivize high-quality participation. The system is designed to prioritize genuine engagement and prevent manipulation.
 
-- **Performance Metrics**
-  - Miners are evaluated using a 7-day moving average of minutes watched
-  - Only videos matching active content briefs are considered
-  - Analytics data includes a 2-day validation period aligned with YouTube's engagement verification, miners will not recieve emissions for the first 2 days after launch
+### 1. Briefs & Boost Multipliers
 
-- **Emissions Model**
-  - Each content brief is allocated an equal proportion of total emissions
-  - A briefs total available emissions will scale with overall engagement
-  - Unused emissions are automatically burned via the burn UID
+- Every [brief](https://dashboard.bitcast.network/) is assigned a **boost** value.
+  - **Boost** acts as a multiplier on the score of videos that fulfill the brief, giving higher priority to briefs from sponsors or clients.
 
-### Collaborative Emissions Scaling
+### 2. Video Eligibility & Format Types
 
-During the initial launch phase, we are experimenting with a novel approach to emissions scaling. This system transforms what would be a zero-sum reward mechanism into a dynamic model where miners benefit from both individual and collective network growth. As total engagement increases for a content brief, the percentage of total available emissions increases. Whatever is not released to miners is burnt.
+- **Eligibility:**  
+  - Videos must have both their transcript and description fully satisfy the requirements of an active brief.
+- **Format Types:**  
+  Each brief specifies a required video format, which determines both eligibility and reward scaling:
+  - **Dedicated:**  
+    - Sponsor’s topic is the main focus (≥80% of video).
+    - Each YouTube account can be rewarded for up to **2 videos per dedicated brief** (oldest 2 by publish date).
+    - Receives **100% of the reward**.
+  - **Ad-Read:**  
+    - Sponsor’s message appears as a short, distinct segment.
+    - Each YouTube account can be rewarded for up to **5 videos per ad-read brief** (oldest 5 by publish date).
+    - Receives **20% of the dedicated reward**.
 
-The rate of increase of emissions will be carefully monitored and adjusted during the first few months post-launch, allowing us to optimize the system based on real-world performance data.
+### 3. Performance Metrics & Anti-Exploitation Controls
 
-<p align="center">
-  <img src="assets/scaling_emissions.png" alt="Dynamic Emissions Model" width="600" />
-</p>
+- **Reward Calculation:**  
+  - Rewards are based on the 7-day moving average of YouTube Premium Revenue (`estimatedRedPartnerRevenue`).
+  - For **non-YPP YouTubers**, Premium Revenue is estimated using the video’s minutes watched (`estimatedMinutesWatched`) multiplied by 0.00005.
+  - For each eligible video, the (actual or estimated) Premium Revenue is multiplied by a scaling factor to determine the daily reward (in USD).
+  - This daily USD reward is then converted into a weight relative to the subnet’s total daily miner emissions (USD).
+  - By anchoring rewards to USD, we align with industry-standard metrics (CPM), making the system more transparent and familiar for miners.
+- **Lookback & Revenue Cap:**  
+  - To prevent exploitation via fake engagement, Bitcast applies a lookback window:
+    - For each video, the **average premium revenue over the 7-day period is capped at the median daily revenue for the channel from the previous month**.
+    - YouTube audit and remove engagement that they deem to be fake within 1 month. The lookback factors this audit in a prevents exploitation.
+- **Reward Timing:**  
+  - Only videos matching active briefs are considered.
+  - Videos earn rewards for the first 14 days after they are published.
+  - There is a **3-day delay** in rewards (to align with YouTube's engagement verification), so rewards always lag behind video engagement by 3 days.
+
+### 4. Emissions Model
+
+- The **boost multiplier** increases the score of qualifying videos.
+- Each brief has a **maximum emissions cap**, preventing any single brief from dominating the total emissions.
+- **Unclaimed emissions** are automatically burned (removed from circulation) via the burn UID.
 
 ---
 
