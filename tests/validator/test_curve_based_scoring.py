@@ -7,7 +7,8 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime
 
 from bitcast.validator.platforms.youtube.evaluation.curve_based_scoring import (
-    calculate_curve_based_score
+    calculate_curve_based_score,
+    _has_zero_total_revenue
 )
 
 
@@ -81,6 +82,61 @@ class TestCurveBasedScoring(unittest.TestCase):
         # Should return error result but not crash
         self.assertIn("score", result)
         self.assertIn("scoring_method", result)
+
+    def test_zero_revenue_detection(self):
+        """Test zero revenue detection function."""
+        # Test zero revenue
+        zero_analytics = [
+            {"estimatedRedPartnerRevenue": 0.0},
+            {"estimatedRedPartnerRevenue": 0.0}
+        ]
+        is_zero, total = _has_zero_total_revenue(zero_analytics)
+        self.assertTrue(is_zero)
+        self.assertEqual(total, 0.0)
+        
+        # Test non-zero revenue
+        revenue_analytics = [
+            {"estimatedRedPartnerRevenue": 5.0},
+            {"estimatedRedPartnerRevenue": 0.0}
+        ]
+        is_zero, total = _has_zero_total_revenue(revenue_analytics)
+        self.assertFalse(is_zero)
+        self.assertEqual(total, 5.0)
+
+    @patch('bitcast.validator.platforms.youtube.evaluation.curve_based_scoring._calculate_non_ypp_curve_score')
+    def test_ypp_zero_revenue_with_stake(self, mock_non_ypp_score):
+        """Test YPP account with zero revenue and min_stake=True routes to non-YPP scoring."""
+        mock_non_ypp_score.return_value = {"score": 8.5, "daily_analytics": []}
+        
+        zero_revenue_analytics = [
+            {"day": "2024-01-01", "estimatedRedPartnerRevenue": 0.0},
+            {"day": "2024-01-02", "estimatedRedPartnerRevenue": 0.0}
+        ]
+        
+        result = calculate_curve_based_score(
+            zero_revenue_analytics, "2024-01-01", "2024-01-15", 
+            is_ypp_account=True, min_stake=True
+        )
+        
+        self.assertEqual(result["scoring_method"], "ypp_zero_revenue")
+        mock_non_ypp_score.assert_called_once()
+
+    def test_ypp_zero_revenue_no_stake(self):
+        """Test YPP account with zero revenue and min_stake=False scores 0."""
+        zero_revenue_analytics = [
+            {"day": "2024-01-01", "estimatedRedPartnerRevenue": 0.0},
+            {"day": "2024-01-02", "estimatedRedPartnerRevenue": 0.0}
+        ]
+        
+        result = calculate_curve_based_score(
+            zero_revenue_analytics, "2024-01-01", "2024-01-15", 
+            is_ypp_account=True, min_stake=False
+        )
+        
+        self.assertEqual(result["score"], 0.0)
+        self.assertEqual(result["scoring_method"], "ypp_zero_revenue_no_stake")
+        self.assertTrue(result["zero_revenue_detected"])
+        self.assertFalse(result["min_stake_met"])
 
 
 if __name__ == '__main__':

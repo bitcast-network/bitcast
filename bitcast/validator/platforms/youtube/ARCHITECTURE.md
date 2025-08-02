@@ -187,6 +187,7 @@ score = calculate_curve_value(day2_avg) - calculate_curve_value(day1_avg)
 
 ### **YPP Account Scoring** (Actual Revenue)
 ```python
+# Standard YPP accounts with revenue > 0: "ypp_curve_based"
 # 1. Apply median capping to daily revenue (T-60 to T-30 median)
 # 2. Calculate cumulative revenue totals
 # 3. Calculate 7-day rolling averages for both periods
@@ -196,8 +197,25 @@ day1_avg, day2_avg = get_period_averages(daily_analytics, metric, ...)
 score = calculate_curve_difference(day1_avg, day2_avg)
 ```
 
+### **YPP Zero-Revenue Account Scoring** (Stake-Based)
+```python
+# YPP accounts with revenue = 0 are evaluated based on stake requirements:
+# - If min_stake = True: "ypp_zero_revenue" (uses Non-YPP scoring method)
+# - If min_stake = False: "ypp_zero_revenue_no_stake" (score = 0)
+
+if total_revenue == 0.0 and min_stake:
+    # Route to Non-YPP scoring method with YPP zero-revenue identifier
+    score = calculate_non_ypp_curve_score(...)
+    scoring_method = "ypp_zero_revenue"
+else:
+    # No stake requirements met
+    score = 0.0
+    scoring_method = "ypp_zero_revenue_no_stake"
+```
+
 ### **Non-YPP Account Scoring** (Estimated Revenue)
 ```python
+# Standard non-YPP accounts: "non_ypp_curve_based"
 # 1. Apply median capping to daily minutes watched (T-60 to T-30 median)  
 # 2. Calculate cumulative minutes watched totals
 # 3. Calculate 7-day rolling averages for both periods
@@ -295,7 +313,7 @@ score_result = calculate_video_score(
 
 # Access scoring details
 final_score = score_result["score"]
-scoring_method = score_result["scoring_method"]  # "ypp_curve_based", "non_ypp_curve_based"
+scoring_method = score_result["scoring_method"]  # "ypp_curve_based", "non_ypp_curve_based", "ypp_zero_revenue", "ypp_zero_revenue_no_stake"
 day1_avg = score_result.get("day1_average", 0)
 day2_avg = score_result.get("day2_average", 0)
 ```
@@ -320,7 +338,7 @@ day2_avg = score_result.get("day2_average", 0)
             "matches_brief": bool,                  # Brief matching result
             "matching_brief_ids": [...],            # List of matched brief IDs
             "score": float,                         # Final calculated score
-            "scoring_method": str,                  # "ypp", "non_ypp_predicted", "non_ypp_fallback"
+            "scoring_method": str,                  # "ypp_curve_based", "non_ypp_curve_based", "ypp_zero_revenue", "ypp_zero_revenue_no_stake"
             "decision_details": {                   # Comprehensive evaluation tracking
                 "video_vet_result": bool,
                 "privacyCheck": bool,

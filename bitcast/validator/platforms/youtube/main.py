@@ -70,7 +70,7 @@ def eval_youtube(creds, briefs, min_stake=False):
         return result
 
     # Process videos and update the result
-    result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result)
+    result = process_videos(youtube_data_client, youtube_analytics_client, briefs, result, min_stake)
     # Attach performance stats to result after full evaluation
     elapsed = time.perf_counter() - start
     result["performance_stats"] = {
@@ -195,7 +195,7 @@ def apply_video_limits(briefs, result):
             f"score reduced by {score_reduction:.4f}"
         )
 
-def process_videos(youtube_data_client, youtube_analytics_client, briefs, result):
+def process_videos(youtube_data_client, youtube_analytics_client, briefs, result, min_stake=False):
     """Process videos, calculate scores, and update the result structure."""
     try:
         # Get YPP status from channel analytics
@@ -227,7 +227,8 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
                     youtube_analytics_client, 
                     result,
                     is_ypp_account,
-                    channel_analytics
+                    channel_analytics,
+                    min_stake
                 )
         
         # Apply video scoring limits for dedicated briefs
@@ -244,7 +245,7 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
 
 def process_single_video(video_id, video_data_dict, video_analytics_dict, video_matches, 
                          video_decision_details, briefs, youtube_analytics_client, result,
-                         is_ypp_account, channel_analytics=None):
+                         is_ypp_account, channel_analytics=None, min_stake=False):
     """Process a single video and update the result structure."""
     video_data = video_data_dict[video_id]
     video_analytics = video_analytics_dict[video_id]
@@ -268,7 +269,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     
     # Calculate and store the score if the video passes vetting and matches a brief
     if video_vet_result and matches_any_brief:
-        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, channel_analytics)
+        update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, channel_analytics, min_stake)
     else:
         result["videos"][video_id]["score"] = 0
 
@@ -284,7 +285,7 @@ def check_video_brief_matches(video_id, video_matches, briefs):
     
     return matches_any_brief, matching_brief_ids
 
-def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, channel_analytics=None):
+def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, channel_analytics=None, min_stake=False):
     """Calculate and update the score for a video that matches a brief using curve-based scoring mechanism."""
     video_publish_date = result["videos"][video_id]["details"].get("publishedAt")
     existing_analytics = result["videos"][video_id]["analytics"]
@@ -295,21 +296,24 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
     video_score_result = calculate_video_score(
         video_id, youtube_analytics_client, video_publish_date, existing_analytics,
         is_ypp_account=is_ypp_account, channel_analytics=channel_analytics, 
-        bitcast_video_id=bitcast_video_id
+        bitcast_video_id=bitcast_video_id, min_stake=min_stake
     )
     video_score = video_score_result["score"]
     scoring_method = video_score_result["scoring_method"]
     
     # Log curve-based scoring information
     curve_info = ""
-    if scoring_method in ["ypp_curve_based", "non_ypp_curve_based"]:
+    if scoring_method in ["ypp_curve_based", "non_ypp_curve_based", "ypp_zero_revenue"]:
         day1_avg = video_score_result.get("day1_average", 0)
         day2_avg = video_score_result.get("day2_average", 0)
         curve_info = f" [Day1 avg: {day1_avg:.4f}, Day2 avg: {day2_avg:.4f}]"
         
-        if scoring_method == "non_ypp_curve_based":
+        if scoring_method in ["non_ypp_curve_based", "ypp_zero_revenue"]:
             multiplier = video_score_result.get("revenue_multiplier", 0)
             curve_info += f" [Revenue multiplier: {multiplier}]"
+    elif scoring_method == "ypp_zero_revenue_no_stake":
+        # Special logging for zero-revenue YPP accounts without stake
+        curve_info = " [Zero revenue, min_stake=False]"
     
     bt.logging.info(f"Curve-based video_score: {video_score} (method: {scoring_method}){curve_info}")
     

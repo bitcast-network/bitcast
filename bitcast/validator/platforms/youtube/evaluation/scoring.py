@@ -19,7 +19,8 @@ from .curve_based_scoring import calculate_curve_based_score
 def calculate_video_score(video_id, youtube_analytics_client, video_publish_date, 
                          existing_analytics, is_ypp_account: bool = True, 
                          channel_analytics: Optional[dict] = None,
-                         bitcast_video_id: Optional[str] = None):
+                         bitcast_video_id: Optional[str] = None,
+                         min_stake: bool = False):
     """
     Calculate the score for a video using curve-based scoring strategy.
     
@@ -31,6 +32,7 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
         is_ypp_account (bool): Whether this is a YPP account
         channel_analytics (Optional[dict]): Channel analytics for median cap calculation
         bitcast_video_id (Optional[str]): Bitcast video ID for logging (defaults to YouTube ID)
+        min_stake (bool): Whether the miner meets minimum stake requirements
         
     Returns:
         dict: Dictionary containing score, daily_analytics, scoring_method, and cap info
@@ -62,4 +64,4 @@ def calculate_video_score(video_id, youtube_analytics_client, video_publish_date
     # Calculate score using curve-based scoring with integrated median capping
     # Use bitcast video ID for logging, fall back to YouTube video ID if not provided
     log_video_id = bitcast_video_id if bitcast_video_id is not None else video_id
-    return calculate_curve_based_score(daily_analytics, start_date, end_date, is_ypp_account, channel_analytics, log_video_id) 
+    return calculate_curve_based_score(daily_analytics, start_date, end_date, is_ypp_account, channel_analytics, log_video_id, min_stake) 

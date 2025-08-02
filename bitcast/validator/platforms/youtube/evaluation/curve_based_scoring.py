@@ -19,13 +19,42 @@ from .curve_scoring import calculate_curve_difference
 from .data_processing import get_period_averages
 
 
+def _has_zero_total_revenue(daily_analytics: List[Dict[str, Any]]) -> tuple[bool, float]:
+    """
+    Check if total revenue across all daily analytics equals zero.
+    
+    Args:
+        daily_analytics: List of daily analytics data
+        
+    Returns:
+        tuple: (is_zero_revenue, total_revenue)
+        
+    Examples:
+        >>> analytics = [
+        ...     {"estimatedRedPartnerRevenue": 0.0},
+        ...     {"estimatedRedPartnerRevenue": 0.0}
+        ... ]
+        >>> is_zero, total = _has_zero_total_revenue(analytics)
+        >>> is_zero
+        True
+        >>> total
+        0.0
+    """
+    total_revenue = sum(
+        item.get("estimatedRedPartnerRevenue", 0.0) 
+        for item in daily_analytics
+    )
+    return total_revenue == 0.0, total_revenue
+
+
 def calculate_curve_based_score(
     daily_analytics: List[Dict[str, Any]], 
     start_date: str, 
     end_date: str,
     is_ypp_account: bool, 
     channel_analytics: Optional[Dict[str, Any]] = None,
-    video_id: Optional[str] = None
+    video_id: Optional[str] = None,
+    min_stake: bool = False
 ) -> Dict[str, Any]:
     """
     Calculate video score using curve-based methodology.
@@ -44,6 +73,7 @@ def calculate_curve_based_score(
         is_ypp_account: Whether this is a YPP account
         channel_analytics: Optional channel analytics for median capping
         video_id: Optional video ID for logging identification
+        min_stake: Whether the miner meets minimum stake requirements
         
     Returns:
         Dict with score, daily_analytics, scoring_method, and debugging info
@@ -85,11 +115,32 @@ def calculate_curve_based_score(
         
         # Step 2: Route to appropriate scoring method
         if is_ypp_account:
-            bt.logging.info("Step 2: Routing to YPP curve scoring (using estimatedRedPartnerRevenue)")
-            result = _calculate_ypp_curve_score(
-                daily_analytics, day1_start, day1_end, day2_start, day2_end,
-                channel_analytics
-            )
+            # Check for zero revenue scenario in YPP accounts
+            is_zero_revenue, total_revenue = _has_zero_total_revenue(daily_analytics)
+            
+            if is_zero_revenue:
+                if min_stake:
+                    bt.logging.info(f"YPP account with zero revenue (total: {total_revenue}) and min_stake=True - routing to Non-YPP scoring")
+                    result = _calculate_non_ypp_curve_score(
+                        daily_analytics, day1_start, day1_end, day2_start, day2_end,
+                        channel_analytics
+                    )
+                    result["scoring_method"] = "ypp_zero_revenue"
+                else:
+                    bt.logging.info(f"YPP account with zero revenue (total: {total_revenue}) but min_stake=False - scoring as 0")
+                    return {
+                        "score": 0.0,
+                        "scoring_method": "ypp_zero_revenue_no_stake",
+                        "daily_analytics": daily_analytics,
+                        "zero_revenue_detected": True,
+                        "min_stake_met": False
+                    }
+            else:
+                bt.logging.info("Step 2: Routing to YPP curve scoring (using estimatedRedPartnerRevenue)")
+                result = _calculate_ypp_curve_score(
+                    daily_analytics, day1_start, day1_end, day2_start, day2_end,
+                    channel_analytics
+                )
         else:
             bt.logging.info(f"Step 2: Routing to Non-YPP curve scoring (using estimatedMinutesWatched * {YT_NON_YPP_REVENUE_MULTIPLIER})")
             result = _calculate_non_ypp_curve_score(
