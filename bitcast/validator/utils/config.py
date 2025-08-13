@@ -30,6 +30,10 @@ BITCAST_BRIEFS_ENDPOINT = f"{BITCAST_SERVER_URL}:8013/briefs"
 BITCAST_STATS_ENDPOINT = f"{BITCAST_SERVER_URL}:8003/submit"
 BITCAST_BLACKLIST_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist"
 BITCAST_BLACKLIST_SOURCES_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist-sources"
+
+# per-account data publishing
+DATA_CLIENT_URL = os.getenv('DATA_CLIENT_URL', 'http://52.42.240.185')
+YOUTUBE_SUBMIT_ENDPOINT = f"{DATA_CLIENT_URL}:8000/api/v1/youtube/submit"
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
@@ -42,6 +46,9 @@ LANGCHAIN_TRACING_V2 = os.getenv('LANGCHAIN_TRACING_V2')
 
 # Only run LLM checks on videos that pass all other checks
 ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
+
+# data publishing configuration
+ENABLE_DATA_PUBLISH = os.getenv('ENABLE_DATA_PUBLISH', 'False').lower() == 'true'
 
 # youtube scoring
 YT_LOOKBACK = 90
@@ -99,6 +106,8 @@ COMMUNITY_RESERVE_UID = 236
 # Log out all non-sensitive config variables
 bt.logging.info(f"BITCAST_BRIEFS_ENDPOINT: {BITCAST_BRIEFS_ENDPOINT}")
 bt.logging.info(f"BITCAST_STATS_ENDPOINT: {BITCAST_STATS_ENDPOINT}")
+bt.logging.info(f"YOUTUBE_SUBMIT_ENDPOINT: {YOUTUBE_SUBMIT_ENDPOINT}")
+bt.logging.info(f"ENABLE_DATA_PUBLISH: {ENABLE_DATA_PUBLISH}")
 bt.logging.info(f"DISABLE_LLM_CACHING: {DISABLE_LLM_CACHING}")
 bt.logging.info(f"LANGCHAIN_TRACING_V2: {LANGCHAIN_TRACING_V2}")
 bt.logging.info(f"ECO_MODE: {ECO_MODE}")

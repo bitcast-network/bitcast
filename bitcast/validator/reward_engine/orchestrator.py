@@ -5,6 +5,8 @@ import numpy as np
 import bittensor as bt
 from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.platforms.youtube.utils import state
+from ..utils.run_manager import generate_current_run_id
+from ..utils.streaming_publisher import publish_miner_accounts_safe, log_streaming_status
 
 from .services.miner_query_service import MinerQueryService
 from .services.platform_registry import PlatformRegistry
@@ -51,7 +53,14 @@ class RewardOrchestrator:
             
             bt.logging.info(f"Processing {len(briefs)} briefs for {len(uids)} miners sequentially")
             
-            # 2. Process miners sequentially to prevent token expiration
+            # 2. Generate run ID for streaming per-account publishing  
+            run_id = generate_current_run_id(validator_self.wallet)
+            bt.logging.info(f"🔄 Generated run ID for validation cycle: {run_id}")
+            
+            # Log streaming publishing status
+            log_streaming_status(len(uids))
+            
+            # 3. Process miners sequentially to prevent token expiration
             evaluation_results = EvaluationResultCollection()
             
             for uid in uids:
@@ -61,21 +70,24 @@ class RewardOrchestrator:
                 # Evaluate immediately while token is fresh
                 result = await self._evaluate_single_miner(miner_response, briefs, validator_self.metagraph)
                 evaluation_results.add_result(uid, result)
+                
+                # 🌊 STREAMING: Publish this miner's accounts immediately
+                await publish_miner_accounts_safe(result, run_id, validator_self.wallet)
             
-            # 3. Aggregate scores across platforms
-            bt.logging.info("🔄 PHASE 3: Aggregating individual video scores into score matrix")
+            # 4. Aggregate scores across platforms
+            bt.logging.info("🔄 PHASE 4: Aggregating individual video scores into score matrix")
             score_matrix = self.score_aggregator.aggregate_scores(evaluation_results, briefs)
             bt.logging.info(f"Score aggregation complete: {score_matrix.matrix.shape} matrix created")
                         
-            # 4. Reset state for next evaluation cycle
+            # 5. Reset state for next evaluation cycle
             state.reset_scored_videos()
             
-            # 5. Calculate emission targets
-            bt.logging.info("💰 PHASE 4: Converting scores to USD emission targets")
+            # 6. Calculate emission targets
+            bt.logging.info("💰 PHASE 5: Converting scores to USD emission targets")
             emission_targets = self.emission_calculator.calculate_targets(score_matrix, briefs)
             
-            # 6. Distribute final rewards
-            bt.logging.info("🎯 PHASE 5: Distributing final rewards to miners")
+            # 7. Distribute final rewards
+            bt.logging.info("🎯 PHASE 6: Distributing final rewards to miners")
             rewards, stats_list = self.reward_distributor.calculate_distribution(
                 emission_targets, evaluation_results, briefs, uids
             )

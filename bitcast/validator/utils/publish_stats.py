@@ -30,7 +30,8 @@ def publish_stats_payload(json_payload):
             response = session.post(BITCAST_STATS_ENDPOINT, json=json_payload)
             data = response.json()  # Attempt to decode JSON response
             
-            if response.status_code == 200 and data.get("status") == "ok":
+            # Accept both "ok" and "success" as valid status values
+            if response.status_code == 200 and data.get("status") in ["ok", "success"]:
                 bt.logging.info("Payload successfully stored as: %s", data.get("stored_as"))
             else:
                 bt.logging.error("Failed to store payload. Status code: %s Response: %s", response.status_code, data)
