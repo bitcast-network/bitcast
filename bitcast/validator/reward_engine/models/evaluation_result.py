@@ -41,6 +41,12 @@ class AccountResult:
                     # Remove description and transcript fields to reduce payload size
                     video_data["details"].pop("description", None)
                     video_data["details"].pop("transcript", None)
+            
+            # Include per-video metrics for streaming publisher
+            if isinstance(video_data, dict) and "brief_metrics" in video_data:
+                # Per-video metrics are already calculated at platform level
+                # Include them in the payload for BA analysis
+                video_data["per_video_metrics"] = video_data["brief_metrics"]
         
         return {
             "account_data": {

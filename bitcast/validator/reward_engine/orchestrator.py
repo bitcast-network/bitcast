@@ -1,6 +1,7 @@
 """Main reward calculation orchestrator - replaces monolithic reward.py functions."""
 
 from typing import List, Tuple, Dict, Any
+import asyncio
 import numpy as np
 import bittensor as bt
 from bitcast.validator.utils.briefs import get_briefs
@@ -13,8 +14,11 @@ from .services.platform_registry import PlatformRegistry
 from .services.score_aggregation_service import ScoreAggregationService
 from .services.emission_calculation_service import EmissionCalculationService
 from .services.reward_distribution_service import RewardDistributionService
+from .services.weight_corrections_service import WeightCorrectionsService
 from .models.evaluation_result import EvaluationResultCollection, EvaluationResult
 from .models.miner_response import MinerResponse
+from ..utils.weight_corrections_publisher import publish_weight_corrections
+from ..utils.config import WEIGHT_CORRECTIONS_ENDPOINT, ENABLE_WEIGHT_CORRECTIONS
 
 
 class RewardOrchestrator:
@@ -26,13 +30,15 @@ class RewardOrchestrator:
         platform_registry: PlatformRegistry = None,
         score_aggregator: ScoreAggregationService = None,
         emission_calculator: EmissionCalculationService = None,
-        reward_distributor: RewardDistributionService = None
+        reward_distributor: RewardDistributionService = None,
+        weight_corrections_service: WeightCorrectionsService = None
     ):
         self.miner_query = miner_query_service or MinerQueryService()
         self.platforms = platform_registry or PlatformRegistry()
         self.score_aggregator = score_aggregator or ScoreAggregationService()
         self.emission_calculator = emission_calculator or EmissionCalculationService()
         self.reward_distributor = reward_distributor or RewardDistributionService()
+        self.weight_corrections = weight_corrections_service or WeightCorrectionsService()
     
     async def calculate_rewards(
         self, 
@@ -88,13 +94,20 @@ class RewardOrchestrator:
             
             # 7. Distribute final rewards
             bt.logging.info("🎯 PHASE 6: Distributing final rewards to miners")
-            rewards, stats_list = self.reward_distributor.calculate_distribution(
+            rewards, stats_list, pre_constraint_weights, post_constraint_weights = self.reward_distributor.calculate_distribution(
                 emission_targets, evaluation_results, briefs, uids
             )
             
             total_rewards = float(np.sum(rewards))
             non_zero_miners = np.count_nonzero(rewards)
             bt.logging.info(f"✅ Successfully calculated rewards: {total_rewards:.6f} total, {non_zero_miners}/{len(uids)} miners rewarded")
+            
+            # 8. Publish weight corrections (fire-and-forget)
+            if ENABLE_WEIGHT_CORRECTIONS:
+                await self._publish_weight_corrections(
+                    evaluation_results, pre_constraint_weights, post_constraint_weights, briefs, run_id, validator_self.wallet
+                )
+            
             return rewards, stats_list
             
         except Exception as e:
@@ -183,6 +196,35 @@ class RewardOrchestrator:
         rewards = np.array([1.0 if uid == 0 else 0.0 for uid in uids])
         stats_list = [{"scores": {}, "uid": uid} for uid in uids]
         return rewards, stats_list
+    
+    async def _publish_weight_corrections(
+        self,
+        evaluation_results: EvaluationResultCollection,
+        pre_constraint_weights: np.ndarray,
+        post_constraint_weights: np.ndarray,
+        briefs: List[Dict[str, Any]],
+        run_id: str,
+        wallet
+    ) -> None:
+        """Publish weight corrections in fire-and-forget mode."""
+        try:
+            bt.logging.info("📊 PHASE 7: Publishing weight corrections")
+            
+            # Calculate corrections using the WeightCorrectionsService
+            corrections = self.weight_corrections.calculate_corrections(
+                evaluation_results, pre_constraint_weights, post_constraint_weights, briefs
+            )
+            
+            # Fire-and-forget publishing
+            asyncio.create_task(publish_weight_corrections(
+                corrections, run_id, wallet, WEIGHT_CORRECTIONS_ENDPOINT
+            ))
+            
+            bt.logging.info(f"🚀 Weight corrections task created for {len(corrections)} corrections")
+            
+        except Exception as e:
+            # Log but don't propagate errors (fire-and-forget)
+            bt.logging.warning(f"⚠️ Weight corrections publishing setup failed: {e}")
     
     def _error_fallback(self, uids: List[int]) -> Tuple[np.ndarray, List[dict]]:
         """Handle errors with safe fallback rewards."""

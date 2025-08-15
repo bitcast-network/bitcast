@@ -18,11 +18,14 @@ class RewardDistributionService:
         evaluation_results: EvaluationResultCollection,
         briefs: List[Dict[str, Any]],
         uids: List[int]
-    ) -> Tuple[np.ndarray, List[dict]]:
+    ) -> Tuple[np.ndarray, List[dict], np.ndarray, np.ndarray]:
         """Calculate final reward distribution from emission targets."""
         try:
             # Convert emission targets to raw weights matrix
             raw_weights_matrix = self._extract_raw_weights_matrix(emission_targets, len(uids))
+            
+            # Store pre-constraint weights for corrections calculation
+            pre_constraint_weights = raw_weights_matrix.copy()
             
             # Normalize weights into final rewards
             rewards, rewards_matrix, brief_emission_percentages = self._normalize_weights(raw_weights_matrix, briefs, uids)
@@ -33,7 +36,7 @@ class RewardDistributionService:
             # Apply community reserve allocation
             final_rewards = allocate_community_reserve(rewards, uids)
             
-            return final_rewards, stats_list
+            return final_rewards, stats_list, pre_constraint_weights, rewards_matrix
             
         except Exception as e:
             bt.logging.error(f"Error in reward distribution: {e}")
@@ -210,8 +213,11 @@ class RewardDistributionService:
         
         return stats_list
     
-    def _error_fallback(self, uids: List[int]) -> Tuple[np.ndarray, List[dict]]:
+    def _error_fallback(self, uids: List[int]) -> Tuple[np.ndarray, List[dict], np.ndarray, np.ndarray]:
         """Simple error fallback that gives all rewards to UID 0."""
         rewards = np.array([1.0 if uid == 0 else 0.0 for uid in uids])
         stats_list = [{"scores": {}, "uid": uid} for uid in uids]
-        return rewards, stats_list 
+        # Return empty pre-constraint weights matrix for error case
+        pre_constraint_weights = np.zeros((len(uids), 0))
+        post_constraint_weights = np.zeros((len(uids), 0))
+        return rewards, stats_list, pre_constraint_weights, post_constraint_weights 
