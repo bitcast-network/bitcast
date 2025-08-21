@@ -13,8 +13,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from bitcast.validator.utils.config import (
     OPENAI_API_KEY,
     DISABLE_LLM_CACHING,
-    LANGCHAIN_API_KEY,
-    LANGCHAIN_TRACING_V2,
     CACHE_DIRS,
     TRANSCRIPT_MAX_LENGTH,
     OPENAI_CACHE_EXPIRY
