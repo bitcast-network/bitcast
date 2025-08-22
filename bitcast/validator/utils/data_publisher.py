@@ -11,7 +11,7 @@ import aiohttp
 import bittensor as bt
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, List
 
 from bitcast.validator.utils.publish_stats import convert_numpy_types
 
@@ -44,54 +44,72 @@ class DataPublisher(ABC):
         """
         pass
     
+    def _get_expected_status_code(self) -> int:
+        """
+        Get the expected HTTP status code for successful requests.
+        Override in subclasses for different endpoint behaviors.
+        
+        Returns:
+            Expected HTTP status code (default: 200)
+        """
+        return 200
+    
     def _sign_message(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Sign message data following publish_stats.py pattern exactly.
-        Signs only the core account_data, not the metadata wrapper.
+        Sign message data using unified format that supports both legacy and new payload structures.
         
         Args:
-            data: Full payload including metadata and account_data
+            data: Full payload including metadata and core data
             
         Returns:
             Dict containing signed payload with signature and signer
         """
         # Get hotkey for signing
         keypair = self.wallet.hotkey
-        vali_hotkey = keypair.ss58_address
+        signer = keypair.ss58_address
         
-        # Extract core data to sign (equivalent to combined_payload in publish_stats.py)
-        # Only sign the account_data portion, not the metadata
-        account_data = data.get('account_data', {})
-        core_data_to_sign = convert_numpy_types(account_data)
+        # Extract core data to sign - supports both payload formats
+        core_data_to_sign = self._extract_signable_data(data)
         
-        # Extract timestamp from payload and strip 'Z' for signing
-        # If no timestamp provided, generate one (similar to publish_stats.py pattern)
-        payload_timestamp = data.get('time', '')
-        if payload_timestamp:
-            if payload_timestamp.endswith('Z'):
-                timestamp = payload_timestamp[:-1]  # Remove 'Z' for signing
-            else:
-                timestamp = payload_timestamp
-        else:
-            # Generate timestamp when not provided in payload
-            timestamp = datetime.utcnow().isoformat()
+        # Generate timestamp for BOTH signing and payload (must be identical!)
+        timestamp = datetime.utcnow().isoformat()
         
-        # Create message to sign (format: hotkey:timestamp:core_data) - same as publish_stats.py
-        message = f"{vali_hotkey}:{timestamp}:{json.dumps(core_data_to_sign, sort_keys=True)}"
+        # Create message to sign (format: signer:timestamp:core_data)
+        message = f"{signer}:{timestamp}:{json.dumps(core_data_to_sign, sort_keys=True)}"
         
         # Sign the message
         signature = keypair.sign(data=message)
         
-        # Create final payload with same structure as publish_stats.py
-        # Convert entire payload to handle NumPy types in metadata fields (like miner_uid)
+        # Create final payload with SAME timestamp used for signing
         converted_payload = convert_numpy_types(data)
         signed_payload = {
-            **converted_payload,  # Include all converted metadata (run_id, platform, etc.)
+            **converted_payload,  # Include all metadata
+            "time": timestamp,  # Use same timestamp as signature
             "signature": signature.hex(),
-            "signer": keypair.ss58_address
+            "signer": signer,
+            "vali_hotkey": signer  # Required for unified API format
         }
         
         return signed_payload
+    
+    def _extract_signable_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract the core data that should be signed from the payload.
+        Supports both unified format ('payload' field) and legacy format ('account_data' field).
+        
+        Args:
+            data: Full payload data
+            
+        Returns:
+            Core data to include in signature
+        """
+        # Unified API format uses 'payload' field
+        if 'payload' in data:
+            return convert_numpy_types(data.get('payload', {}))
+        
+        # Legacy format uses 'account_data' field
+        account_data = data.get('account_data', {})
+        return convert_numpy_types(account_data)
     
     def _log_success(self, endpoint: str, data_type: str = "data") -> None:
         """Log successful publication."""
@@ -102,63 +120,68 @@ class DataPublisher(ABC):
         bt.logging.error(f"Failed to publish {data_type} to {endpoint}: {error}")
 
 
-class AccountDataPublisher(DataPublisher):
-    """Implementation for publishing individual account data."""
+class UnifiedDataPublisher(DataPublisher):
+    """Unified publisher for both YouTube and Weight Corrections using new API format."""
     
-    def __init__(self, wallet: bt.wallet, timeout_seconds: int = 10):
+    def __init__(self, wallet: bt.wallet, timeout_seconds: int = 20):
         """
-        Initialize AccountDataPublisher.
+        Initialize UnifiedDataPublisher with timeout for async processing.
         
         Args:
             wallet: Bittensor wallet for message signing
-            timeout_seconds: HTTP request timeout
+            timeout_seconds: HTTP request timeout for async processing
         """
         super().__init__(wallet, timeout_seconds)
     
-    async def publish_account_data(self, run_id: str, 
-        account_data: Dict[str, Any], 
+    def _get_expected_status_code(self) -> int:
+        """Return 202 Accepted for async processing."""
+        return 202
+    
+
+    
+    async def publish_unified_payload(
+        self,
+        payload_type: str,
+        run_id: str,
+        payload_data: Any,
         endpoint: str,
-        miner_uid: int,
-        account_id: str,
-        platform: str = "youtube"
+        miner_uid: Optional[int] = None
     ) -> bool:
         """
-        Publish individual account data to endpoint.
+        Publish data using unified API format.
         
         Args:
-            account_data: Account-specific data payload
+            payload_type: "youtube" or "weight_corrections"
+            run_id: Validation cycle identifier
+            payload_data: The actual data (format depends on payload_type)
             endpoint: Target endpoint URL
-            miner_uid: Miner UID for this account
-            account_id: Account identifier (e.g., "account_1")
-            platform: Platform name (default: "youtube")
+            miner_uid: Optional miner UID
             
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            # Get current run ID
-            
-            # Create payload structure
+            # Create unified payload structure
             payload = {
+                "payload_type": payload_type,
                 "run_id": run_id,
-                "platform": platform,
-                "miner_uid": miner_uid,
-                "account_id": account_id,
-                "vali_hotkey": self.wallet.hotkey.ss58_address,
-                "time": datetime.utcnow().isoformat() + "Z",
-                "account_data": account_data
+                "payload": payload_data
             }
             
-            # Publish the data
+            # Add optional miner_uid if provided
+            if miner_uid is not None:
+                payload["miner_uid"] = miner_uid
+            
+            # Publish using unified format
             return await self.publish_data(payload, endpoint)
             
         except Exception as e:
-            self._log_error(endpoint, e, f"account data for {account_id}")
+            self._log_error(endpoint, e, f"{payload_type} data")
             return False
     
     async def publish_data(self, data: Dict[str, Any], endpoint: str) -> bool:
         """
-        Publish data to specified endpoint with async HTTP POST.
+        Publish data to specified endpoint with unified API format handling.
         
         Args:
             data: Data payload to publish
@@ -168,19 +191,28 @@ class AccountDataPublisher(DataPublisher):
             bool: True if successful, False otherwise
         """
         try:
-            # Sign the message
+            # Sign the message using corrected format
             signed_payload = self._sign_message(data)
             
-            # Make async HTTP request
+            # Make async HTTP request with longer timeout
             timeout = aiohttp.ClientTimeout(total=self.timeout_seconds)
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(endpoint, json=signed_payload) as response:
-                    if response.status == 200:
+                async with session.post(
+                    endpoint, 
+                    json=signed_payload,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    }
+                ) as response:
+                    if response.status == 202:  # Expect 202 Accepted for async processing
                         try:
                             response_data = await response.json()
-                            # Accept both "ok" and "success" as valid status values
-                            if response_data.get("status") in ["ok", "success"]:
-                                self._log_success(endpoint, "account data")
+                            # Check for success status in response
+                            if response_data.get("status") == "success":
+                                payload_type = signed_payload.get("payload_type", "unknown")
+                                bt.logging.info(f"✅ Successfully published {payload_type} data to {endpoint}")
+                                bt.logging.info(f"📁 Stored as: {response_data.get('stored_as', 'N/A')}")
                                 return True
                             else:
                                 bt.logging.error(f"Server returned error: {response_data}")
@@ -188,38 +220,61 @@ class AccountDataPublisher(DataPublisher):
                         except Exception as json_error:
                             bt.logging.error(f"Failed to parse response JSON: {json_error}")
                             return False
+                    elif response.status == 400:
+                        error_text = await response.text()
+                        bt.logging.error(f"400 Bad Request - Payload validation failed: {error_text}")
+                        return False
+                    elif response.status == 401:
+                        bt.logging.error(f"401 Unauthorized - Invalid signature/authentication")
+                        return False
+                    elif response.status == 403:
+                        bt.logging.error(f"403 Forbidden - Validator not authorized")
+                        return False
                     else:
-                        bt.logging.error(f"HTTP {response.status} error from {endpoint}")
+                        error_text = await response.text()
+                        bt.logging.error(f"HTTP {response.status} error from {endpoint}: {error_text}")
                         return False
                         
         except asyncio.TimeoutError:
-            self._log_error(endpoint, Exception("Request timeout"), "account data")
+            self._log_error(endpoint, Exception("Request timeout"), "unified data")
             return False
         except Exception as e:
-            self._log_error(endpoint, e, "account data")
+            self._log_error(endpoint, e, "unified data")
             return False
+
+
+
 
 
 # Convenience functions for easy usage
-_account_publisher: Optional[AccountDataPublisher] = None
 
 
-def get_account_publisher(wallet: bt.wallet) -> AccountDataPublisher:
+async def publish_unified_data(
+    payload_type: str,
+    run_id: str, 
+    wallet: bt.wallet,
+    payload_data: Union[Dict[str, Any], List[Dict[str, Any]]],
+    endpoint: str,
+    miner_uid: Optional[int] = None
+) -> bool:
     """
-    Get or create global AccountDataPublisher instance.
+    Convenience function to publish data using unified API format.
     
     Args:
+        payload_type: "youtube" or "weight_corrections"
+        run_id: Validation cycle identifier
         wallet: Bittensor wallet
+        payload_data: The actual data payload
+        endpoint: Target endpoint URL
+        miner_uid: Optional miner UID
         
     Returns:
-        AccountDataPublisher: Global publisher instance
+        bool: True if successful, False otherwise
     """
-    global _account_publisher
-    
-    if _account_publisher is None:
-        _account_publisher = AccountDataPublisher(wallet)
-    
-    return _account_publisher
+    publisher = UnifiedDataPublisher(wallet)
+    return await publisher.publish_unified_payload(
+        payload_type, run_id, payload_data, endpoint, miner_uid
+    )
 
 
 async def publish_single_account(
@@ -232,20 +287,31 @@ async def publish_single_account(
     platform: str = "youtube"
 ) -> bool:
     """
-    Convenience function to publish single account data.
+    Convenience function to publish single account data using unified API format.
     
     Args:
+        run_id: Validation cycle identifier
         wallet: Bittensor wallet
         account_data: Account data to publish
         endpoint: Target endpoint URL
         miner_uid: Miner UID
         account_id: Account identifier
-        platform: Platform name
+        platform: Platform name (should be "youtube" for unified format)
         
     Returns:
         bool: True if successful, False otherwise
     """
-    publisher = get_account_publisher(wallet)
-    return await publisher.publish_account_data(run_id, 
-        account_data, endpoint, miner_uid, account_id, platform
+    # Use unified format directly
+    unified_payload_data = {
+        "account_data": account_data,
+        "account_id": account_id
+    }
+    
+    publisher = UnifiedDataPublisher(wallet)
+    return await publisher.publish_unified_payload(
+        payload_type="youtube",
+        run_id=run_id,
+        payload_data=unified_payload_data,
+        endpoint=endpoint,
+        miner_uid=miner_uid
     )

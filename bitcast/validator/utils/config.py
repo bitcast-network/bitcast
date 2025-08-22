@@ -51,7 +51,7 @@ ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
 ENABLE_DATA_PUBLISH = os.getenv('ENABLE_DATA_PUBLISH', 'False').lower() == 'true'
 
 # weight corrections publishing  
-WEIGHT_CORRECTIONS_ENDPOINT = os.getenv('WEIGHT_CORRECTIONS_ENDPOINT', f"{BITCAST_SERVER_URL}:8000/api/v1/weight-corrections")
+WEIGHT_CORRECTIONS_ENDPOINT = os.getenv('WEIGHT_CORRECTIONS_ENDPOINT', f"{DATA_CLIENT_URL}:8000/api/v1/weight-corrections")
 ENABLE_WEIGHT_CORRECTIONS = os.getenv('ENABLE_WEIGHT_CORRECTIONS', 'True').lower() == 'true'
 
 # youtube scoring

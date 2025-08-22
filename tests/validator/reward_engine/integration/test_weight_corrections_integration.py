@@ -176,9 +176,10 @@ class TestWeightCorrectionsIntegration:
             evaluation_results, pre_constraint_weights, post_constraint_weights, briefs
         )
         
-        # Mock the publishing
-        with patch('bitcast.validator.utils.weight_corrections_publisher.WeightCorrectionsPublisher') as mock_publisher_class:
+        # Mock the publishing (now uses UnifiedDataPublisher directly)
+        with patch('bitcast.validator.utils.weight_corrections_publisher.UnifiedDataPublisher') as mock_publisher_class:
             mock_publisher = AsyncMock()
+            mock_publisher.publish_unified_payload = AsyncMock(return_value=True)
             mock_publisher_class.return_value = mock_publisher
             
             mock_wallet = Mock()
@@ -190,7 +191,12 @@ class TestWeightCorrectionsIntegration:
             
             # Verify publisher was called correctly
             mock_publisher_class.assert_called_once_with(mock_wallet)
-            mock_publisher.publish_corrections.assert_called_once_with(corrections, run_id, endpoint)
+            mock_publisher.publish_unified_payload.assert_called_once_with(
+                payload_type="weight_corrections",
+                run_id=run_id,
+                payload_data=corrections,
+                endpoint=endpoint
+            )
     
     def test_constraint_scenarios(self):
         """Test various constraint scenarios and their impact on scaling factors."""

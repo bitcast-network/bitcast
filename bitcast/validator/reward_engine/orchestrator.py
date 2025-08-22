@@ -215,12 +215,15 @@ class RewardOrchestrator:
                 evaluation_results, pre_constraint_weights, post_constraint_weights, briefs
             )
             
-            # Fire-and-forget publishing
-            asyncio.create_task(publish_weight_corrections(
+            # Execute immediately like account data publishing - IDENTICAL pattern
+            success = await publish_weight_corrections(
                 corrections, run_id, wallet, WEIGHT_CORRECTIONS_ENDPOINT
-            ))
+            )
             
-            bt.logging.info(f"🚀 Weight corrections task created for {len(corrections)} corrections")
+            if success:
+                bt.logging.info(f"🚀 Weight corrections published for {len(corrections)} corrections")
+            else:
+                bt.logging.warning(f"🚀 Weight corrections publishing failed for {len(corrections)} corrections")
             
         except Exception as e:
             # Log but don't propagate errors (fire-and-forget)

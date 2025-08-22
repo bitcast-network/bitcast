@@ -10,7 +10,7 @@ import bittensor as bt
 import asyncio
 
 from .config import ENABLE_DATA_PUBLISH, YOUTUBE_SUBMIT_ENDPOINT
-from .data_publisher import publish_single_account
+from .data_publisher import publish_unified_data, publish_single_account
 from ..reward_engine.models.evaluation_result import EvaluationResult
 
 
@@ -46,19 +46,19 @@ async def publish_miner_accounts(
     tasks = []
     
     for account_id, account_result in evaluation_result.account_results.items():
-        # Generate posting payload using Phase 2 infrastructure
+        # Generate posting payload
         payload = account_result.to_posting_payload(
             run_id=run_id,
             miner_uid=evaluation_result.uid,
             platform=evaluation_result.platform
         )
         
-        # Create publishing task using Phase 1 infrastructure
+        # Create publishing task
         task = publish_single_account(
+            run_id=run_id,
             wallet=wallet,
             account_data=payload["account_data"],
             endpoint=YOUTUBE_SUBMIT_ENDPOINT,
-            run_id=run_id,
             miner_uid=evaluation_result.uid,
             account_id=account_id,
             platform=evaluation_result.platform
