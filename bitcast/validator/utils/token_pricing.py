@@ -2,7 +2,10 @@ import requests
 import bittensor as bt
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
+from bitcast.utils.misc import ttl_cache
 
+
+@ttl_cache(ttl=600)  # 10 minutes TTL
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=1, max=10),
@@ -42,6 +45,7 @@ def get_bitcast_alpha_price() -> float:
     return float(bitcast_usd_price)
 
 
+@ttl_cache(ttl=600)  # 10 minutes TTL
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=1, max=10),

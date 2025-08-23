@@ -77,8 +77,8 @@ class RewardOrchestrator:
                 result = await self._evaluate_single_miner(miner_response, briefs, validator_self.metagraph)
                 evaluation_results.add_result(uid, result)
                 
-                # 🌊 STREAMING: Publish this miner's accounts immediately
-                await publish_miner_accounts_safe(result, run_id, validator_self.wallet)
+                # 🌊 STREAMING: Publish this miner's accounts immediately (fire and forget)
+                publish_miner_accounts_safe(result, run_id, validator_self.wallet)
             
             # 4. Aggregate scores across platforms
             bt.logging.info("🔄 PHASE 4: Aggregating individual video scores into score matrix")

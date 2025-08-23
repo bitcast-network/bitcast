@@ -36,14 +36,14 @@ class TestWeightCorrectionsIntegration:
                         "brief_1": {
                             "base_score": 2.5,
                             "scaling_factor": 2000,
-                            "scaled_score": 5000.0,
+                            "usd_target": 5000.0,
                             "weight": 5000.0,
                             "limitation_status": "active"
                         },
                         "brief_2": {
                             "base_score": 1.0,
                             "scaling_factor": 400,
-                            "scaled_score": 400.0,
+                            "usd_target": 400.0,
                             "weight": 400.0,
                             "limitation_status": "active"
                         }
@@ -55,7 +55,7 @@ class TestWeightCorrectionsIntegration:
                         "brief_1": {
                             "base_score": 1.8,
                             "scaling_factor": 2000,
-                            "scaled_score": 3600.0,
+                            "usd_target": 3600.0,
                             "weight": 3600.0,
                             "limitation_status": "limited_fifo"  # This video was limited
                         }

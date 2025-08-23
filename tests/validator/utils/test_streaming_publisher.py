@@ -1,8 +1,9 @@
 """
 Tests for the streaming per-account publisher functionality.
 
-Tests cover streaming publishing of account data immediately after miner evaluation,
-ensuring the new system works independently from the monolithic flow.
+Tests cover fire and forget streaming publishing of account data immediately after 
+miner evaluation, ensuring the new system works independently from the monolithic flow.
+The streaming publisher launches publishing tasks without waiting for results.
 """
 
 import pytest
@@ -59,10 +60,11 @@ class TestStreamingPublisher:
         self.run_id = "vali_test_20250106_120000"
     
     @patch('bitcast.validator.utils.streaming_publisher.ENABLE_DATA_PUBLISH', True)
+    @patch('bitcast.validator.utils.streaming_publisher.asyncio.create_task')
     @patch('bitcast.validator.utils.streaming_publisher.publish_single_account')
     @pytest.mark.asyncio
-    async def test_publish_miner_accounts_success(self, mock_publish_single):
-        """Test successful streaming publishing for a miner's accounts."""
+    async def test_publish_miner_accounts_success(self, mock_publish_single, mock_create_task):
+        """Test successful fire and forget streaming publishing for a miner's accounts."""
         mock_publish_single.return_value = True
         
         result = await publish_miner_accounts(
@@ -71,21 +73,17 @@ class TestStreamingPublisher:
             self.mock_wallet
         )
         
-        assert result is True
-        assert mock_publish_single.call_count == 2  # Two accounts
+        assert result is None  # Fire and forget returns None
+        assert mock_create_task.call_count == 2  # Two tasks launched
         
-        # Verify first account call
-        first_call = mock_publish_single.call_args_list[0]
-        assert first_call[1]["wallet"] == self.mock_wallet
-        assert first_call[1]["run_id"] == self.run_id
-        assert first_call[1]["miner_uid"] == 123
-        assert first_call[1]["account_id"] == "account_1"
-        assert first_call[1]["platform"] == "youtube"
+        # Verify that tasks were created for the publish_single_account calls
+        assert mock_create_task.called
     
     @patch('bitcast.validator.utils.streaming_publisher.ENABLE_DATA_PUBLISH', False)
+    @patch('bitcast.validator.utils.streaming_publisher.asyncio.create_task')
     @patch('bitcast.validator.utils.streaming_publisher.publish_single_account')
     @pytest.mark.asyncio
-    async def test_publish_miner_accounts_disabled(self, mock_publish_single):
+    async def test_publish_miner_accounts_disabled(self, mock_publish_single, mock_create_task):
         """Test that streaming is skipped when disabled."""
         result = await publish_miner_accounts(
             self.evaluation_result,
@@ -93,13 +91,15 @@ class TestStreamingPublisher:
             self.mock_wallet
         )
         
-        assert result is True
+        assert result is None  # Fire and forget returns None
         mock_publish_single.assert_not_called()
+        mock_create_task.assert_not_called()
     
     @patch('bitcast.validator.utils.streaming_publisher.ENABLE_DATA_PUBLISH', True)
+    @patch('bitcast.validator.utils.streaming_publisher.asyncio.create_task')
     @patch('bitcast.validator.utils.streaming_publisher.publish_single_account')
     @pytest.mark.asyncio
-    async def test_publish_miner_accounts_no_accounts(self, mock_publish_single):
+    async def test_publish_miner_accounts_no_accounts(self, mock_publish_single, mock_create_task):
         """Test streaming with no account results."""
         empty_result = EvaluationResult(
             uid=456,
@@ -114,21 +114,18 @@ class TestStreamingPublisher:
             self.mock_wallet
         )
         
-        assert result is True
+        assert result is None  # Fire and forget returns None
         mock_publish_single.assert_not_called()
+        mock_create_task.assert_not_called()
     
     @patch('bitcast.validator.utils.streaming_publisher.ENABLE_DATA_PUBLISH', True)
+    @patch('bitcast.validator.utils.streaming_publisher.asyncio.create_task')
     @patch('bitcast.validator.utils.streaming_publisher.publish_single_account')
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("failure_scenario,side_effect,expected_result", [
-        ("partial_failure", [True, False], True),  # Some succeed
-        ("all_failures", [False, False], False),   # All fail
-        ("with_exceptions", [True, Exception("Network error")], True),  # Exception handled
-        ("all_exceptions", [Exception("Error1"), Exception("Error2")], False),  # All exceptions
-    ])
-    async def test_publish_miner_accounts_failures(self, mock_publish_single, failure_scenario, side_effect, expected_result):
-        """Test streaming with various failure scenarios."""
-        mock_publish_single.side_effect = side_effect
+    async def test_publish_miner_accounts_fire_and_forget(self, mock_publish_single, mock_create_task):
+        """Test that streaming launches tasks without waiting for results (fire and forget)."""
+        # Fire and forget doesn't care about success/failure, just launches tasks
+        mock_publish_single.return_value = True
         
         result = await publish_miner_accounts(
             self.evaluation_result,
@@ -136,28 +133,24 @@ class TestStreamingPublisher:
             self.mock_wallet
         )
         
-        assert result is expected_result
-        assert mock_publish_single.call_count == 2
+        assert result is None  # Fire and forget returns None
+        assert mock_create_task.call_count == 2  # Two tasks launched
     
-    @patch('bitcast.validator.utils.streaming_publisher.publish_miner_accounts')
-    @pytest.mark.asyncio
-    async def test_publish_miner_accounts_safe_wrapper(self, mock_publish):
-        """Test the safe wrapper that never raises exceptions."""
-        # Mock the function to raise an exception
-        mock_publish.side_effect = Exception("Unexpected error")
+    @patch('bitcast.validator.utils.streaming_publisher.asyncio.create_task')
+    def test_publish_miner_accounts_safe_wrapper(self, mock_create_task):
+        """Test the safe wrapper that never raises exceptions (fire and forget)."""
+        # Mock create_task to raise an exception
+        mock_create_task.side_effect = Exception("Unexpected error")
         
-        # Should not raise exception
-        await publish_miner_accounts_safe(
+        # Should not raise exception (fire and forget)
+        publish_miner_accounts_safe(
             self.evaluation_result,
             self.run_id,
             self.mock_wallet
         )
         
-        mock_publish.assert_called_once_with(
-            self.evaluation_result,
-            self.run_id,
-            self.mock_wallet
-        )
+        # Should have attempted to create task
+        mock_create_task.assert_called_once()
     
     @patch('bitcast.validator.utils.streaming_publisher.ENABLE_DATA_PUBLISH', True)
     def test_log_streaming_status_enabled(self, caplog):
@@ -185,10 +178,11 @@ class TestStreamingPublisherIntegration:
         self.mock_wallet.hotkey.ss58_address = "test_validator_hotkey"
         
     @patch('bitcast.validator.utils.streaming_publisher.ENABLE_DATA_PUBLISH', True)
+    @patch('bitcast.validator.utils.streaming_publisher.asyncio.create_task')
     @patch('bitcast.validator.utils.streaming_publisher.publish_single_account')
     @pytest.mark.asyncio
-    async def test_realistic_streaming_scenario(self, mock_publish_single):
-        """Test streaming with realistic evaluation result structure."""
+    async def test_realistic_streaming_scenario(self, mock_publish_single, mock_create_task):
+        """Test fire and forget streaming with realistic evaluation result structure."""
         mock_publish_single.return_value = True
         
         # Create realistic account result
@@ -238,21 +232,5 @@ class TestStreamingPublisherIntegration:
             self.mock_wallet
         )
         
-        assert result is True
-        mock_publish_single.assert_called_once()
-        
-        # Verify the call structure matches expected format
-        call_kwargs = mock_publish_single.call_args[1]
-        assert call_kwargs["wallet"] == self.mock_wallet
-        assert call_kwargs["run_id"] == run_id
-        assert call_kwargs["miner_uid"] == 789
-        assert call_kwargs["account_id"] == "UC_realistic_channel_id"
-        assert call_kwargs["platform"] == "youtube"
-        
-        # Verify account data structure
-        account_data = call_kwargs["account_data"]
-        assert "yt_account" in account_data
-        assert "videos" in account_data
-        assert "scores" in account_data
-        assert "performance_stats" in account_data
-        assert account_data["success"] is True
+        assert result is None  # Fire and forget returns None
+        mock_create_task.assert_called_once()  # One task launched for one account

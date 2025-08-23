@@ -18,29 +18,25 @@ async def publish_miner_accounts(
     evaluation_result: EvaluationResult,
     run_id: str,
     wallet: bt.wallet
-) -> bool:
+) -> None:
     """
-    Publish all accounts for a single miner immediately after evaluation.
+    Publish all accounts for a single miner immediately after evaluation (fire and forget).
     
     Args:
         evaluation_result: Complete evaluation result for a single miner
         run_id: Unique run identifier for this validation cycle
         wallet: Bittensor wallet for message signing
-        
-    Returns:
-        True if any accounts published successfully (or publishing disabled),
-        False if all failed
     """
     # Early return if per-account publishing is disabled
     if not ENABLE_DATA_PUBLISH:
-        return True
+        return
     
     # Early return if no account results to publish
     if not evaluation_result.account_results:
-        return True
+        return
     
     account_count = len(evaluation_result.account_results)
-    bt.logging.info(f"🌊 Streaming {account_count} accounts for UID {evaluation_result.uid}")
+    bt.logging.info(f"🌊 Streaming {account_count} accounts for UID {evaluation_result.uid} (fire and forget)")
     
     # Create tasks for all account postings for this miner
     tasks = []
@@ -66,36 +62,24 @@ async def publish_miner_accounts(
         
         tasks.append(task)
     
-    # Execute all account postings for this miner in parallel
+    # Fire and forget: Launch all account publishing tasks without waiting for results
     try:
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for task in tasks:
+            asyncio.create_task(task)
         
-        # Check if any succeeded
-        any_success = any(
-            result is True 
-            for result in results 
-            if not isinstance(result, Exception)
-        )
-        
-        if any_success:
-            bt.logging.info(f"✅ UID {evaluation_result.uid}: Successfully streamed accounts")
-        else:
-            bt.logging.warning(f"⚠️ UID {evaluation_result.uid}: All account publishing failed")
-        
-        return any_success
+        bt.logging.info(f"🚀 UID {evaluation_result.uid}: Launched {len(tasks)} publishing tasks")
         
     except Exception as e:
-        bt.logging.error(f"Unexpected error publishing accounts for UID {evaluation_result.uid}: {e}")
-        return False
+        bt.logging.error(f"Error launching publishing tasks for UID {evaluation_result.uid}: {e}")
 
 
-async def publish_miner_accounts_safe(
+def publish_miner_accounts_safe(
     evaluation_result: EvaluationResult,
     run_id: str,
     wallet: bt.wallet
 ) -> None:
     """
-    Safe wrapper for publish_miner_accounts that never raises exceptions.
+    Safe wrapper for publish_miner_accounts that never raises exceptions (fire and forget).
     
     Args:
         evaluation_result: Complete evaluation result for a single miner
@@ -103,7 +87,8 @@ async def publish_miner_accounts_safe(
         wallet: Bittensor wallet for message signing
     """
     try:
-        await publish_miner_accounts(evaluation_result, run_id, wallet)
+        # Fire and forget: Launch the publishing without waiting
+        asyncio.create_task(publish_miner_accounts(evaluation_result, run_id, wallet))
     except Exception as e:
         bt.logging.error(f"Streaming publisher error for UID {evaluation_result.uid}: {e}")
 

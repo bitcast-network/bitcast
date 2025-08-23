@@ -508,4 +508,42 @@ def test_select_highest_priority_brief():
     # Test case 6: Empty lists
     selected_index, selected_brief = select_highest_priority_brief([], [])
     assert selected_index is None
-    assert selected_brief is None 
+    assert selected_brief is None
+
+
+def test_boost_factor_applied_in_usd_calculations():
+    """Regression test: Verify boost factor is correctly applied in per-video USD calculations."""
+    from bitcast.validator.platforms.youtube.main import _calculate_per_video_metrics
+    
+    # Mock pricing functions to have predictable values
+    with patch('bitcast.validator.platforms.youtube.main.get_bitcast_alpha_price', return_value=10.0), \
+         patch('bitcast.validator.platforms.youtube.main.get_total_miner_emissions', return_value=1000.0):
+        
+        # Test data
+        base_score = 1.0
+        scaling_factor = 100
+        boost_factor = 1.25
+        
+        # Calculate metrics
+        metrics = _calculate_per_video_metrics(base_score, scaling_factor, boost_factor)
+        
+        # Verify boost is applied correctly
+        assert metrics["brief_boost"] == boost_factor, "Should store boost factor as brief_boost"
+        assert "boost" not in metrics, "Old 'boost' field should not exist"
+        assert "boost_factor" not in metrics, "Old 'boost_factor' field should not exist"
+        
+        # Verify USD target includes all factors (this is now the actual USD value)
+        expected_usd_target = base_score * scaling_factor * boost_factor  # 1.0 * 100 * 1.25 = 125.0
+        assert metrics["usd_target"] == expected_usd_target, f"USD target should be {expected_usd_target}"
+        assert "scaled_score" not in metrics, "Old 'scaled_score' field should not exist"
+        
+        # Verify alpha target calculation
+        # alpha_target = usd_target / alpha_price = 125.0 / 10.0 = 12.5
+        expected_alpha_target = 12.5
+        assert abs(metrics["alpha_target"] - expected_alpha_target) < 1e-10, f"Alpha target should be {expected_alpha_target}"
+        
+        # Verify weight calculation (normalized)
+        # total_daily_usd = alpha_price * total_daily_alpha = 10.0 * 1000.0 = 10000.0
+        # weight = usd_target / total_daily_usd = 125.0 / 10000.0 = 0.0125
+        expected_weight = 0.0125
+        assert abs(metrics["weight"] - expected_weight) < 1e-10, f"Weight should be {expected_weight}" 

@@ -121,7 +121,7 @@ class RewardDistributionService:
         
         # Apply individual brief caps
         for brief_idx, brief in enumerate(briefs):
-            brief_cap = brief.get("cap", 1.0)  # Default from BA response
+            brief_cap = brief.get("cap", 100.0)
             brief_sum = result[:, brief_idx].sum()
             
             if brief_sum > brief_cap:
