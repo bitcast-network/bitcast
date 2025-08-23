@@ -20,10 +20,6 @@ from bitcast.validator.utils.config import (
     DISCRETE_MODE,
     ECO_MODE,
     YT_LOOKBACK,
-    YT_MAX_VIDEOS_PER_DEDICATED_BRIEF,
-    YT_MAX_VIDEOS_PER_AD_READ_BRIEF,
-    YT_SCALING_FACTOR_DEDICATED,
-    YT_SCALING_FACTOR_AD_READ,
 )
 from bitcast.validator.utils.token_pricing import get_bitcast_alpha_price, get_total_miner_emissions
 
@@ -135,14 +131,14 @@ def apply_video_limits(briefs, result):
         brief_id = brief["id"]
         brief_format = brief.get("format", "dedicated")
         
-        # Determine the limit based on brief format
-        max_videos = None
-        if brief_format == "dedicated":
-            max_videos = YT_MAX_VIDEOS_PER_DEDICATED_BRIEF
-        elif brief_format == "ad-read":
-            max_videos = YT_MAX_VIDEOS_PER_AD_READ_BRIEF
-        else:
-            # No limits for other formats (integrated, etc.)
+        # Get the limit from brief payload, default to no limit if not specified
+        max_count = brief.get("max_count")
+        if max_count is None:
+            continue # proceed with no limit
+            
+        max_videos = max(0, max_count)
+        if max_videos == 0:
+            # Zero or negative means no videos allowed for this brief
             continue
             
         # Find all videos that scored > 0 for this brief
@@ -162,6 +158,8 @@ def apply_video_limits(briefs, result):
         # Check if we need to apply limits
         if len(scored_videos) <= max_videos:
             continue
+            
+        bt.logging.info(f"Brief '{brief_id}' exceeded max_count limit of {max_videos}, limiting {len(scored_videos)} videos to {max_videos}")
             
         # Sort videos by publish date (ascending) - oldest videos get priority (FIFO)
         scored_videos.sort(key=lambda x: result["videos"][x["video_id"]]["details"]["publishedAt"])
