@@ -1,7 +1,8 @@
 """Data models for evaluation results."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+import copy
 
 
 @dataclass
@@ -14,6 +15,49 @@ class AccountResult:
     performance_stats: Dict[str, Any]
     success: bool
     error_message: str = ""
+    
+    def to_posting_payload(
+        self, 
+        run_id: Optional[str] = None,
+        miner_uid: Optional[int] = None,
+        platform: str = "youtube"
+    ) -> Dict[str, Any]:
+        """
+        Create posting payload for per-account data publishing.
+        
+        Args:
+            run_id: Validation run identifier
+            miner_uid: Miner UID for this account
+            platform: Platform name (default: "youtube")
+            
+        Returns:
+            Dict containing formatted payload for per-account posting
+        """
+        # Deep copy videos and clean descriptions
+        cleaned_videos = copy.deepcopy(self.videos)
+        for video_id, video_data in cleaned_videos.items():
+            if isinstance(video_data, dict) and "details" in video_data:
+                if isinstance(video_data["details"], dict):
+                    # Remove description and transcript fields to reduce payload size
+                    video_data["details"].pop("description", None)
+                    video_data["details"].pop("transcript", None)
+            
+            # Include per-video metrics for streaming publisher
+            if isinstance(video_data, dict) and "brief_metrics" in video_data:
+                # Per-video metrics are already calculated at platform level
+                # Include them in the payload for BA analysis
+                video_data["per_video_metrics"] = video_data["brief_metrics"]
+        
+        return {
+            "account_data": {
+                "yt_account": copy.deepcopy(self.platform_data),
+                "videos": cleaned_videos,
+                "scores": copy.deepcopy(self.scores),
+                "performance_stats": copy.deepcopy(self.performance_stats),
+                "success": self.success,
+                "error_message": self.error_message
+            }
+        }
     
     @classmethod
     def create_error_result(

@@ -41,10 +41,16 @@ class ScoreAggregationService(ScoreAggregator):
         return score_matrix
     
     def _aggregate_brief_scores(self, evaluation_result, brief_id: str) -> float:
-        """Aggregate scores for a specific brief across all accounts."""
+        """
+        Aggregate scores for a specific brief across all accounts.
+        
+        Note: This is platform-agnostic summation. Platform-specific transformations
+        (scaling factors, boost multipliers) are applied at the platform level
+        before aggregation, making this service work for any future platform.
+        """
         total_score = 0.0
         
-        # Sum scores from all account evaluations
+        # Sum pre-scaled scores from all account evaluations
         for account_data in evaluation_result.account_results.values():
             brief_score = account_data.scores.get(brief_id, 0.0)
             total_score += brief_score

@@ -147,9 +147,10 @@ class TestEmissionCalculationService:
             assert targets[1].usd_target >= 0
             
             # Should have proper structure
-            assert "scaling_factor" in targets[0].scaling_factors
-            assert "boost_factor" in targets[0].scaling_factors
-            # Note: smoothing_factor removed - curve-based scoring handles diminishing returns
+            # Note: scaling_factors is now empty since platform-specific transformations
+            # (scaling factors, boost multipliers) are applied at the platform level
+            assert isinstance(targets[0].scaling_factors, dict)
+            assert isinstance(targets[1].scaling_factors, dict)
     
     def test_zero_score_matrix_handling(self):
         """Test handling of zero score matrix."""

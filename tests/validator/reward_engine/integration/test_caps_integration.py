@@ -51,7 +51,7 @@ class TestCapsIntegration:
         
         # Calculate final distribution with caps
         uids = [0, 1, 2, 3]  # Include burn UID
-        final_rewards, stats_list = self.distribution_service.calculate_distribution(
+        final_rewards, stats_list, _, _ = self.distribution_service.calculate_distribution(
             emission_targets, evaluation_results, briefs, uids
         )
         
@@ -97,7 +97,7 @@ class TestCapsIntegration:
         uids = [0, 1, 2]  # Include burn UID
         
         # Test with caps
-        rewards_caps, stats_caps = self.distribution_service.calculate_distribution(
+        rewards_caps, stats_caps, _, _ = self.distribution_service.calculate_distribution(
             emission_targets, evaluation_results, briefs_with_caps, uids
         )
         
@@ -125,7 +125,7 @@ class TestCapsIntegration:
         uids = [0, 1]  # Include burn UID
         
         # Execute distribution
-        rewards, stats = self.distribution_service.calculate_distribution(
+        rewards, stats, _, _ = self.distribution_service.calculate_distribution(
             emission_targets, evaluation_results, briefs, uids
         )
         
@@ -180,7 +180,7 @@ class TestCapsIntegration:
         uids = [0, 1, 2, 3]  # Include burn UID
         
         # Execute distribution
-        rewards, stats = self.distribution_service.calculate_distribution(
+        rewards, stats, _, _ = self.distribution_service.calculate_distribution(
             emission_targets, evaluation_results, briefs, uids
         )
         
@@ -222,7 +222,7 @@ class TestCapsIntegration:
         uids = [0, 1]  # Include burn UID
         
         # Execute distribution
-        rewards, stats = self.distribution_service.calculate_distribution(
+        rewards, stats, _, _ = self.distribution_service.calculate_distribution(
             emission_targets, evaluation_results, briefs, uids
         )
         
@@ -248,7 +248,7 @@ class TestCapsIntegration:
         uids = [0, 1, 2]  # Include burn UID
         
         # Execute distribution
-        rewards, stats = self.distribution_service.calculate_distribution(
+        rewards, stats, _, _ = self.distribution_service.calculate_distribution(
             emission_targets, evaluation_results, briefs, uids
         )
         
@@ -287,7 +287,7 @@ class TestCapsIntegration:
         
         # Benchmark execution time
         start_time = time.time()
-        rewards, stats = self.distribution_service.calculate_distribution(
+        rewards, stats, _, _ = self.distribution_service.calculate_distribution(
             emission_targets, evaluation_results, briefs, uids
         )
         execution_time = time.time() - start_time
@@ -320,7 +320,7 @@ class TestCapsIntegration:
         with patch('bitcast.validator.reward_engine.services.reward_distribution_service.allocate_community_reserve') as mock_reserve:
             mock_reserve.return_value = np.array([0.2, 0.4, 0.4])  # Mock reserve allocation
             
-            rewards, stats = self.distribution_service.calculate_distribution(
+            rewards, stats, _, _ = self.distribution_service.calculate_distribution(
                 emission_targets, evaluation_results, briefs, uids
             )
         

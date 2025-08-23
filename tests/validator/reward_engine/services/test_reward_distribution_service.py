@@ -112,7 +112,7 @@ class TestRewardDistributionService:
         uids = [1, 2]
         
         # Call calculate_distribution
-        rewards, stats_list = self.service.calculate_distribution(
+        rewards, stats_list, pre_constraint_weights, post_constraint_weights = self.service.calculate_distribution(
             emission_targets, eval_results, briefs, uids
         )
         
