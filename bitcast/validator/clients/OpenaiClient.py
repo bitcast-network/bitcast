@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 import bittensor as bt
 from openai import OpenAI, APIError
-from langsmith.wrappers import wrap_openai
 from threading import Lock
 from diskcache import Cache
 import secrets
@@ -38,7 +37,7 @@ class OpenaiClient:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = wrap_openai(OpenAI(api_key=OPENAI_API_KEY))
+                    cls._instance = OpenAI(api_key=OPENAI_API_KEY)
         return cls._instance
 
     @classmethod
