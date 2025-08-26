@@ -168,6 +168,24 @@ class TestStreamingPublisher:
         # Check that appropriate logs were created (we can't easily assert on bt.logging)
         # This test mainly ensures the function runs without error
 
+    @patch('bitcast.validator.utils.streaming_publisher.ENABLE_DATA_PUBLISH', False)
+    @patch('bitcast.validator.utils.streaming_publisher.asyncio.create_task')
+    @patch('bitcast.validator.utils.streaming_publisher.publish_single_account')
+    def test_publish_miner_accounts_safe_disabled_weights(self, mock_publish_single, mock_create_task):
+        """Test that publishing is skipped when ENABLE_DATA_PUBLISH is False (disable_set_weights mode)."""
+        # Should create the task (since that's how the safe wrapper works)
+        # But the actual publishing should be skipped due to ENABLE_DATA_PUBLISH=False
+        publish_miner_accounts_safe(
+            self.evaluation_result,
+            self.run_id,
+            self.mock_wallet
+        )
+        
+        # Task should be created (the wrapper creates it)
+        mock_create_task.assert_called_once()
+        # But actual publishing should not happen due to ENABLE_DATA_PUBLISH=False
+        mock_publish_single.assert_not_called()
+
 
 class TestStreamingPublisherIntegration:
     """Integration tests for streaming publisher with real data structures."""

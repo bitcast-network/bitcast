@@ -74,7 +74,11 @@ async def forward(self):
         # Update the scores based on the rewards
         self.update_scores(rewards, miner_uids, blacklisted_uids)
 
-        publish_stats(self.wallet, yt_stats_list, miner_uids)
+        # Only publish stats if weights are not disabled
+        if not self.config.neuron.disable_set_weights:
+            publish_stats(self.wallet, yt_stats_list, miner_uids)
+        else:
+            bt.logging.info("Skipping stats publishing due to disable_set_weights flag")
         
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
