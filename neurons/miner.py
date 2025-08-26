@@ -52,8 +52,18 @@ class Miner(BaseMinerNeuron):
         if self.config.dev_mode:
             return False, "Blacklist disabled in dev mode"
 
-        if synapse.dendrite.hotkey == "5DAoDtMxVqtMu2Nd5E7QhPEGXDMgrySvE1b3rRT5ARDhfNNK":
-            return False, "Owner hotkey accepted"
+        bt.logging.info(f"Checking request from hotkey: {synapse.dendrite.hotkey}")
+
+        if synapse.failed_verification:
+            bt.logging.warning(f"Request failed signature verification")
+            return True, "Signature verification failed"
+        
+        # Require signatures - reject unsigned requests
+        if synapse.dendrite is None or synapse.dendrite.signature is None:
+            bt.logging.warning(f"Request missing required signature")
+            return True, "Missing required signature"
+        
+        bt.logging.info(f"Signature verification passed")
 
         bt.logging.info(f"Received synapse: {synapse}")
         if synapse.dendrite is None or synapse.dendrite.hotkey is None:
