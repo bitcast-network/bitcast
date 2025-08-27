@@ -58,13 +58,12 @@ class Miner(BaseMinerNeuron):
             bt.logging.warning(f"Request failed signature verification")
             return True, "Signature verification failed"
         
-        # Require signatures - reject unsigned requests
-        if synapse.dendrite is None or synapse.dendrite.signature is None:
-            bt.logging.warning(f"Request missing required signature")
+        # Signature must exist and not be a bypass attempt
+        signature = synapse.dendrite.signature if synapse.dendrite else None
+        if not signature or not isinstance(signature, str) or signature.lower().strip() in ['null', 'none', 'false', '0', 'undefined', '']:
+            bt.logging.warning(f"Missing or invalid signature: {signature}")
             return True, "Missing required signature"
         
-        bt.logging.info(f"Signature verification passed")
-
         bt.logging.info(f"Received synapse: {synapse}")
         if synapse.dendrite is None or synapse.dendrite.hotkey is None:
             bt.logging.warning("Received a request without a dendrite or hotkey.")
