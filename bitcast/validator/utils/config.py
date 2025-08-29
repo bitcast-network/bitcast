@@ -22,7 +22,7 @@ YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
 BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
 OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
-__version__ = "2.0.1"
+__version__ = "2.0.4"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -83,7 +83,7 @@ YT_MIN_CHANNEL_RETENTION = 10
 YT_MIN_VIDEO_RETENTION = 10
 
 # acceptance filter
-YT_MIN_ALPHA_STAKE_THRESHOLD = 2000
+YT_MIN_ALPHA_STAKE_THRESHOLD = 1000
 
 # transcript api
 TRANSCRIPT_MAX_RETRY = 10
