@@ -77,11 +77,11 @@ class EmissionCalculationService(EmissionCalculator):
         briefs: List[Dict[str, Any]]
     ) -> np.ndarray:
         """
-        Transform pre-scaled scores into USD daily emission targets.
+        Transform fully-scaled scores into USD daily emission targets.
         
-        For backward compatibility, still applies boost multipliers at this level
-        even though platform-specific scaling factors are applied at platform level.
-        This maintains test compatibility while improving architecture.
+        Scores matrix already contains all scaling factors (platform scaling + boost)
+        applied at the per-video level. This method simply passes through the 
+        pre-calculated USD targets without additional transformations.
         """
         if scores_matrix.size == 0:
             bt.logging.warning("Empty score matrix - returning empty array")
@@ -90,16 +90,10 @@ class EmissionCalculationService(EmissionCalculator):
         # Work with a copy to avoid modifying the original
         emission_targets = scores_matrix.astype(np.float64, copy=True)
         
-        # Apply boost multipliers for backward compatibility with tests
-        for brief_idx, brief in enumerate(briefs):
-            if brief_idx >= emission_targets.shape[1]:
-                bt.logging.warning(f"Brief {brief_idx} exceeds matrix columns ({emission_targets.shape[1]}) - skipping")
-                continue
-            
-            # Apply boost multiplier (platform scaling factors are already applied)
-            boost_factor = brief.get("boost", 1.0)
-            emission_targets[:, brief_idx] *= boost_factor
-                    
+        # Boost multipliers are now applied at the per-video level only (no double application)
+        # Platform scaling factors and boost factors are both applied during per-video scoring
+        # This eliminates the double-boost bug while maintaining complete per-video metrics for streaming
+        
         return emission_targets
     
     def _calculate_raw_weights(self, emission_targets_matrix: np.ndarray) -> np.ndarray:

@@ -147,9 +147,9 @@ def apply_video_limits(briefs, result):
         scored_videos = []
         for video_id, video_data in result["videos"].items():
             if video_data.get("matching_brief_ids") and brief_id in video_data["matching_brief_ids"]:
-                # Use USD target for this specific brief
-                usd_targets = video_data.get("usd_targets", {})
-                video_score = usd_targets.get(brief_id, 0)
+                # Use raw base score for this specific brief (not USD-scaled value)
+                brief_metrics = video_data.get("brief_metrics", {}).get(brief_id, {})
+                video_score = brief_metrics.get("base_score", 0)
                 if video_score > 0:
                     scored_videos.append({
                         "video_id": video_id,
