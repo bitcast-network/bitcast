@@ -85,7 +85,7 @@ def main():
     import multiprocessing
     multiprocessing.set_start_method('fork', force=True)
     import uvicorn, os
-    uvicorn.run("internal_api:app", host="0.0.0.0", port=8000, workers=os.cpu_count())
+    uvicorn.run("internal_api:app", host="0.0.0.0", port=7999, workers=os.cpu_count())
 
 if __name__ == "__main__":
     main()
