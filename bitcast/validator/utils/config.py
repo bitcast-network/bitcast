@@ -31,9 +31,12 @@ BITCAST_STATS_ENDPOINT = f"{BITCAST_SERVER_URL}:8003/submit"
 BITCAST_BLACKLIST_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist"
 BITCAST_BLACKLIST_SOURCES_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist-sources"
 
-# per-account data publishing
+# new publishing configuration
+ENABLE_DATA_PUBLISH = os.getenv('ENABLE_DATA_PUBLISH', 'False').lower() == 'true'
 DATA_CLIENT_URL = os.getenv('DATA_CLIENT_URL', 'http://52.42.240.185')
-YOUTUBE_SUBMIT_ENDPOINT = f"{DATA_CLIENT_URL}:8000/api/v1/youtube/submit"
+YOUTUBE_SUBMIT_ENDPOINT = f"{DATA_CLIENT_URL}:7999/api/v1/youtube/submit"
+WEIGHT_CORRECTIONS_ENDPOINT = f"{DATA_CLIENT_URL}:7999/api/v1/weight-corrections"
+
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
@@ -44,13 +47,6 @@ DISABLE_LLM_CACHING = os.getenv('DISABLE_LLM_CACHING', 'False').lower() == 'true
 
 # Only run LLM checks on videos that pass all other checks
 ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
-
-# data publishing configuration
-ENABLE_DATA_PUBLISH = os.getenv('ENABLE_DATA_PUBLISH', 'False').lower() == 'true'
-
-# weight corrections publishing  
-WEIGHT_CORRECTIONS_ENDPOINT = os.getenv('WEIGHT_CORRECTIONS_ENDPOINT', f"{DATA_CLIENT_URL}:8000/api/v1/weight-corrections")
-ENABLE_WEIGHT_CORRECTIONS = os.getenv('ENABLE_WEIGHT_CORRECTIONS', 'True').lower() == 'true'
 
 # youtube scoring
 YT_LOOKBACK = 90
@@ -110,7 +106,6 @@ bt.logging.info(f"BITCAST_STATS_ENDPOINT: {BITCAST_STATS_ENDPOINT}")
 bt.logging.info(f"YOUTUBE_SUBMIT_ENDPOINT: {YOUTUBE_SUBMIT_ENDPOINT}")
 bt.logging.info(f"ENABLE_DATA_PUBLISH: {ENABLE_DATA_PUBLISH}")
 bt.logging.info(f"WEIGHT_CORRECTIONS_ENDPOINT: {WEIGHT_CORRECTIONS_ENDPOINT}")
-bt.logging.info(f"ENABLE_WEIGHT_CORRECTIONS: {ENABLE_WEIGHT_CORRECTIONS}")
 bt.logging.info(f"DISABLE_LLM_CACHING: {DISABLE_LLM_CACHING}")
 bt.logging.info(f"ECO_MODE: {ECO_MODE}")
 bt.logging.info(f"YT_MIN_SUBS: {YT_MIN_SUBS}")
@@ -119,7 +114,6 @@ bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")
 bt.logging.info(f"YT_MIN_MINS_WATCHED: {YT_MIN_MINS_WATCHED}")
 bt.logging.info(f"YT_MIN_CHANNEL_RETENTION: {YT_MIN_CHANNEL_RETENTION}")
 bt.logging.info(f"YT_MAX_VIDEOS: {YT_MAX_VIDEOS}")
-
 bt.logging.info(f"YT_MIN_VIDEO_RETENTION: {YT_MIN_VIDEO_RETENTION}")
 bt.logging.info(f"YT_MIN_ALPHA_STAKE_THRESHOLD: {YT_MIN_ALPHA_STAKE_THRESHOLD}")
 bt.logging.info(f"YT_VIDEO_RELEASE_BUFFER: {YT_VIDEO_RELEASE_BUFFER}")

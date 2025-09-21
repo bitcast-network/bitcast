@@ -18,7 +18,7 @@ from .services.weight_corrections_service import WeightCorrectionsService
 from .models.evaluation_result import EvaluationResultCollection, EvaluationResult
 from .models.miner_response import MinerResponse
 from ..utils.weight_corrections_publisher import publish_weight_corrections
-from ..utils.config import WEIGHT_CORRECTIONS_ENDPOINT, ENABLE_WEIGHT_CORRECTIONS
+from ..utils.config import WEIGHT_CORRECTIONS_ENDPOINT, ENABLE_DATA_PUBLISH
 
 
 class RewardOrchestrator:
@@ -103,7 +103,7 @@ class RewardOrchestrator:
             bt.logging.info(f"✅ Successfully calculated rewards: {total_rewards:.6f} total, {non_zero_miners}/{len(uids)} miners rewarded")
             
             # 8. Publish weight corrections (fire-and-forget)
-            if ENABLE_WEIGHT_CORRECTIONS:
+            if ENABLE_DATA_PUBLISH:
                 await self._publish_weight_corrections(
                     evaluation_results, pre_constraint_weights, post_constraint_weights, briefs, run_id, validator_self.wallet
                 )
