@@ -12,6 +12,7 @@ import bittensor as bt
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, Any, Optional, Union, List
+import time
 
 from bitcast.validator.utils.publish_stats import convert_numpy_types
 
@@ -113,7 +114,7 @@ class DataPublisher(ABC):
     
     def _log_success(self, endpoint: str, data_type: str = "data") -> None:
         """Log successful publication."""
-        bt.logging.info(f"Successfully published {data_type} to {endpoint}")
+        bt.logging.info(f"Successfully published {data_type}")
     
     def _log_error(self, endpoint: str, error: Exception, data_type: str = "data") -> None:
         """Log publication error."""
@@ -123,13 +124,13 @@ class DataPublisher(ABC):
 class UnifiedDataPublisher(DataPublisher):
     """Unified publisher for both YouTube and Weight Corrections using new API format."""
     
-    def __init__(self, wallet: bt.wallet, timeout_seconds: int = 20):
+    def __init__(self, wallet: bt.wallet, timeout_seconds: int = 60):
         """
         Initialize UnifiedDataPublisher with timeout for async processing.
         
         Args:
             wallet: Bittensor wallet for message signing
-            timeout_seconds: HTTP request timeout for async processing
+            timeout_seconds: HTTP request timeout for async processing (default: 60s)
         """
         super().__init__(wallet, timeout_seconds)
     
@@ -190,6 +191,7 @@ class UnifiedDataPublisher(DataPublisher):
         Returns:
             bool: True if successful, False otherwise
         """
+        start_time = time.time()
         try:
             # Sign the message using corrected format
             signed_payload = self._sign_message(data)
@@ -205,41 +207,43 @@ class UnifiedDataPublisher(DataPublisher):
                         "Accept": "application/json"
                     }
                 ) as response:
+                    response_time = time.time() - start_time
                     if response.status == 202:  # Expect 202 Accepted for async processing
                         try:
                             response_data = await response.json()
                             # Check for success status in response
                             if response_data.get("status") == "success":
                                 payload_type = signed_payload.get("payload_type", "unknown")
-                                bt.logging.info(f"✅ Successfully published {payload_type} data to {endpoint}")
-                                bt.logging.info(f"📁 Stored as: {response_data.get('stored_as', 'N/A')}")
+                                bt.logging.info(f"✅ Successfully published {payload_type} data (%.2fs)", response_time)
                                 return True
                             else:
-                                bt.logging.error(f"Server returned error: {response_data}")
+                                bt.logging.error(f"Server returned error: {response_data} (%.2fs)", response_time)
                                 return False
                         except Exception as json_error:
-                            bt.logging.error(f"Failed to parse response JSON: {json_error}")
+                            bt.logging.error(f"Failed to parse response JSON: {json_error} (%.2fs)", response_time)
                             return False
                     elif response.status == 400:
                         error_text = await response.text()
-                        bt.logging.error(f"400 Bad Request - Payload validation failed: {error_text}")
+                        bt.logging.error(f"400 Bad Request - Payload validation failed: {error_text} (%.2fs)", response_time)
                         return False
                     elif response.status == 401:
-                        bt.logging.error(f"401 Unauthorized - Invalid signature/authentication")
+                        bt.logging.error(f"401 Unauthorized - Invalid signature/authentication (%.2fs)", response_time)
                         return False
                     elif response.status == 403:
-                        bt.logging.error(f"403 Forbidden - Validator not authorized")
+                        bt.logging.error(f"403 Forbidden - Validator not authorized (%.2fs)", response_time)
                         return False
                     else:
                         error_text = await response.text()
-                        bt.logging.error(f"HTTP {response.status} error from {endpoint}: {error_text}")
+                        bt.logging.error(f"HTTP {response.status} error from {endpoint}: {error_text} (%.2fs)", response_time)
                         return False
                         
         except asyncio.TimeoutError:
-            self._log_error(endpoint, Exception("Request timeout"), "unified data")
+            response_time = time.time() - start_time
+            bt.logging.warning(f"Request timed out after %.2fs - server queue may be processing", response_time)
             return False
         except Exception as e:
-            self._log_error(endpoint, e, "unified data")
+            response_time = time.time() - start_time
+            bt.logging.error(f"Failed to publish unified data to {endpoint}: {e} (%.2fs)", response_time)
             return False
 
 
