@@ -23,10 +23,12 @@ class EmissionCalculationService(EmissionCalculator):
         """
         bt.logging.info(f"=== EMISSION CALCULATION START: {score_matrix.matrix.shape[0]} miners, {len(briefs)} briefs ===")
         
-        # Convert scores to USD emission targets with scaling factors
-        emission_targets_matrix = self._calculate_emission_targets_matrix(
-            score_matrix.matrix, briefs
-        )
+        # Scores matrix already contains all scaling factors applied at per-video level
+        if score_matrix.matrix.size == 0:
+            bt.logging.warning("Empty score matrix - returning empty array")
+            emission_targets_matrix = np.array([])
+        else:
+            emission_targets_matrix = score_matrix.matrix.astype(np.float64, copy=True)
         
         # Convert USD targets to raw weights using alpha price and total emissions
         raw_weights_matrix = self._calculate_raw_weights(emission_targets_matrix)
@@ -49,10 +51,10 @@ class EmissionCalculationService(EmissionCalculator):
             if usd_target > 0.01:
                 bt.logging.info(f"Brief {brief.get('id', f'brief_{brief_idx}')}: ${usd_target:.2f}, weight={brief_weight_sum:.4f}")
             
-            # For backward compatibility, include boost factor metadata
+            # Store brief metadata for downstream processes
             brief_format = brief.get("format", "dedicated")
             scaling_factors = {
-                "boost_factor": brief.get("boost", 1.0)  # Track boost for backward compatibility
+                "boost_factor": brief.get("boost", 1.0)
             }
             
             target = EmissionTarget(
@@ -70,31 +72,6 @@ class EmissionCalculationService(EmissionCalculator):
         
         bt.logging.info(f"=== EMISSION CALCULATION COMPLETE: Total USD targets=${total_usd_targets:.2f}, Total weights={total_weights:.6f} ===")
         return targets
-    
-    def _calculate_emission_targets_matrix(
-        self, 
-        scores_matrix: np.ndarray, 
-        briefs: List[Dict[str, Any]]
-    ) -> np.ndarray:
-        """
-        Transform fully-scaled scores into USD daily emission targets.
-        
-        Scores matrix already contains all scaling factors (platform scaling + boost)
-        applied at the per-video level. This method simply passes through the 
-        pre-calculated USD targets without additional transformations.
-        """
-        if scores_matrix.size == 0:
-            bt.logging.warning("Empty score matrix - returning empty array")
-            return np.array([])
-        
-        # Work with a copy to avoid modifying the original
-        emission_targets = scores_matrix.astype(np.float64, copy=True)
-        
-        # Boost multipliers are now applied at the per-video level only (no double application)
-        # Platform scaling factors and boost factors are both applied during per-video scoring
-        # This eliminates the double-boost bug while maintaining complete per-video metrics for streaming
-        
-        return emission_targets
     
     def _calculate_raw_weights(self, emission_targets_matrix: np.ndarray) -> np.ndarray:
         """
