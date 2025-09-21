@@ -95,7 +95,7 @@ class TestDataPublisher:
     def test_log_success(self, mock_bt):
         """Test success logging."""
         self.publisher._log_success("http://test.com", "test data")
-        mock_bt.logging.info.assert_called_once_with("Successfully published test data to http://test.com")
+        mock_bt.logging.info.assert_called_once_with("Successfully published test data")
     
     @patch('bitcast.validator.utils.data_publisher.bt')
     def test_log_error(self, mock_bt):
