@@ -33,7 +33,7 @@ BITCAST_BLACKLIST_SOURCES_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist-sourc
 
 # new publishing configuration
 ENABLE_DATA_PUBLISH = os.getenv('ENABLE_DATA_PUBLISH', 'False').lower() == 'true'
-DATA_CLIENT_URL = os.getenv('DATA_CLIENT_URL', 'http://44.254.20.95') s
+DATA_CLIENT_URL = os.getenv('DATA_CLIENT_URL', 'http://44.254.20.95')
 YOUTUBE_SUBMIT_ENDPOINT = f"{DATA_CLIENT_URL}:7999/api/v1/youtube/submit"
 WEIGHT_CORRECTIONS_ENDPOINT = f"{DATA_CLIENT_URL}:7999/api/v1/weight-corrections"
 
