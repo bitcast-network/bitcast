@@ -45,7 +45,7 @@ from .brief_matching import (
 )
 
 # Import functions that tests may need to patch
-from bitcast.validator.clients.OpenaiClient import evaluate_content_against_brief, check_for_prompt_injection
+from bitcast.validator.clients.ChuteClient import evaluate_content_against_brief, check_for_prompt_injection
 from bitcast.validator.platforms.youtube.utils import state
 from bitcast.validator.platforms.youtube.api.video import get_video_analytics, get_video_data_batch
 
