@@ -13,7 +13,7 @@ How to add a new prompt version:
 The system defaults to version 2.
 """
 
-def generate_brief_evaluation_prompt_v2(brief, duration, description, transcript):
+def generate_brief_evaluation_prompt_v3(brief, duration, description, transcript):
     """
     Generate a prompt that forces the LLM to prove each brief item
     with an exact quote + timestamp or mark it Not Met.
@@ -50,9 +50,10 @@ def generate_brief_evaluation_prompt_v2(brief, duration, description, transcript
         "       – the corresponding `start` time (in seconds) or `start-to-start+dur` range.\n"
         "   • If no clear evidence or you are **uncertain**, mark **Not Met**.\n"
         "3. After the checklist, apply extra gates:\n"
-        "   • **Video-type check** – Dedicated / Pre-roll / Other (must match brief):\n"
+        "   • **Video-type check** – Dedicated / Ad-read / Integrated / Other (must match brief):\n"
         "       - Dedicated: Calculate the total duration of segments directly about the sponsor's topic. If this is less than 80% of total video duration, mark as Not Met.\n"
-        "       - Pre-roll: Short ad segment at the start of a video\n"
+        "       - Ad-read: Short ad segment within the video.\n"
+        "       - Integrated: The sponsor’s requested content is woven into the content itself.\n"
         "       - Other: Any other format\n"
         "   • **Silent content check** – Is over 50% of the video silent or music-only?\n"
         "4. **If any item or gate fails → Verdiction = NO.**\n\n"
@@ -68,7 +69,7 @@ def generate_brief_evaluation_prompt_v2(brief, duration, description, transcript
         "- Req 2: ...\n"
         "...\n"
         "## Additional Gates\n"
-        "- Video type: Dedicated / Pre-roll / Other — short note with rough percentage calculation\n"
+        "- Video type: Dedicated / Ad-read / Integrated / Other — short note with rough percentage or timestamp calculation\n"
         "- Silent/music-only issue? YES/NO — short note\n"
         "## Verdict\n"
         "YES or NO\n"
@@ -78,7 +79,7 @@ def generate_brief_evaluation_prompt_v2(brief, duration, description, transcript
         "Be concise and remember: fabricated evidence = Not Met."
     )
 
-def generate_brief_evaluation_prompt_v3(brief, duration, description, transcript):
+def generate_brief_evaluation_prompt_v4(brief, duration, description, transcript):
     """
     Generate a prompt that forces the LLM to prove each brief item
     with an exact quote + timestamp or mark it Not Met.
@@ -146,8 +147,8 @@ def generate_brief_evaluation_prompt_v3(brief, duration, description, transcript
 
 # Registry of available prompt generators
 PROMPT_GENERATORS = {
-    2: generate_brief_evaluation_prompt_v2,
     3: generate_brief_evaluation_prompt_v3,
+    4: generate_brief_evaluation_prompt_v4,
 }
 
 

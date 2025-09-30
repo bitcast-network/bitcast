@@ -7,7 +7,7 @@ prompt injection attempts in video content.
 
 import bittensor as bt
 
-from bitcast.validator.clients.ChuteClient import check_for_prompt_injection
+from bitcast.validator.clients.LLMRouter import check_for_prompt_injection
 from bitcast.validator.platforms.youtube.api.transcript import (
     get_video_transcript as fetch_video_transcript_api,
 )
