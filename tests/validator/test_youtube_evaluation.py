@@ -334,7 +334,7 @@ def test_check_video_retention():
 @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_transcript')
 @patch('bitcast.validator.platforms.youtube.evaluation.video.state.is_video_already_scored')
 @patch('bitcast.validator.platforms.youtube.evaluation.video.state.mark_video_as_scored')
-@patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+@patch('bitcast.validator.platforms.youtube.evaluation.video.transcript.check_for_prompt_injection')
 @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
 @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.ThreadPoolExecutor')
 @patch('bitcast.validator.utils.config.DISABLE_LLM_CACHING', True)

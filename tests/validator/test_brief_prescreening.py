@@ -86,7 +86,7 @@ class TestBriefPreScreening:
         assert details["preScreeningCheck"] == []
 
     @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
-    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.transcript.check_for_prompt_injection')
     @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
     @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.ThreadPoolExecutor')
     def test_vet_video_prescreening_filters_briefs(self, mock_executor, mock_evaluate_content, mock_check_injection, mock_get_transcript):
@@ -151,8 +151,8 @@ class TestBriefPreScreening:
         assert brief_reasonings[1] == "Video description does not contain required unique identifier"
 
     @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
-    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
-    @patch('bitcast.validator.clients.OpenaiClient.evaluate_content_against_brief')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.transcript.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
     def test_vet_video_no_briefs_pass_prescreening(self, mock_evaluate_content, mock_check_injection, mock_get_transcript):
         """Test that LLM evaluation is skipped when no briefs pass pre-screening."""
         # Setup mock data
@@ -196,7 +196,7 @@ class TestBriefPreScreening:
         assert all("does not contain required unique identifier" in reasoning for reasoning in brief_reasonings)
 
     @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
-    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.transcript.check_for_prompt_injection')
     @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
     def test_vet_video_brief_validation_error(self, mock_evaluate_content, mock_check_injection, mock_get_transcript):
         """Test that brief validation errors are handled correctly - only the invalid brief fails."""
@@ -239,7 +239,7 @@ class TestBriefPreScreening:
         assert brief_reasonings[0] == "Content meets brief"  # Mocked LLM evaluation result
 
     @patch('bitcast.validator.platforms.youtube.evaluation.video.orchestration.get_video_transcript')
-    @patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection')
+    @patch('bitcast.validator.platforms.youtube.evaluation.video.transcript.check_for_prompt_injection')
     @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.evaluate_content_against_brief')
     @patch('bitcast.validator.platforms.youtube.evaluation.video.brief_matching.ThreadPoolExecutor')
     def test_vet_video_mixed_valid_invalid_briefs(self, mock_executor, mock_evaluate_content, mock_check_injection, mock_get_transcript):
