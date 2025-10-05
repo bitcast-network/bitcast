@@ -48,6 +48,10 @@ ADDITIONAL_METRICS = {
     "subscribedStatusMinutes": ("averageViewPercentage", "subscribedStatus", None, None, None),
     "estimatedAdRevenue": ("estimatedAdRevenue", "", None, None, None),
     "monetizedPlaybacks": ("monetizedPlaybacks", "", None, None, None),
+    # New video-level YPP/Premium metrics
+    "shares": ("shares", "", None, None, None),
+    "redViews": ("redViews", "", None, None, None),
+    "estimatedRedMinutesWatched": ("estimatedRedMinutesWatched", "", None, None, None),
 }
 
 # Slow API calls that we only use in non eco mode on videos of interest
@@ -143,7 +147,15 @@ CHANNEL_ADDITIONAL_METRICS = {
 }
 
 # Revenue metrics that commonly fail for accounts without monetization
-REVENUE_METRICS = {"estimatedAdRevenue", "cpm", "estimatedRedPartnerRevenue", "monetizedPlaybacks"}
+REVENUE_METRICS = {
+    "estimatedAdRevenue", 
+    "cpm", 
+    "estimatedRedPartnerRevenue", 
+    "monetizedPlaybacks",
+    # New YPP/Premium-specific video metrics (shares excluded - available to all creators)
+    "redViews", 
+    "estimatedRedMinutesWatched"
+}
 
 def get_channel_metrics(eco_mode=False):
     """

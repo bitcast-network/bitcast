@@ -5,17 +5,21 @@ from bitcast.validator.platforms.youtube.main import update_video_score, check_v
 def test_update_video_score():
     # Setup
     youtube_analytics_client = MagicMock()
-    briefs = [{"id": "test_brief"}]
+    briefs = [{"id": "test_brief", "format": "dedicated"}]  # Specify format for clarity
     result = {"videos": {}, "scores": {"test_brief": 0}}
     
     # Create a single video_matches dictionary that will be updated
     video_matches = {}
     
     # Mock YT_ROLLING_WINDOW to 1 for easier test calculations (so no division)
+    # Mock token pricing functions to prevent API calls in tests
     with patch('bitcast.validator.platforms.youtube.evaluation.scoring.YT_ROLLING_WINDOW', 1), \
-         patch('bitcast.validator.platforms.youtube.main.calculate_video_score') as mock_calculate:
+         patch('bitcast.validator.platforms.youtube.main.calculate_video_score') as mock_calculate, \
+         patch('bitcast.validator.platforms.youtube.main.get_bitcast_alpha_price', return_value=1.0), \
+         patch('bitcast.validator.platforms.youtube.main.get_total_miner_emissions', return_value=1000.0):
         
-        # Test case 1: First video with revenue score 2.50 (daily average over 1 day = 2.50)
+        # Test case 1: First video with revenue score 2.50 
+        # With dedicated scaling factor (2000), final score = 2.50 * 2000 = 5000.0
         video_id_1 = "test_video_id_1"
         video_matches[video_id_1] = [True]  # Add to video_matches
         result["videos"][video_id_1] = {
@@ -24,9 +28,11 @@ def test_update_video_score():
         }
         mock_calculate.return_value = {"score": 2.50, "daily_analytics": {}, "scoring_method": "ypp"}
         update_video_score(video_id_1, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True)
-        assert result["scores"]["test_brief"] == 2.50, "First score should be 2.50"
+        assert result["scores"]["test_brief"] == 5000.0, "First score should be 5000.0 (2.50 * 2000 scaling)"
         
-        # Test case 2: Second video with revenue score 1.75 (daily average over 1 day = 1.75)
+        # Test case 2: Second video with revenue score 1.75 
+        # With dedicated scaling factor (2000), scaled score = 1.75 * 2000 = 3500.0
+        # Total = 5000.0 + 3500.0 = 8500.0
         video_id_2 = "test_video_id_2"
         video_matches[video_id_2] = [True]  # Add to video_matches
         result["videos"][video_id_2] = {
@@ -35,9 +41,11 @@ def test_update_video_score():
         }
         mock_calculate.return_value = {"score": 1.75, "daily_analytics": {}, "scoring_method": "ypp"}
         update_video_score(video_id_2, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True)
-        assert result["scores"]["test_brief"] == 4.25, "Score should be 4.25 (2.50 + 1.75)"
+        assert result["scores"]["test_brief"] == 8500.0, "Score should be 8500.0 (5000.0 + 3500.0)"
         
         # Test case 3: Third video with revenue score 0 (no revenue generated)
+        # With dedicated scaling factor (2000), scaled score = 0 * 2000 = 0.0
+        # Total = 8500.0 + 0.0 = 8500.0
         video_id_3 = "test_video_id_3"
         video_matches[video_id_3] = [True]  # Add to video_matches
         result["videos"][video_id_3] = {
@@ -46,9 +54,11 @@ def test_update_video_score():
         }
         mock_calculate.return_value = {"score": 0, "daily_analytics": {}, "scoring_method": "ypp"}
         update_video_score(video_id_3, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True)
-        assert result["scores"]["test_brief"] == 4.25, "Score should remain 4.25 (2.50 + 1.75 + 0)"
+        assert result["scores"]["test_brief"] == 8500.0, "Score should remain 8500.0 (5000.0 + 3500.0 + 0.0)"
         
-        # Test case 4: Fourth video with revenue score 0.80 (daily average over 1 day = 0.80)
+        # Test case 4: Fourth video with revenue score 0.80 
+        # With dedicated scaling factor (2000), scaled score = 0.80 * 2000 = 1600.0
+        # Total = 8500.0 + 1600.0 = 10100.0
         video_id_4 = "test_video_id_4"
         video_matches[video_id_4] = [True]  # Add to video_matches
         result["videos"][video_id_4] = {
@@ -57,7 +67,7 @@ def test_update_video_score():
         }
         mock_calculate.return_value = {"score": 0.80, "daily_analytics": {}, "scoring_method": "ypp"}
         update_video_score(video_id_4, youtube_analytics_client, video_matches, briefs, result, is_ypp_account=True)
-        assert result["scores"]["test_brief"] == 5.05, "Score should be 5.05 (2.50 + 1.75 + 0 + 0.80)"
+        assert result["scores"]["test_brief"] == 10100.0, "Score should be 10100.0 (5000.0 + 3500.0 + 0.0 + 1600.0)"
 
 
 def test_check_video_brief_matches():
@@ -498,4 +508,42 @@ def test_select_highest_priority_brief():
     # Test case 6: Empty lists
     selected_index, selected_brief = select_highest_priority_brief([], [])
     assert selected_index is None
-    assert selected_brief is None 
+    assert selected_brief is None
+
+
+def test_boost_factor_applied_in_usd_calculations():
+    """Regression test: Verify boost factor is correctly applied in per-video USD calculations."""
+    from bitcast.validator.platforms.youtube.main import _calculate_per_video_metrics
+    
+    # Mock pricing functions to have predictable values
+    with patch('bitcast.validator.platforms.youtube.main.get_bitcast_alpha_price', return_value=10.0), \
+         patch('bitcast.validator.platforms.youtube.main.get_total_miner_emissions', return_value=1000.0):
+        
+        # Test data
+        base_score = 1.0
+        scaling_factor = 100
+        boost_factor = 1.25
+        
+        # Calculate metrics
+        metrics = _calculate_per_video_metrics(base_score, scaling_factor, boost_factor)
+        
+        # Verify boost is applied correctly
+        assert metrics["brief_boost"] == boost_factor, "Should store boost factor as brief_boost"
+        assert "boost" not in metrics, "Old 'boost' field should not exist"
+        assert "boost_factor" not in metrics, "Old 'boost_factor' field should not exist"
+        
+        # Verify USD target includes all factors (this is now the actual USD value)
+        expected_usd_target = base_score * scaling_factor * boost_factor  # 1.0 * 100 * 1.25 = 125.0
+        assert metrics["usd_target"] == expected_usd_target, f"USD target should be {expected_usd_target}"
+        assert "scaled_score" not in metrics, "Old 'scaled_score' field should not exist"
+        
+        # Verify alpha target calculation
+        # alpha_target = usd_target / alpha_price = 125.0 / 10.0 = 12.5
+        expected_alpha_target = 12.5
+        assert abs(metrics["alpha_target"] - expected_alpha_target) < 1e-10, f"Alpha target should be {expected_alpha_target}"
+        
+        # Verify weight calculation (normalized)
+        # total_daily_usd = alpha_price * total_daily_alpha = 10.0 * 1000.0 = 10000.0
+        # weight = usd_target / total_daily_usd = 125.0 / 10000.0 = 0.0125
+        expected_weight = 0.0125
+        assert abs(metrics["weight"] - expected_weight) < 1e-10, f"Weight should be {expected_weight}" 

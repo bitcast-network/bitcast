@@ -20,7 +20,10 @@ from bitcast.validator.utils.config import (
     DISCRETE_MODE,
     ECO_MODE,
     YT_LOOKBACK,
+    YT_SCALING_FACTOR_DEDICATED,
+    YT_SCALING_FACTOR_AD_READ,
 )
+from bitcast.validator.utils.token_pricing import get_bitcast_alpha_price, get_total_miner_emissions
 
 
 def eval_youtube(creds, briefs, min_stake=False):
@@ -144,7 +147,9 @@ def apply_video_limits(briefs, result):
         scored_videos = []
         for video_id, video_data in result["videos"].items():
             if video_data.get("matching_brief_ids") and brief_id in video_data["matching_brief_ids"]:
-                video_score = video_data.get("score", 0)
+                # Use raw base score for this specific brief (not USD-scaled value)
+                brief_metrics = video_data.get("brief_metrics", {}).get(brief_id, {})
+                video_score = brief_metrics.get("base_score", 0)
                 if video_score > 0:
                     scored_videos.append({
                         "video_id": video_id,
@@ -170,8 +175,22 @@ def apply_video_limits(briefs, result):
             video_id = video_info["video_id"]
             original_score = video_info["score"]
             
-            # Set video score to 0
-            result["videos"][video_id]["score"] = 0
+            # Update USD target for this brief to 0
+            if "usd_targets" in result["videos"][video_id]:
+                result["videos"][video_id]["usd_targets"][brief_id] = 0
+                
+            # Update per-video metrics to reflect limitation
+            if "brief_metrics" in result["videos"][video_id] and brief_id in result["videos"][video_id]["brief_metrics"]:
+                metrics = result["videos"][video_id]["brief_metrics"][brief_id]
+                metrics["limitation_status"] = "limited_fifo"
+                # Reset all metrics for limited videos
+                metrics["usd_target"] = 0
+                metrics["alpha_target"] = 0
+                metrics["weight"] = 0
+            
+            # Update backward-compatible "score" field (highest remaining USD target)
+            remaining_scores = [s for s in result["videos"][video_id].get("usd_targets", {}).values() if s > 0]
+            result["videos"][video_id]["score"] = max(remaining_scores) if remaining_scores else 0
             
             # Add metadata to track this was limited
             if "score_limited" not in result["videos"][video_id]:
@@ -285,6 +304,77 @@ def check_video_brief_matches(video_id, video_matches, briefs):
     
     return matches_any_brief, matching_brief_ids
 
+
+def _get_youtube_scaling_factor(brief_format: str) -> float:
+    """Get YouTube-specific scaling factor based on brief format."""
+    scaling_factors = {
+        "dedicated": YT_SCALING_FACTOR_DEDICATED,
+        "ad-read": YT_SCALING_FACTOR_AD_READ
+    }
+    
+    factor = scaling_factors.get(brief_format, YT_SCALING_FACTOR_DEDICATED)
+    if brief_format not in scaling_factors:
+        bt.logging.warning(f"Unknown brief format '{brief_format}', using dedicated scaling factor")
+    
+    return factor
+
+
+def _calculate_per_video_metrics(base_score: float, scaling_factor: float, boost_factor: float) -> dict:
+    """Calculate comprehensive per-video metrics for streaming publisher.
+    
+    Args:
+        base_score: The base video score (e.g., from curve-based scoring)
+        scaling_factor: Platform-specific scaling (e.g., 400 for dedicated, 80 for ad-read)
+        boost_factor: Brief-specific boost multiplier (e.g., 1.25, 2.0)
+        
+    Returns:
+        dict: Per-video metrics including USD/Alpha targets with ALL scaling applied
+    """
+    try:
+        # Calculate USD target with ALL factors (platform scaling + boost) - this is the actual USD value
+        usd_target = base_score * scaling_factor * boost_factor
+        
+        # Get pricing information for weight normalization
+        alpha_price_usd = get_bitcast_alpha_price()
+        total_daily_alpha = get_total_miner_emissions()
+        total_daily_usd = alpha_price_usd * total_daily_alpha
+        
+        # Calculate alpha target and normalized weight
+        alpha_target = usd_target / alpha_price_usd if alpha_price_usd > 0 else 0.0
+        weight = usd_target / total_daily_usd if total_daily_usd > 0 else 0.0
+        
+        # Validation logging
+        if usd_target > 0:
+            bt.logging.debug(f"Per-video metrics: base={base_score:.6f}, scaling={scaling_factor}, "
+                           f"boost={boost_factor}, usd_target=${usd_target:.6f}, "
+                           f"alpha_target={alpha_target:.12f}, weight={weight:.12f}")
+        
+        # Validate boost_factor is within expected range
+        if boost_factor < 0.1 or boost_factor > 10.0:
+            bt.logging.warning(f"Unusual boost_factor value: {boost_factor} (expected 0.1-10.0)")
+        
+        return {
+            "base_score": base_score,
+            "scaling_factor": scaling_factor,
+            "brief_boost": boost_factor,
+            "usd_target": usd_target,
+            "alpha_target": alpha_target,
+            "weight": weight,
+            "limitation_status": "active"
+        }
+    except Exception as e:
+        bt.logging.error(f"Error calculating per-video metrics: {e}")
+        return {
+            "base_score": base_score,
+            "scaling_factor": scaling_factor,
+            "brief_boost": boost_factor,
+            "usd_target": 0.0,
+            "alpha_target": 0.0,
+            "weight": 0.0,
+            "limitation_status": "error"
+        }
+
+
 def update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, channel_analytics=None, min_stake=False):
     """Calculate and update the score for a video that matches a brief using curve-based scoring mechanism."""
     video_publish_date = result["videos"][video_id]["details"].get("publishedAt")
@@ -298,7 +388,7 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         is_ypp_account=is_ypp_account, channel_analytics=channel_analytics, 
         bitcast_video_id=bitcast_video_id, min_stake=min_stake
     )
-    video_score = video_score_result["score"]
+    base_video_score = video_score_result["score"]
     scoring_method = video_score_result["scoring_method"]
     
     # Log curve-based scoring information
@@ -315,9 +405,10 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         # Special logging for zero-revenue YPP accounts without stake
         curve_info = " [Zero revenue, min_stake=False]"
     
-    bt.logging.info(f"Curve-based video_score: {video_score} (method: {scoring_method}){curve_info}")
+    bt.logging.info(f"Curve-based base_score: {base_video_score} (method: {scoring_method}){curve_info}")
     
-    result["videos"][video_id]["score"] = video_score
+    # Store base score and analytics (before scaling)
+    result["videos"][video_id]["base_score"] = base_video_score
     result["videos"][video_id]["daily_analytics"] = video_score_result["daily_analytics"]
     result["videos"][video_id]["scoring_method"] = scoring_method
     
@@ -334,9 +425,43 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         
         result["videos"][video_id]["cap_info"] = cap_info_dict
     
-    # Update the score for the matching brief
+    # Apply YouTube-specific scaling and boost factors per brief match
+    usd_targets_by_brief = {}
+    per_video_metrics_by_brief = {}
+    
     for i, match in enumerate(video_matches.get(video_id, [])):
         if match:
-            brief_id = briefs[i]["id"]
-            result["scores"][brief_id] += video_score
-            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, Score: {video_score}") 
+            brief = briefs[i]
+            brief_id = brief["id"]
+            brief_format = brief.get("format", "dedicated")
+            boost_factor = brief.get("boost", 1.0)
+            
+            # Get platform-specific scaling factor
+            scaling_factor = _get_youtube_scaling_factor(brief_format)
+            
+            # Calculate comprehensive per-video metrics with ALL scaling factors applied
+            video_metrics = _calculate_per_video_metrics(base_video_score, scaling_factor, boost_factor)
+            
+            # Extract the USD target (this is now the actual meaningful USD value)
+            usd_target = video_metrics["usd_target"]
+            
+            # Store USD target and metrics for this brief
+            usd_targets_by_brief[brief_id] = usd_target
+            per_video_metrics_by_brief[brief_id] = video_metrics
+            
+            # Update the brief score with USD target value
+            result["scores"][brief_id] += usd_target
+            
+            bt.logging.info(f"Brief: {brief_id}, Video: {result['videos'][video_id]['details']['bitcastVideoId']}, "
+                          f"Base Score: {base_video_score:.6f}, Scaling: {scaling_factor}, "
+                          f"Boost: {boost_factor}, USD Target: ${usd_target:.6f}")
+    
+    # Store per-video metrics for streaming publisher
+    result["videos"][video_id]["brief_metrics"] = per_video_metrics_by_brief
+    result["videos"][video_id]["usd_targets"] = usd_targets_by_brief
+    
+    # Maintain backward compatibility: store the highest USD target as "score"
+    if usd_targets_by_brief:
+        result["videos"][video_id]["score"] = max(usd_targets_by_brief.values())
+    else:
+        result["videos"][video_id]["score"] = base_video_score 

@@ -282,7 +282,7 @@ class TestYouTubeEvaluatorUnit:
         assert self.evaluator._check_min_stake(high_stake_info) is True
         
         # Below threshold  
-        low_stake_info = {"alpha_stake": 1000.0}
+        low_stake_info = {"alpha_stake": 100.0}
         assert self.evaluator._check_min_stake(low_stake_info) is False
         
         # No stake info

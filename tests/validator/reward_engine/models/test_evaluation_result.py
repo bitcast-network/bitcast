@@ -121,4 +121,34 @@ class TestEvaluationResultCollection:
         assert retrieved == result
         
         missing = collection.get_result(999)
-        assert missing is None 
+        assert missing is None
+
+
+class TestAccountResultBasicPosting:
+    """Basic test for AccountResult posting functionality."""
+    
+    def test_to_posting_payload_basic_functionality(self):
+        """Test that to_posting_payload returns properly structured data."""
+        account_result = AccountResult(
+            account_id="test_account",
+            platform_data={"channel_id": "UC123"},
+            videos={"video1": {"title": "Test Video"}},
+            scores={"brief1": 0.8},
+            performance_stats={"api_calls": 5},
+            success=True
+        )
+        
+        payload = account_result.to_posting_payload(
+            run_id="test_run_123",
+            miner_uid=456,
+            platform="youtube"
+        )
+        
+        # Verify structure
+        assert "account_data" in payload
+        account_data = payload["account_data"]
+        assert "yt_account" in account_data
+        assert "videos" in account_data  
+        assert "scores" in account_data
+        assert "performance_stats" in account_data
+        assert account_data["success"] is True 

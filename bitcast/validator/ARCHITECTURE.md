@@ -40,7 +40,7 @@ The Bitcast Validator is a sophisticated, modular system for evaluating content 
                    ┌─────────────────────────────────────────────────────┐
                    │               Supporting Systems                    │
                    │                                                     │
-                   │  • OpenAI Client (Multi-Version)  • Intelligent    │
+                   │  • LLM Router (Multi-Provider)    • Intelligent    │
                    │  • Content Briefs & Caching       • Configuration  │
                    │  • Error Handling Standards       • State Mgmt     │
                    │  • Performance Monitoring         • Stats Pub      │
@@ -51,7 +51,7 @@ The Bitcast Validator is a sophisticated, modular system for evaluating content 
                    │                External APIs                        │
                    │                                                     │
                    │  • YouTube Data & Analytics API   • RapidAPI       │
-                   │  • OpenAI Content Analysis         • Bitcast Server │
+                   │  • OpenAI / Chutes LLM APIs        • Bitcast Server │
                    │  • Transcript Services             • Monitoring     │
                    └─────────────────────────────────────────────────────┘
 ```
@@ -162,22 +162,38 @@ result = await evaluator.evaluate_accounts(response, briefs, metagraph_info)
 
 ### **Content Evaluation & Security Systems**
 
+#### **LLM Router** (`clients/LLMRouter.py`)
+- **Version-Based Routing**: Routes inference requests to appropriate LLM provider
+  - **Versions 1-3**: OpenAI (GPT-4o with structured outputs)
+  - **Versions 4+**: Chutes (DeepSeek-V3 for cost-effectiveness)
+- **Prompt Injection**: Always uses Chutes for consistency and cost
+- **Simple Interface**: Transparent routing - calling code unchanged
+
+```python
+# LLM routing based on prompt version
+def evaluate_content_against_brief(brief, duration, description, transcript):
+    prompt_version = brief.get('prompt_version', 1)
+    if prompt_version >= 4:
+        return ChuteClient.evaluate_content_against_brief(...)
+    else:
+        return OpenaiClient.evaluate_content_against_brief(...)
+```
+
 #### **Prompt Versioning System** (`clients/prompts.py`)
-- **Multi-Version Support**: Registry-based prompt management (v2, v3+)
+- **Multi-Version Support**: Registry-based prompt management (v3, v4+)
 - **Version Selection**: Briefs specify `prompt_version` for evaluation approach
 - **Enhanced Evaluation**: Different video type support per version
-  - **V2**: Dedicated / Pre-roll / Other
   - **V3**: Dedicated / Ad-read / Integrated / Other
-- **Backward Compatibility**: Defaults to v2 for existing briefs
+  - **V4**: Advanced evaluation with improved structured format
 
 ```python
 # Prompt version system
 PROMPT_GENERATORS = {
-    2: generate_brief_evaluation_prompt_v2,
     3: generate_brief_evaluation_prompt_v3,
+    4: generate_brief_evaluation_prompt_v4,
 }
 
-def generate_brief_evaluation_prompt(brief, duration, description, transcript, version=2):
+def generate_brief_evaluation_prompt(brief, duration, description, transcript, version=3):
     prompt_generator = get_prompt_generator(version)
     return prompt_generator(brief, duration, description, transcript)
 ```

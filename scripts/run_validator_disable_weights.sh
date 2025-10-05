@@ -74,6 +74,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Disable data publishing when running with disabled weights
+export ENABLE_DATA_PUBLISH=false
+
 # Login to Weights & Biases
 if ! wandb login $WANDB_API_KEY; then
   echo "Failed to login to Weights & Biases with the provided API key."

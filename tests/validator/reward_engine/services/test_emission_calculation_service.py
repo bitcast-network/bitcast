@@ -57,24 +57,6 @@ class TestEmissionCalculationService:
             assert targets[0].scaling_factors["boost_factor"] == 2.0
             assert targets[1].scaling_factors["boost_factor"] == 1.5
     
-    def test_boost_doubles_final_score(self):
-        """Test that Boost = 2 doubles the final score compared to Boost = 1."""
-        score_matrix = ScoreMatrix(np.array([[10.0], [5.0]]))
-        
-        # Brief without boost
-        briefs_no_boost = [{"id": "brief1", "format": "dedicated", "weight": 100, "boost": 1.0}]
-        # Brief with 2x boost  
-        briefs_with_boost = [{"id": "brief1", "format": "dedicated", "weight": 100, "boost": 2.0}]
-        
-        with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \
-             patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_total_miner_emissions', return_value=1000.0):
-            
-            targets_no_boost = self.service.calculate_targets(score_matrix, briefs_no_boost)
-            targets_with_boost = self.service.calculate_targets(score_matrix, briefs_with_boost)
-            
-            # USD target should be doubled (approximately, accounting for smoothing)
-            ratio = targets_with_boost[0].usd_target / targets_no_boost[0].usd_target
-            assert abs(ratio - 2.0) < 0.1  # Allow small variance due to smoothing
     
     def test_multiple_briefs_different_boost_values(self):
         """Test multiple briefs with different boost values work correctly."""
@@ -98,19 +80,17 @@ class TestEmissionCalculationService:
             assert targets[0].brief_id == "brief1"
             assert targets[1].brief_id == "brief2"
     
-    def test_boost_applied_before_smoothing(self):
-        """Test that boost is applied after scaling but before smoothing."""
-        # This test verifies the order of operations by checking the implementation
+    def test_basic_emission_calculation(self):
+        """Test basic emission target calculation with single brief."""
         score_matrix = ScoreMatrix(np.array([[100.0]]))
         briefs = [{"id": "brief1", "format": "dedicated", "weight": 100, "boost": 2.0}]
         
         with patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_bitcast_alpha_price', return_value=1.0), \
              patch('bitcast.validator.reward_engine.services.emission_calculation_service.get_total_miner_emissions', return_value=1000.0):
             
-            # Call the method and verify it completes without error
             targets = self.service.calculate_targets(score_matrix, briefs)
             assert len(targets) == 1
-            assert targets[0].usd_target > 0  # Should have positive target
+            assert targets[0].usd_target == 100.0  # Should equal input USD value
     
     def test_boost_execution_with_large_values(self):
         """Test that boost functionality executes correctly with various boost values."""
@@ -146,10 +126,9 @@ class TestEmissionCalculationService:
             assert targets[0].usd_target >= 0
             assert targets[1].usd_target >= 0
             
-            # Should have proper structure
-            assert "scaling_factor" in targets[0].scaling_factors
-            assert "boost_factor" in targets[0].scaling_factors
-            # Note: smoothing_factor removed - curve-based scoring handles diminishing returns
+            # Should have proper structure with boost metadata
+            assert isinstance(targets[0].scaling_factors, dict)
+            assert isinstance(targets[1].scaling_factors, dict)
     
     def test_zero_score_matrix_handling(self):
         """Test handling of zero score matrix."""

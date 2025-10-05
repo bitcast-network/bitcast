@@ -21,6 +21,11 @@ class TestForwardIntegration:
         self.mock_validator.wallet.hotkey = Mock()  # Fix: Add hotkey attribute
         self.mock_validator.update_scores = Mock()
         
+        # Setup config mock with disable_set_weights
+        self.mock_validator.config = Mock()
+        self.mock_validator.config.neuron = Mock()
+        self.mock_validator.config.neuron.disable_set_weights = False
+        
         # Setup metagraph with proper structure
         self.mock_validator.metagraph = Mock()
         mock_n = Mock()
@@ -98,6 +103,51 @@ class TestForwardIntegration:
         # Check that rewards were added to stats
         published_stats = publish_call_args[1]
         assert len(published_stats) == 3
+        
+        mock_sleep.assert_called_once()
+    
+    @pytest.mark.asyncio
+    @patch('bitcast.validator.forward.get_all_uids')
+    @patch('bitcast.validator.forward.get_briefs')
+    @patch('bitcast.validator.forward.publish_stats')
+    @patch('time.sleep')
+    async def test_forward_function_disable_publishing(self, mock_sleep, mock_publish_stats, mock_get_briefs, mock_get_uids):
+        """Test that publishing is disabled when disable_set_weights is True."""
+        # Set disable_set_weights to True
+        self.mock_validator.config.neuron.disable_set_weights = True
+        
+        # Setup mocks
+        mock_get_uids.return_value = self.test_uids
+        mock_get_briefs.return_value = [
+            {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100}
+        ]
+        
+        # Get orchestrator and mock its calculate_rewards method
+        orchestrator = get_reward_orchestrator()
+        
+        # Mock rewards and stats
+        mock_rewards = np.array([0.4, 0.3, 0.3])
+        mock_stats_list = [
+            {"uid": 123, "scores": {"brief1": 0.5}, "yt_account": {"blacklisted": False}},
+            {"uid": 456, "scores": {"brief1": 0.2}, "yt_account": {"blacklisted": False}},
+            {"uid": 789, "scores": {"brief1": 0.1}, "yt_account": {"blacklisted": False}}
+        ]
+        
+        # Mock the orchestrator's calculate_rewards method
+        with patch.object(orchestrator, 'calculate_rewards', new_callable=AsyncMock) as mock_calculate:
+            mock_calculate.return_value = (mock_rewards, mock_stats_list)
+            
+            # Execute forward function
+            await forward(self.mock_validator)
+            
+            # Verify orchestrator was called (normal evaluation still happens)
+            mock_calculate.assert_called_once_with(self.mock_validator, self.test_uids)
+        
+        # Verify core functionality still works
+        self.mock_validator.update_scores.assert_called_once()
+        
+        # Verify publish_stats was NOT called due to disable_set_weights
+        mock_publish_stats.assert_not_called()
         
         mock_sleep.assert_called_once()
     
