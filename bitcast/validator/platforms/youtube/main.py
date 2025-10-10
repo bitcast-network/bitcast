@@ -16,6 +16,10 @@ from bitcast.validator.platforms.youtube.evaluation import (
     vet_videos,
 )
 from bitcast.validator.platforms.youtube.utils import _format_error, state
+from bitcast.validator.platforms.youtube.utils.historical_videos import (
+    add_historical_videos_to_list,
+    record_matching_video,
+)
 from bitcast.validator.utils.config import (
     DISCRETE_MODE,
     ECO_MODE,
@@ -223,18 +227,21 @@ def process_videos(youtube_data_client, youtube_analytics_client, briefs, result
         # Note: Using hardcoded multiplier for Non-YPP accounts (YT_NON_YPP_REVENUE_MULTIPLIER)
         bt.logging.info(f"Account YPP status: {is_ypp_account}")
         
+        # Get recent uploads and add historical videos
         video_ids = get_all_uploads(youtube_data_client, YT_LOOKBACK)
+        bt.logging.info(f"Found {len(video_ids)} recent uploads")
+        all_video_ids = add_historical_videos_to_list(video_ids, result)
         
-        # Vet videos and store the results
+        # Vet videos and store the results (includes both recent and historical videos)
         video_matches, video_data_dict, video_analytics_dict, video_decision_details = vet_videos(
-            video_ids, briefs, youtube_data_client, youtube_analytics_client, is_ypp_account
+            all_video_ids, briefs, youtube_data_client, youtube_analytics_client, is_ypp_account
         )
         
         # Get channel analytics for median cap calculation
         channel_analytics = result["yt_account"]["analytics"]
         
-        # Process each video and update the result
-        for video_id in video_ids:
+        # Process each video and update the result (includes both recent and historical)
+        for video_id in all_video_ids:
             if video_id in video_data_dict and video_id in video_analytics_dict:
                 process_single_video(
                     video_id, 
@@ -288,6 +295,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     
     # Calculate and store the score if the video passes vetting and matches a brief
     if video_vet_result and matches_any_brief:
+        record_matching_video(video_id, video_data, matching_brief_ids, result)
         update_video_score(video_id, youtube_analytics_client, video_matches, briefs, result, is_ypp_account, channel_analytics, min_stake)
     else:
         result["videos"][video_id]["score"] = 0
