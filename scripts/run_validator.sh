@@ -31,8 +31,8 @@ if [ -z "$RAPID_API_KEY" ]; then
   echo "Error: RAPID_API_KEY is not set in the .env file."
   exit 1
 fi
-if [ -z "$OPENAI_API_KEY" ]; then
-  echo "Error: OPENAI_API_KEY is not set in the .env file."
+if [ -z "$CHUTES_API_KEY" ]; then
+  echo "Error: CHUTES_API_KEY is not set in the .env file."
   exit 1
 fi
 if [ -z "$WANDB_API_KEY" ]; then
