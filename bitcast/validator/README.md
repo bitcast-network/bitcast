@@ -32,8 +32,8 @@ Ensure your machine meets these requirements before proceeding with setup.
    - Subscribe to the [youtube-transcriptor API](https://rapidapi.com/benrhzala90/api/youtube-transcriptor) - Choose **Pro** subscription ($10pm)
    - Copy your API key
 
-2. **OpenAI API Key**
-   - Get your API key from [OpenAI Platform](https://platform.openai.com/)
+2. **Chutes API Key**
+   - Get your API key from [Chutes.ai](https://chutes.ai/)
    - Ensure you have sufficient credits
 
 3. **Weights & Biases API Key**
@@ -64,7 +64,7 @@ Ensure your machine meets these requirements before proceeding with setup.
    - `WALLET_NAME`: Your Bittensor wallet name
    - `HOTKEY_NAME`: Your validator hotkey name
    - `RAPID_API_KEY`: Your RapidAPI key
-   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `CHUTES_API_KEY`: Your Chutes API key
    - `WANDB_API_KEY`: Your Weights & Biases API key
    - `VENV_PATH`: (Optional) Custom path to Python virtual environment
    - `PM2_PROCESS_NAME`: (Optional) Custom name for PM2 process (default: bitcast_validator)

@@ -14,3 +14,4 @@ build/
 .cursor/
 .dev_planning/
 .vscode
+historical_videos.jsonl

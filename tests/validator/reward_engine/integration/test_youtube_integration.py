@@ -275,9 +275,10 @@ class TestYouTubeEvaluatorUnit:
         """Set up test fixtures."""
         self.evaluator = YouTubeEvaluator()
     
+    @patch('bitcast.validator.platforms.youtube.youtube_evaluator.YT_MIN_ALPHA_STAKE_THRESHOLD', 5000)
     def test_check_min_stake(self):
         """Test minimum stake checking."""
-        # Above threshold (YT_MIN_ALPHA_STAKE_THRESHOLD = 5000)
+        # Above threshold (mocked to 5000)
         high_stake_info = {"alpha_stake": 10000.0}
         assert self.evaluator._check_min_stake(high_stake_info) is True
         

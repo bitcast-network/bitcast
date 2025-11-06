@@ -26,8 +26,8 @@ class TestRewardOrchestrator:
         self.mock_validator.metagraph.I = [0.1, 0.2, 0.2, 0.15]  # Incentives: UID 1=0.2
         self.mock_validator.metagraph.E = [0.05, 0.1, 0.1, 0.075]  # Emissions: UID 1=0.1
         
-        # Test data - include UID 0 for community reserve
-        self.uids = [0, 123, 456, 789]  # Include UID 0 for community reserve
+        # Test data - include UID 0 for subnet treasury
+        self.uids = [0, 123, 456, 789]  # Include UID 0 for subnet treasury
         self.briefs = [
             {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
             {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
@@ -78,7 +78,7 @@ class TestRewardOrchestrator:
         for uid in self.uids:
             mock_response = Mock()
             if uid == 0:
-                # UID 0 (community reserve) gets no tokens
+                # UID 0 (subnet treasury) gets no tokens
                 mock_response.YT_access_tokens = []
             else:
                 mock_response.YT_access_tokens = ["mock_token"]
@@ -185,7 +185,7 @@ class TestRewardOrchestoratorIntegration:
     @patch('bitcast.validator.utils.briefs.get_briefs')
     @patch('bitcast.validator.utils.token_pricing.get_bitcast_alpha_price')
     @patch('bitcast.validator.utils.token_pricing.get_total_miner_emissions')
-    @patch('bitcast.validator.rewards_scaling.allocate_community_reserve')
+    @patch('bitcast.validator.rewards_scaling.allocate_subnet_treasury')
     async def test_end_to_end_workflow(
         self, mock_allocate, mock_emissions, mock_price, mock_get_briefs
     ):
@@ -271,8 +271,8 @@ class TestRewardOrchestoratorIntegration:
         assert len(rewards) == 3
         assert len(stats_list) == 3
         
-        # Verify reward distribution logic - UID 0 (burn/reserve) gets 1.0, others get 0.0
-        assert rewards[0] == 1.0  # UID 0 (burn/community reserve) gets special treatment
+        # Verify reward distribution logic - UID 0 (burn/treasury) gets 1.0, others get 0.0
+        assert rewards[0] == 1.0  # UID 0 (burn/subnet treasury) gets special treatment
         assert rewards[1] == 0.0  # UID 123 
         assert rewards[2] == 0.0  # UID 456
         
