@@ -301,8 +301,8 @@ class TestCapsIntegration:
         assert "brief_emission_percentages" in stats[0]
         assert len(stats[0]["brief_emission_percentages"]) == num_briefs
         
-    def test_caps_with_community_reserve(self):
-        """Test that caps work correctly with community reserve allocation."""
+    def test_caps_with_subnet_treasury(self):
+        """Test that caps work correctly with subnet treasury allocation."""
         emission_targets = [
             EmissionTarget(
                 brief_id="brief1", 
@@ -316,16 +316,16 @@ class TestCapsIntegration:
         evaluation_results = EvaluationResultCollection()
         uids = [0, 1, 2]  # Include burn UID
         
-        # Execute distribution (includes community reserve allocation)
-        with patch('bitcast.validator.reward_engine.services.reward_distribution_service.allocate_community_reserve') as mock_reserve:
-            mock_reserve.return_value = np.array([0.2, 0.4, 0.4])  # Mock reserve allocation
+        # Execute distribution (includes subnet treasury allocation)
+        with patch('bitcast.validator.reward_engine.services.reward_distribution_service.allocate_subnet_treasury') as mock_treasury:
+            mock_treasury.return_value = np.array([0.2, 0.4, 0.4])  # Mock treasury allocation
             
             rewards, stats, _, _ = self.distribution_service.calculate_distribution(
                 emission_targets, evaluation_results, briefs, uids
             )
         
-        # Verify community reserve was called
-        mock_reserve.assert_called_once()
+        # Verify subnet treasury was called
+        mock_treasury.assert_called_once()
         
         # Verify final rewards
         assert len(rewards) == 3

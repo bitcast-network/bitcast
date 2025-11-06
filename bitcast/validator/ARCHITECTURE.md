@@ -110,7 +110,7 @@ RewardDistributionService → [Final Rewards & Stats]
 - **`MinerQueryService`**: Bittensor protocol communication with retry logic and timeout handling
 - **`ScoreAggregationService`**: Multi-platform score combination with normalization
 - **`EmissionCalculationService`**: USD target calculation with scaling factor application
-- **`RewardDistributionService`**: Final reward normalization with community reserve allocation
+- **`RewardDistributionService`**: Final reward normalization with subnet treasury allocation
 - **`PlatformRegistry`**: Platform evaluator management with priority-based selection
 
 #### **Interface Layer** (`interfaces/`)
@@ -317,7 +317,7 @@ total_scores = aggregate_platform_scores(evaluation_results)
 # Advanced emission calculation with anti-exploitation
 emission_targets = calculate_emission_targets(scores, briefs)
 
-# Final distribution with community reserve and error recovery
+# Final distribution with subnet treasury and error recovery
 final_rewards = distribute_rewards(emission_targets, uids)
 ```
 

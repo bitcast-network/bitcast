@@ -91,4 +91,5 @@ def test_youtube_config_imports():
     assert isinstance(MAX_ACCOUNTS_PER_SYNAPSE, int)
     assert isinstance(YT_MIN_ALPHA_STAKE_THRESHOLD, (int, float))
     assert MAX_ACCOUNTS_PER_SYNAPSE > 0
-    assert YT_MIN_ALPHA_STAKE_THRESHOLD > 0 
+    # YT_MIN_ALPHA_STAKE_THRESHOLD can be 0 (meaning no minimum stake requirement)
+    assert YT_MIN_ALPHA_STAKE_THRESHOLD >= 0 

@@ -98,7 +98,7 @@ Bitcast employs a dynamic, multi-layered scoring and rewards mechanism to fairly
 
 - The **boost multiplier** increases the score of qualifying videos.
 - Each brief has a **maximum emissions cap**, preventing any single brief from dominating the total emissions.
-- **Unclaimed emissions** are automatically burned (removed from circulation) via the burn UID.
+- **Unclaimed emissions** are automatically allocated to the subnet treasury.
 
 ---
 
