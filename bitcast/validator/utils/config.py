@@ -20,7 +20,7 @@ CACHE_DIRS = {
 # Cache expiry times (in seconds)
 YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
 BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
-OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
+LLM_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
 __version__ = "2.1.1"
 
@@ -38,7 +38,6 @@ YOUTUBE_SUBMIT_ENDPOINT = f"{DATA_CLIENT_URL}:7999/api/v1/youtube/submit"
 WEIGHT_CORRECTIONS_ENDPOINT = f"{DATA_CLIENT_URL}:7999/api/v1/weight-corrections"
 
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 CHUTES_API_KEY = os.getenv('CHUTES_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
 WANDB_PROJECT = os.getenv('WANDB_PROJECT', 'bitcast_vali_logs')
@@ -81,7 +80,7 @@ YT_MIN_CHANNEL_RETENTION = 10
 YT_MIN_VIDEO_RETENTION = 10
 
 # acceptance filter
-YT_MIN_ALPHA_STAKE_THRESHOLD = 1000
+YT_MIN_ALPHA_STAKE_THRESHOLD = 0
 
 # transcript api
 TRANSCRIPT_MAX_RETRY = 10

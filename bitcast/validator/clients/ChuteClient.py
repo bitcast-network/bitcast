@@ -2,18 +2,21 @@ import bittensor as bt
 import requests
 import secrets
 import re
+import os
+import atexit
 from threading import Lock
 from typing import Optional, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential
+from diskcache import Cache
 
 from bitcast.validator.utils.config import (
     CHUTES_API_KEY,
     DISABLE_LLM_CACHING,
     TRANSCRIPT_MAX_LENGTH,
-    OPENAI_CACHE_EXPIRY
+    LLM_CACHE_EXPIRY,
+    CACHE_DIRS
 )
 from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt
-from bitcast.validator.clients.OpenaiClient import OpenaiClient
 
 # Model configuration - hardcoded for flexibility per function
 BRIEF_EVALUATION_MODEL = "deepseek-ai/DeepSeek-V3-0324"
@@ -29,11 +32,14 @@ def reset_chutes_request_count():
 
 class ChuteClient:
     """
-    Chutes API client that reuses OpenAI cache infrastructure.
-    Implements singleton pattern and delegates cache operations to OpenaiClient.
+    Chutes API client with disk-based caching.
+    Implements singleton pattern for efficient resource management.
     """
     _instance = None
     _lock = Lock()
+    _cache = None
+    _cache_dir = CACHE_DIRS["openai"]  # Cache directory path
+    _cache_lock = Lock()
 
     def __new__(cls):
         if cls._instance is None:
@@ -44,22 +50,40 @@ class ChuteClient:
 
     @classmethod
     def initialize_cache(cls) -> None:
-        """Initialize the cache by delegating to OpenaiClient."""
-        OpenaiClient.initialize_cache()
+        """Initialize the cache if it hasn't been initialized yet."""
+        if cls._cache is None:
+            os.makedirs(cls._cache_dir, exist_ok=True)
+            cls._cache = Cache(
+                directory=cls._cache_dir,
+                size_limit=1e9,  # 1GB
+                disk_min_file_size=0,
+                disk_pickle_protocol=4,
+            )
 
     @classmethod
     def cleanup(cls) -> None:
-        """Clean up resources by delegating to OpenaiClient."""
-        OpenaiClient.cleanup()
+        """Clean up resources."""
+        if cls._cache is not None:
+            with cls._cache_lock:
+                if cls._cache is not None:
+                    cls._cache.close()
+                    cls._cache = None
 
     @classmethod
-    def get_cache(cls) -> Optional:
-        """Thread-safe cache access by delegating to OpenaiClient."""
-        return OpenaiClient.get_cache()
+    def get_cache(cls) -> Optional[Cache]:
+        """Thread-safe cache access."""
+        if cls._cache is None:
+            cls.initialize_cache()
+        return cls._cache
 
     def __del__(self):
         """Ensure cleanup on object destruction."""
         self.cleanup()
+
+# Initialize cache on module load
+ChuteClient.initialize_cache()
+# Register cleanup on exit
+atexit.register(ChuteClient.cleanup)
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 def _make_chutes_request(model: str, **kwargs):
@@ -108,8 +132,8 @@ def _crop_transcript(transcript) -> str:
     return transcript
 
 def _get_prompt_version(brief):
-    """Get the prompt version for a brief, defaulting to v1 for backwards compatibility."""
-    return brief.get('prompt_version', 1)
+    """Get the prompt version for a brief, defaulting to v4."""
+    return brief.get('prompt_version', 4)
 
 def _parse_llm_response(text_response: str, response_type: str = "brief_evaluation") -> Dict[str, Any]:
     """
@@ -162,8 +186,8 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
     Returns a tuple of (bool, str) where bool indicates if the content meets the brief, and str is the reasoning.
     
     Supports multiple prompt versions based on the brief's prompt_version field:
-    - Version 1 (default): Original prompt format for backwards compatibility
-    - Version 2: Enhanced prompt with detailed evaluation criteria and structured response
+    - Version 3: Detailed evaluation with evidence requirements
+    - Version 4: Advanced evaluation with improved structured format
     """
     # Prepare transcript for prompt
     transcript = _crop_transcript(transcript)
@@ -179,9 +203,9 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
             meets_brief = cached_result["meets_brief"]
             reasoning = cached_result["reasoning"]
             
-            # Implement sliding expiration - reset the 24-hour timer on access
-            with OpenaiClient._cache_lock:
-                cache.set(prompt_content, cached_result, expire=OPENAI_CACHE_EXPIRY)
+            # Implement sliding expiration - reset the timer on access
+            with ChuteClient._cache_lock:
+                cache.set(prompt_content, cached_result, expire=LLM_CACHE_EXPIRY)
             
             emoji = "✅" if meets_brief else "❌"
             bt.logging.info(f"Meets brief '{brief['id']}' (v{prompt_version}): {meets_brief} {emoji} (cache)")
@@ -202,8 +226,8 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
         reasoning = parsed_result["reasoning"]
 
         if cache is not None:
-            with OpenaiClient._cache_lock:
-                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=OPENAI_CACHE_EXPIRY)
+            with ChuteClient._cache_lock:
+                cache.set(prompt_content, {"meets_brief": meets_brief, "reasoning": reasoning}, expire=LLM_CACHE_EXPIRY)
 
         emoji = "✅" if meets_brief else "❌"
         bt.logging.info(f"Brief {brief['id']} (v{prompt_version}) met: {meets_brief} {emoji}")
@@ -266,9 +290,9 @@ def check_for_prompt_injection(description, transcript):
         if cache is not None and injection_prompt_template in cache:
             injection_detected = cache[injection_prompt_template]
             
-            # Implement sliding expiration - reset the 24-hour timer on access
-            with OpenaiClient._cache_lock:
-                cache.set(injection_prompt_template, injection_detected, expire=OPENAI_CACHE_EXPIRY)
+            # Implement sliding expiration - reset the timer on access
+            with ChuteClient._cache_lock:
+                cache.set(injection_prompt_template, injection_detected, expire=LLM_CACHE_EXPIRY)
             
             bt.logging.info(f"Prompt Injection: {injection_detected} (cache)")
             return injection_detected
@@ -286,8 +310,8 @@ def check_for_prompt_injection(description, transcript):
         injection_detected = parsed_result["injection_detected"]
 
         if cache is not None:
-            with OpenaiClient._cache_lock:
-                cache.set(injection_prompt_template, injection_detected, expire=OPENAI_CACHE_EXPIRY)
+            with ChuteClient._cache_lock:
+                cache.set(injection_prompt_template, injection_detected, expire=LLM_CACHE_EXPIRY)
 
         bt.logging.info(f"Prompt Injection Check: {'Failed' if injection_detected else 'Passed'}")
         return injection_detected

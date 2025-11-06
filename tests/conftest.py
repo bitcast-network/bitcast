@@ -20,8 +20,8 @@ def mock_external_apis():
          patch('bitcast.validator.utils.token_pricing.get_bitcast_alpha_price') as mock_price, \
          patch('bitcast.validator.utils.token_pricing.get_total_miner_emissions') as mock_emissions, \
          patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist, \
-         patch('bitcast.validator.clients.OpenaiClient.evaluate_content_against_brief') as mock_openai_eval, \
-         patch('bitcast.validator.clients.OpenaiClient.check_for_prompt_injection') as mock_openai_inject, \
+         patch('bitcast.validator.clients.ChuteClient.evaluate_content_against_brief') as mock_llm_eval, \
+         patch('bitcast.validator.platforms.youtube.evaluation.video.transcript.check_for_prompt_injection') as mock_llm_inject, \
          patch('bitcast.validator.platforms.youtube.api.transcript._fetch_transcript') as mock_transcript, \
          patch('requests.get') as mock_requests_get:
         
@@ -38,9 +38,9 @@ def mock_external_apis():
         # Mock blacklist API
         mock_blacklist.return_value = ["ADVERTISING"]
         
-        # Mock OpenAI API calls
-        mock_openai_eval.return_value = (True, "Content matches brief criteria")
-        mock_openai_inject.return_value = (False, "No prompt injection detected")
+        # Mock LLM API calls (Chutes)
+        mock_llm_eval.return_value = (True, "Content matches brief criteria")
+        mock_llm_inject.return_value = (False, "No prompt injection detected")
         
         # Mock transcript API
         mock_transcript.return_value = [{"text": "Sample video transcript"}]
@@ -57,8 +57,8 @@ def mock_external_apis():
             'price': mock_price,
             'emissions': mock_emissions,
             'blacklist': mock_blacklist,
-            'openai_eval': mock_openai_eval,
-            'openai_inject': mock_openai_inject,
+            'llm_eval': mock_llm_eval,
+            'llm_inject': mock_llm_inject,
             'transcript': mock_transcript,
             'requests': mock_requests_get
         }

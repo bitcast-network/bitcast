@@ -384,7 +384,7 @@ async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_
         }
     }
 
-    # Mock OpenAI client functions at the high level
+    # Mock LLM client functions at the high level (Chutes)
     mock_check_injection.return_value = False          # No prompt injection detected
     mock_evaluate_content.return_value = (True, "Video meets the brief criteria")  # Brief evaluation passes
 

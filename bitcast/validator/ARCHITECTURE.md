@@ -51,7 +51,7 @@ The Bitcast Validator is a sophisticated, modular system for evaluating content 
                    │                External APIs                        │
                    │                                                     │
                    │  • YouTube Data & Analytics API   • RapidAPI       │
-                   │  • OpenAI / Chutes LLM APIs        • Bitcast Server │
+                   │  • Chutes LLM API (DeepSeek-V3)   • Bitcast Server │
                    │  • Transcript Services             • Monitoring     │
                    └─────────────────────────────────────────────────────┘
 ```
@@ -162,21 +162,22 @@ result = await evaluator.evaluate_accounts(response, briefs, metagraph_info)
 
 ### **Content Evaluation & Security Systems**
 
-#### **LLM Router** (`clients/LLMRouter.py`)
-- **Version-Based Routing**: Routes inference requests to appropriate LLM provider
-  - **Versions 1-3**: OpenAI (GPT-4o with structured outputs)
-  - **Versions 4+**: Chutes (DeepSeek-V3 for cost-effectiveness)
-- **Prompt Injection**: Always uses Chutes for consistency and cost
-- **Simple Interface**: Transparent routing - calling code unchanged
+#### **Chutes LLM Client** (`clients/ChuteClient.py`)
+- **Primary LLM Provider**: All inference requests use Chutes (DeepSeek-V3)
+  - **Cost-Effective**: Efficient LLM inference for content evaluation
+  - **Prompt Versions**: Supports version 3 and 4+ prompt formats
+  - **Direct Integration**: Code calls ChuteClient methods directly
+- **Clean API**: Simple interface for brief evaluation and prompt injection detection
+- **Singleton Pattern**: Efficient resource management with shared cache
 
 ```python
-# LLM routing based on prompt version
-def evaluate_content_against_brief(brief, duration, description, transcript):
-    prompt_version = brief.get('prompt_version', 1)
-    if prompt_version >= 4:
-        return ChuteClient.evaluate_content_against_brief(...)
-    else:
-        return OpenaiClient.evaluate_content_against_brief(...)
+# Direct LLM calls via ChuteClient
+from bitcast.validator.clients.ChuteClient import ChuteClient
+
+meets_brief, reasoning = ChuteClient.evaluate_content_against_brief(
+    brief, duration, description, transcript
+)
+injection_detected = ChuteClient.check_for_prompt_injection(description, transcript)
 ```
 
 #### **Prompt Versioning System** (`clients/prompts.py`)
@@ -187,13 +188,13 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
   - **V4**: Advanced evaluation with improved structured format
 
 ```python
-# Prompt version system
+# Prompt version registry
 PROMPT_GENERATORS = {
     3: generate_brief_evaluation_prompt_v3,
     4: generate_brief_evaluation_prompt_v4,
 }
 
-def generate_brief_evaluation_prompt(brief, duration, description, transcript, version=3):
+def generate_brief_evaluation_prompt(brief, duration, description, transcript, version=4):
     prompt_generator = get_prompt_generator(version)
     return prompt_generator(brief, duration, description, transcript)
 ```
@@ -206,18 +207,11 @@ def generate_brief_evaluation_prompt(brief, duration, description, transcript, v
 
 #### **Brief Prescreening & Optimization**
 - **Unique Identifier Filtering**: Pre-filter briefs before expensive LLM evaluation
-- **Performance Impact**: 60-80% reduction in OpenAI API costs
+- **Performance Impact**: 60-80% reduction in LLM API costs
 - **Intelligent Processing**: Only eligible briefs proceed to content analysis
 - **Cost Optimization**: Maintains evaluation accuracy while reducing expenses
 
 ### **Supporting Systems**
-
-#### **Enhanced OpenAI Client** (`clients/OpenaiClient.py`)
-- **Multi-Version Prompt Support**: Automatic version detection and routing
-- **Intelligent Caching**: TTL-based caching with sliding expiration
-- **Retry Logic**: Exponential backoff with comprehensive error handling
-- **Security Integration**: Prompt injection detection and content safety
-- **Performance Monitoring**: Request tracking and response time metrics
 
 #### **Comprehensive Error Handling** (`utils/error_handling.py`)
 - **Standardized Error Patterns**: Consistent error handling across all components
@@ -387,21 +381,22 @@ python -m pytest tests/validator/performance/                 # Performance test
 - **Mock-Heavy Testing**: External API calls fully mocked for reliability and speed
 - **Error Handling Tests**: Comprehensive error scenario validation
 
-## Migration & Compatibility
+## System Benefits
 
-### **Backward Compatibility Guarantees**
-The enhanced architecture maintains complete compatibility with existing systems:
-- **Same Interface**: Identical return formats for `(rewards, stats_list)`
-- **Same Configuration**: All existing config variables continue to work with enhancements
-- **Same Functionality**: All existing evaluation logic preserved with optimizations
-- **Additive Changes**: New features are additive and don't break existing workflows
+### **Performance Optimizations**
+- **Cost Efficiency**: 60-80% reduction in LLM costs through intelligent prescreening
+- **Fast Evaluation**: Concurrent processing and early exit strategies
+- **Efficient Caching**: 3-day TTL cache with sliding expiration
 
-### **Migration Benefits**
-- **Performance**: 60-80% reduction in LLM costs through intelligent prescreening
-- **Security**: Advanced prompt injection detection and content manipulation prevention
-- **Reliability**: Comprehensive error handling with graceful degradation
+### **Security & Reliability**
+- **Prompt Injection Detection**: Advanced detection and content manipulation prevention
+- **Error Handling**: Comprehensive error handling with graceful degradation
 - **Observability**: Detailed performance metrics and decision audit trails
-- **Maintainability**: Modular architecture with standardized error handling patterns
+
+### **Maintainability**
+- **Modular Architecture**: Clean separation of concerns with SOLID principles
+- **Standardized Patterns**: Consistent error handling and logging patterns
+- **Simple Integration**: Direct API calls with clear interfaces
 
 ## Future Roadmap
 
@@ -425,4 +420,4 @@ The modular architecture supports seamless addition of new social media platform
 - **Audit Compliance**: Enhanced logging and compliance reporting
 - **Automated Response**: Self-healing security incident response
 
-The Bitcast Validator represents a mature, production-ready system with sophisticated evaluation capabilities, advanced security features, comprehensive performance optimizations, and intelligent cost management while maintaining full backward compatibility and extensibility for future platform additions. 
+The Bitcast Validator represents a mature, production-ready system with sophisticated evaluation capabilities, advanced security features, comprehensive performance optimizations, and intelligent cost management with extensibility for future platform additions. 

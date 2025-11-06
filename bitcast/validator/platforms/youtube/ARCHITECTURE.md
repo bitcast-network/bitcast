@@ -122,7 +122,7 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids, is_ypp_accoun
 ```
 
 **Benefits**:
-- Significant cost reduction for OpenAI API usage and transcript API calls
+- Significant cost reduction for LLM API usage and transcript API calls
 - Faster evaluation cycles with early exit for non-matching videos
 - Maintained accuracy with intelligent filtering
 - Skips both transcript fetch and prompt injection check when no briefs match
@@ -369,7 +369,7 @@ day2_avg = score_result.get("day2_average", 0)
     "performance_stats": {
         "data_api_calls": int,                      # YouTube Data API usage
         "analytics_api_calls": int,                 # YouTube Analytics API usage
-        "openai_requests": int,                     # OpenAI API usage
+        "llm_requests": int,                        # LLM API usage (Chutes)
         "evaluation_time_s": float,                 # Total evaluation time
         "prescreening_savings": {                   # Prescreening performance metrics
             "total_briefs": int,

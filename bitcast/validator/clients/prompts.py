@@ -10,20 +10,19 @@ How to add a new prompt version:
 3. Update tests to validate the new version
 4. Briefs can then specify "prompt_version": X to use the new format
 
-The system defaults to version 2.
+Currently supported versions: v3, v4 (default: v4)
 """
 
 def generate_brief_evaluation_prompt_v3(brief, duration, description, transcript):
     """
-    Generate a prompt that forces the LLM to prove each brief item
-    with an exact quote + timestamp or mark it Not Met.
+    Generate a detailed evaluation prompt that requires evidence for each brief item.
 
-    Improvements over the old version:
-    • Instructs the model to auto-number the brief items.
-    • Requires a 5-15-word quote for every Met claim.
-    • Demands the raw `start` time (seconds) from the transcript as evidence.
-    • States that uncertain or fabricated timestamps → Not Met.
-    • Re-emphasises “description-only” items.
+    Features:
+    • Auto-numbers brief items for systematic evaluation
+    • Requires 5-15-word quote for every Met claim
+    • Demands exact `start` time (seconds) from transcript as evidence
+    • Uncertain or fabricated timestamps → Not Met
+    • Special handling for description-only items
     """
     return (
         "///// SPONSOR BRIEF /////\n"
@@ -81,15 +80,14 @@ def generate_brief_evaluation_prompt_v3(brief, duration, description, transcript
 
 def generate_brief_evaluation_prompt_v4(brief, duration, description, transcript):
     """
-    Generate a prompt that forces the LLM to prove each brief item
-    with an exact quote + timestamp or mark it Not Met.
+    Generate an advanced evaluation prompt with improved structured format.
 
-    Improvements over the old version:
-    • Instructs the model to auto-number the brief items.
-    • Requires a 5-15-word quote for every Met claim.
-    • Demands the raw `start` time (seconds) from the transcript as evidence.
-    • States that uncertain or fabricated timestamps → Not Met.
-    • Re-emphasises “description-only” items.
+    Features:
+    • Auto-numbers brief items for systematic evaluation
+    • Requires 5-15-word quote for every Met claim
+    • Demands exact `start` time (seconds) from transcript as evidence
+    • Uncertain or fabricated timestamps → Not Met
+    • Special handling for description-only items
     """
     return (
         "///// SPONSOR BRIEF /////\n"

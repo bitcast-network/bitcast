@@ -3,7 +3,6 @@ import time
 
 import bittensor as bt
 
-import bitcast.validator.clients.OpenaiClient as openai_client_module
 from bitcast.validator.platforms.youtube.api import (
     get_channel_analytics,
     get_channel_data,
@@ -28,6 +27,7 @@ from bitcast.validator.utils.config import (
     YT_SCALING_FACTOR_AD_READ,
 )
 from bitcast.validator.utils.token_pricing import get_bitcast_alpha_price, get_total_miner_emissions
+from bitcast.validator.clients.ChuteClient import chutes_request_count, reset_chutes_request_count
 
 
 def eval_youtube(creds, briefs, min_stake=False):
@@ -37,7 +37,7 @@ def eval_youtube(creds, briefs, min_stake=False):
     result, youtube_data_client, youtube_analytics_client = initialize_youtube_evaluation(creds, briefs)
     # Reset API call counters for this token evaluation
     state.reset_api_call_counts()
-    openai_client_module.reset_openai_request_count()
+    reset_chutes_request_count()
     start = time.perf_counter()
     
     # Get and process channel information
@@ -48,7 +48,7 @@ def eval_youtube(creds, briefs, min_stake=False):
         result["performance_stats"] = {
             "data_api_calls": state.data_api_call_count,
             "analytics_api_calls": state.analytics_api_call_count,
-            "openai_requests": openai_client_module.openai_request_count,
+            "llm_requests": chutes_request_count,
             "evaluation_time_s": elapsed
         }
         return result
@@ -69,7 +69,7 @@ def eval_youtube(creds, briefs, min_stake=False):
         result["performance_stats"] = {
             "data_api_calls": state.data_api_call_count,
             "analytics_api_calls": state.analytics_api_call_count,
-            "openai_requests": openai_client_module.openai_request_count,
+            "llm_requests": chutes_request_count,
             "evaluation_time_s": elapsed
         }
         return result
@@ -81,7 +81,7 @@ def eval_youtube(creds, briefs, min_stake=False):
     result["performance_stats"] = {
         "data_api_calls": state.data_api_call_count,
         "analytics_api_calls": state.analytics_api_call_count,
-        "openai_requests": openai_client_module.openai_request_count,
+        "llm_requests": chutes_request_count,
         "evaluation_time_s": elapsed
     }
     
