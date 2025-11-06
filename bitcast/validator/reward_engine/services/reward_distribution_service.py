@@ -6,7 +6,7 @@ import bittensor as bt
 from ..models.emission_target import EmissionTarget
 from ..models.evaluation_result import EvaluationResultCollection
 from ...utils.config import YT_MIN_EMISSIONS
-from ...rewards_scaling import allocate_community_reserve
+from ...rewards_scaling import allocate_subnet_treasury
 
 
 class RewardDistributionService:
@@ -33,8 +33,8 @@ class RewardDistributionService:
             # Create stats from evaluation results
             stats_list = self._create_stats_list(evaluation_results, uids, brief_emission_percentages)
             
-            # Apply community reserve allocation
-            final_rewards = allocate_community_reserve(rewards, uids)
+            # Apply subnet treasury allocation
+            final_rewards = allocate_subnet_treasury(rewards, uids)
             
             return final_rewards, stats_list, pre_constraint_weights, rewards_matrix
             
