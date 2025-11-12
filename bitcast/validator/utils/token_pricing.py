@@ -3,6 +3,7 @@ import bittensor as bt
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from bitcast.utils.misc import ttl_cache
+from bitcast.validator.utils.config import SUBNET_MECH_EMISSION_RATIO
 
 
 @ttl_cache(ttl=600)  # 10 minutes TTL
@@ -56,18 +57,20 @@ def get_total_miner_emissions() -> float:
     Get the total miner emissions per day for subnet 93.
     
     Returns:
-        float: The total miner emissions in TAO per day
+        float: The total miner emissions in Alpha per day
         
     Raises:
         Exception: If the subtensor connection or calculation fails after all retries
     """
     subtensor = bt.Subtensor(network='finney')
     subnet_info = subtensor.subnet(netuid=93)
-    tao_per_block = float(subnet_info.alpha_in_emission)
+    alpha_per_block = float(subnet_info.alpha_in_emission)
     
     BLOCKS_PER_DAY = 7200
-    total_tao_daily = tao_per_block * BLOCKS_PER_DAY
-    miner_daily = total_tao_daily * 0.41
+    total_alpha_daily = alpha_per_block * BLOCKS_PER_DAY
+    
+    # miner share (41%) * subnet mech emission ratio from config
+    miner_daily = total_alpha_daily * 0.41 * SUBNET_MECH_EMISSION_RATIO
     
     if not isinstance(miner_daily, (int, float)) or miner_daily < 0:
         raise ValueError(f"Invalid miner emissions value: {miner_daily}")
