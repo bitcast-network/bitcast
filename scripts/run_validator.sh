@@ -86,5 +86,5 @@ if pm2 list | grep -q "$PM2_PROCESS_NAME"; then
   pm2 restart "$PM2_PROCESS_NAME"
 else
   echo "Process '$PM2_PROCESS_NAME' is not running. Starting it for the first time..."
-  pm2 start python --name "$PM2_PROCESS_NAME" -- neurons/validator.py --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE_FLAG
+  pm2 start python --name "$PM2_PROCESS_NAME" -- "$PROJECT_ROOT/neurons/validator.py" --netuid $NETUID --subtensor.chain_endpoint $SUBTENSOR_CHAIN_ENDPOINT --subtensor.network $SUBTENSOR_NETWORK --wallet.name $WALLET_NAME --wallet.hotkey $HOTKEY_NAME --axon.port $PORT $LOGGING $DISABLE_AUTO_UPDATE_FLAG
 fi
