@@ -33,7 +33,6 @@ BITCAST_BLACKLIST_SOURCES_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist-sourc
 
 # subnet mechanism configuration
 MECHID = int(os.getenv('MECHID', '0'))
-SUBNET_MECH_EMISSION_RATIO = 0.85
 
 # new publishing configuration
 ENABLE_DATA_PUBLISH = os.getenv('ENABLE_DATA_PUBLISH', 'False').lower() == 'true'
