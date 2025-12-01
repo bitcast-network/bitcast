@@ -51,7 +51,7 @@ The Bitcast Validator is a sophisticated, modular system for evaluating content 
                    │                External APIs                        │
                    │                                                     │
                    │  • YouTube Data & Analytics API   • RapidAPI       │
-                   │  • OpenAI / Chutes LLM APIs        • Bitcast Server │
+                   │  • Chutes LLM API (DeepSeek-V3)   • Bitcast Server │
                    │  • Transcript Services             • Monitoring     │
                    └─────────────────────────────────────────────────────┘
 ```
@@ -162,22 +162,11 @@ result = await evaluator.evaluate_accounts(response, briefs, metagraph_info)
 
 ### **Content Evaluation & Security Systems**
 
-#### **LLM Router** (`clients/LLMRouter.py`)
-- **Version-Based Routing**: Routes inference requests to appropriate LLM provider
-  - **Versions 1-3**: OpenAI (GPT-4o with structured outputs)
-  - **Versions 4+**: Chutes (DeepSeek-V3 for cost-effectiveness)
-- **Prompt Injection**: Always uses Chutes for consistency and cost
-- **Simple Interface**: Transparent routing - calling code unchanged
-
-```python
-# LLM routing based on prompt version
-def evaluate_content_against_brief(brief, duration, description, transcript):
-    prompt_version = brief.get('prompt_version', 1)
-    if prompt_version >= 4:
-        return ChuteClient.evaluate_content_against_brief(...)
-    else:
-        return OpenaiClient.evaluate_content_against_brief(...)
-```
+#### **Chutes LLM Client** (`clients/ChuteClient.py`)
+- **Single Provider**: Uses Chutes API with DeepSeek-V3 for all evaluations
+- **Cost-Effective**: DeepSeek-V3 provides excellent performance at lower cost
+- **Integrated Caching**: Self-contained cache implementation with TTL and sliding expiration
+- **Double Validation**: Runs two concurrent evaluations with optimistic logic to reduce false negatives
 
 #### **Prompt Versioning System** (`clients/prompts.py`)
 - **Multi-Version Support**: Registry-based prompt management (v3, v4+)
@@ -206,18 +195,19 @@ def generate_brief_evaluation_prompt(brief, duration, description, transcript, v
 
 #### **Brief Prescreening & Optimization**
 - **Unique Identifier Filtering**: Pre-filter briefs before expensive LLM evaluation
-- **Performance Impact**: 60-80% reduction in OpenAI API costs
+- **Performance Impact**: 60-80% reduction in LLM API costs
 - **Intelligent Processing**: Only eligible briefs proceed to content analysis
 - **Cost Optimization**: Maintains evaluation accuracy while reducing expenses
 
 ### **Supporting Systems**
 
-#### **Enhanced OpenAI Client** (`clients/OpenaiClient.py`)
-- **Multi-Version Prompt Support**: Automatic version detection and routing
+#### **Enhanced Chutes Client** (`clients/ChuteClient.py`)
+- **Multi-Version Prompt Support**: Supports v3 and v4 prompt formats
 - **Intelligent Caching**: TTL-based caching with sliding expiration
 - **Retry Logic**: Exponential backoff with comprehensive error handling
 - **Security Integration**: Prompt injection detection and content safety
 - **Performance Monitoring**: Request tracking and response time metrics
+- **Double Validation**: Concurrent evaluations with optimistic logic
 
 #### **Comprehensive Error Handling** (`utils/error_handling.py`)
 - **Standardized Error Patterns**: Consistent error handling across all components

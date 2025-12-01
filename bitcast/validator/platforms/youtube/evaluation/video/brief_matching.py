@@ -210,7 +210,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                 brief_reasonings[brief_index] = reasoning
                 if match:
                     met_brief_ids.append(brief["id"])
-                # Note: Individual brief completion logs will appear from OpenaiClient
+                # Note: Individual brief completion logs will appear from ChuteClient
             except Exception as e:
                 log_and_raise_processing_error(
                     error=e,

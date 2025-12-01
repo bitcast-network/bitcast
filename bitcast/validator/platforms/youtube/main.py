@@ -48,7 +48,7 @@ def eval_youtube(creds, briefs, min_stake=False):
         result["performance_stats"] = {
             "data_api_calls": state.data_api_call_count,
             "analytics_api_calls": state.analytics_api_call_count,
-            "openai_requests": openai_client_module.openai_request_count,
+            "chutes_requests": chute_client_module.chutes_request_count,
             "evaluation_time_s": elapsed
         }
         return result
@@ -69,7 +69,7 @@ def eval_youtube(creds, briefs, min_stake=False):
         result["performance_stats"] = {
             "data_api_calls": state.data_api_call_count,
             "analytics_api_calls": state.analytics_api_call_count,
-            "openai_requests": openai_client_module.openai_request_count,
+            "chutes_requests": chute_client_module.chutes_request_count,
             "evaluation_time_s": elapsed
         }
         return result
@@ -81,7 +81,7 @@ def eval_youtube(creds, briefs, min_stake=False):
     result["performance_stats"] = {
         "data_api_calls": state.data_api_call_count,
         "analytics_api_calls": state.analytics_api_call_count,
-        "openai_requests": openai_client_module.openai_request_count,
+        "chutes_requests": chute_client_module.chutes_request_count,
         "evaluation_time_s": elapsed
     }
     
