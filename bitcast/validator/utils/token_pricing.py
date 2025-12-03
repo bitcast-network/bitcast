@@ -1,9 +1,29 @@
+import os
 import requests
 import bittensor as bt
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from bitcast.utils.misc import ttl_cache
-from bitcast.validator.utils.config import SUBNET_MECH_EMISSION_RATIO
+
+
+def get_subnet_mech_emission_ratio(netuid: int = 93, mechid: int = None, fallback: float = 0.85) -> float:
+    """Retrieve subnet mechanism emission ratio from chain, with fallback on error."""
+    if mechid is None:
+        mechid = int(os.getenv('MECHID', '0'))
+    
+    try:
+        subtensor = bt.Subtensor(network="finney")
+        emission_split = subtensor.get_mechanism_emission_split(netuid=netuid)
+        
+        if emission_split and len(emission_split) > mechid and sum(emission_split) > 0:
+            ratio = emission_split[mechid] / sum(emission_split)
+            bt.logging.info(f"Retrieved mechanism {mechid} emission ratio: {ratio:.4f} ({ratio*100:.2f}%)")
+            return ratio
+    except Exception as e:
+        bt.logging.warning(f"Failed to retrieve emission ratio: {e}")
+    
+    bt.logging.info(f"Using fallback emission ratio: {fallback}")
+    return fallback
 
 
 @ttl_cache(ttl=600)  # 10 minutes TTL
@@ -53,26 +73,17 @@ def get_bitcast_alpha_price() -> float:
     retry=retry_if_exception_type((Exception,))
 )
 def get_total_miner_emissions() -> float:
-    """
-    Get the total miner emissions per day for subnet 93.
-    
-    Returns:
-        float: The total miner emissions in Alpha per day
-        
-    Raises:
-        Exception: If the subtensor connection or calculation fails after all retries
-    """
-    subtensor = bt.Subtensor(network='finney')
+    """Get daily miner emissions for subnet 93."""
+    subtensor = bt.Subtensor(network="finney")
     subnet_info = subtensor.subnet(netuid=93)
-    alpha_per_block = float(subnet_info.alpha_in_emission)
-    
-    BLOCKS_PER_DAY = 7200
-    total_alpha_daily = alpha_per_block * BLOCKS_PER_DAY
-    
-    # miner share (41%) * subnet mech emission ratio from config
-    miner_daily = total_alpha_daily * 0.41 * SUBNET_MECH_EMISSION_RATIO
-    
+    daily_alpha_emission = 7200 * float(subnet_info.alpha_out_emission)
+
+    # miner share (41%) * subnet mech emission ratio
+    emission_ratio = get_subnet_mech_emission_ratio(netuid=93)
+    miner_daily = daily_alpha_emission * 0.41 * emission_ratio
+
     if not isinstance(miner_daily, (int, float)) or miner_daily < 0:
         raise ValueError(f"Invalid miner emissions value: {miner_daily}")
-    
+
     return float(miner_daily)
+    
