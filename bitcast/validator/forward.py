@@ -1,4 +1,4 @@
-import time
+import asyncio
 import threading
 import bittensor as bt
 
@@ -50,7 +50,7 @@ def get_reward_orchestrator() -> RewardOrchestrator:
 async def forward(self):
     """Forward function using the new modular reward system."""
     if self.step % VALIDATOR_STEPS_INTERVAL != 0:
-        time.sleep(VALIDATOR_WAIT)
+        await asyncio.sleep(VALIDATOR_WAIT)
         return
 
     bt.logging.info(f"Starting forward pass at step {self.step}")
@@ -96,4 +96,4 @@ async def forward(self):
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
 
-    time.sleep(VALIDATOR_WAIT)
+    await asyncio.sleep(VALIDATOR_WAIT)
