@@ -1,4 +1,3 @@
-import random
 import bittensor as bt
 import numpy as np
 from typing import List
@@ -15,6 +14,10 @@ def check_uid_availability(
     Returns:
         bool: True if uid is available, False otherwise
     """
+    # Validate uid is within valid range
+    if uid < 0 or uid >= metagraph.n.item():
+        return False
+    
     # Filter non serving axons.
     if not metagraph.axons[uid].is_serving:
         return False
@@ -29,13 +32,27 @@ def check_uid_availability(
 def get_all_uids(self, exclude: List[int] = None) -> np.ndarray:
     """Returns all uids from the metagraph, excluding specified ones.
     Args:
+        self: Validator or neuron instance with metagraph attribute
         exclude (List[int]): List of uids to exclude from the result.
     Returns:
         uids (np.ndarray): All uids excluding specified ones.
     """
+    # Validate metagraph exists and has valid n attribute
+    if not hasattr(self, 'metagraph') or self.metagraph is None:
+        raise AttributeError("Instance must have a valid metagraph attribute")
+    
+    try:
+        n = self.metagraph.n.item()
+    except (AttributeError, ValueError) as e:
+        raise AttributeError(f"Metagraph must have a valid 'n' attribute: {e}") from e
+    
+    if n <= 0:
+        # Return array with just uid 0 if metagraph is empty
+        return np.array([0])
+    
     avail_uids = []
 
-    for uid in range(self.metagraph.n.item()):
+    for uid in range(n):
         uid_is_not_excluded = exclude is None or uid not in exclude
 
         if uid_is_not_excluded:
