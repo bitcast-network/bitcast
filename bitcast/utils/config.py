@@ -28,15 +28,15 @@ def is_cuda_available():
         output = subprocess.check_output(
             ["nvidia-smi", "-L"], stderr=subprocess.STDOUT
         )
-        if "NVIDIA" in output.decode("utf-8"):
+        if "NVIDIA" in output.decode("utf-8", errors="replace"):
             return "cuda"
-    except Exception:
+    except (subprocess.CalledProcessError, FileNotFoundError, UnicodeDecodeError, OSError):
         pass
     try:
-        output = subprocess.check_output(["nvcc", "--version"]).decode("utf-8")
+        output = subprocess.check_output(["nvcc", "--version"]).decode("utf-8", errors="replace")
         if "release" in output:
             return "cuda"
-    except Exception:
+    except (subprocess.CalledProcessError, FileNotFoundError, UnicodeDecodeError, OSError):
         pass
     return "cpu"
 
@@ -54,7 +54,7 @@ def check_config(cls, config: "bt.Config"):
             config.neuron.name,
         )
     )
-    print("full path:", full_path)
+    bt.logging.debug(f"Full path: {full_path}")
     config.neuron.full_path = os.path.expanduser(full_path)
     if not os.path.exists(config.neuron.full_path):
         os.makedirs(config.neuron.full_path, exist_ok=True)
