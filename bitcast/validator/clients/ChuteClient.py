@@ -199,7 +199,7 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
     Evaluate the transcript against the brief using Chutes API.
     Returns a tuple of (bool, str) where bool indicates if content meets brief, str is reasoning.
     
-    Runs two concurrent evaluations and applies optimistic logic (pass if either passes)
+    Runs three concurrent evaluations and applies optimistic logic (pass if any passes)
     to reduce false negatives from LLM non-determinism.
     """
     transcript = _crop_transcript(transcript)
@@ -220,16 +220,16 @@ def evaluate_content_against_brief(brief, duration, description, transcript):
             bt.logging.info(f"Meets brief '{brief['id']}' (v{prompt_version}): {meets_brief} {emoji} (cache)")
             return meets_brief, reasoning
 
-        # Run two concurrent evaluations
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [executor.submit(_make_single_brief_evaluation, prompt_content) for _ in range(2)]
+        # Run three concurrent evaluations
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [executor.submit(_make_single_brief_evaluation, prompt_content) for _ in range(3)]
             results = [future.result() for future in futures]
         
         # Optimistic: pass if either passes
         meets_brief = any(r["meets_brief"] for r in results)
         reasoning = next((r["reasoning"] for r in results if r["meets_brief"]), results[0]["reasoning"])
         
-        bt.logging.debug(f"Double validation for '{brief['id']}': {results[0]['meets_brief']}, {results[1]['meets_brief']}")
+        bt.logging.debug(f"Triple validation for '{brief['id']}': {results[0]['meets_brief']}, {results[1]['meets_brief']}, {results[2]['meets_brief']}")
 
         if cache is not None:
             with ChuteClient._cache_lock:
