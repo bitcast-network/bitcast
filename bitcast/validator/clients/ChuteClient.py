@@ -16,7 +16,7 @@ from bitcast.validator.utils.config import (
     TRANSCRIPT_MAX_LENGTH,
     OPENAI_CACHE_EXPIRY
 )
-from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt
+from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt, get_latest_prompt_version
 
 # Model configuration - hardcoded for flexibility per function
 BRIEF_EVALUATION_MODEL = "deepseek-ai/DeepSeek-V3-0324"
@@ -130,8 +130,8 @@ def _crop_transcript(transcript) -> str:
     return transcript
 
 def _get_prompt_version(brief):
-    """Get the prompt version for a brief, defaulting to v1 for backwards compatibility."""
-    return brief.get('prompt_version', 1)
+    """Get the prompt version for a brief, defaulting to the latest available version."""
+    return brief.get('prompt_version', get_latest_prompt_version())
 
 def _make_single_brief_evaluation(prompt_content: str) -> Dict[str, Any]:
     """Make a single LLM evaluation call for brief matching using Chutes API."""
