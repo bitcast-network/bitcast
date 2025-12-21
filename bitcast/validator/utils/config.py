@@ -22,7 +22,7 @@ YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
 BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
 OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
-__version__ = "2.6.0"
+__version__ = "2.6.1"
 
 # required
 BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
@@ -76,7 +76,7 @@ YT_SCORE_CAP_END_DAYS = 30    # T-30 days
 # youtube channel
 YT_MIN_CHANNEL_AGE = 21
 YT_MIN_SUBS = 100
-YT_MAX_SUBS = 200000
+YT_MAX_SUBS = 500000
 YT_MIN_MINS_WATCHED = 1000
 YT_MIN_CHANNEL_RETENTION = 10
 
