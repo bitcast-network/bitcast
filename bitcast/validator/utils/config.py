@@ -102,7 +102,7 @@ MAX_ACCOUNTS_PER_SYNAPSE = 1000
 DISCRETE_MODE = True
 
 # subnet treasury
-SUBNET_TREASURY_PERCENTAGE = 1.0
+SUBNET_TREASURY_PERCENTAGE = 0
 SUBNET_TREASURY_UID = int(os.getenv('SUBNET_TREASURY_UID', '106'))
 
 # Log out all non-sensitive config variables
