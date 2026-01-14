@@ -11,12 +11,16 @@ Storage Format: JSON Lines (.jsonl)
            "bitcast_channel_id": str, "date_first_matched": str, "brief_id": str}
 """
 
-import fcntl
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+from threading import Lock
 from typing import List, Dict, Any
 import bittensor as bt
+
+# Cross-platform file locking using threading lock
+# Note: fcntl is Unix-only, so we use a threading lock for cross-platform compatibility
+_file_lock = Lock()
 
 from bitcast.validator.utils.config import ECO_MODE
 
@@ -39,7 +43,7 @@ def _load_recorded_entries():
         return
     
     try:
-        with open(HISTORICAL_VIDEOS_PATH, 'r') as f:
+        with open(HISTORICAL_VIDEOS_PATH, 'r', encoding='utf-8') as f:
             for line in f:
                 if line.strip():
                     try:
@@ -94,14 +98,13 @@ def record_video_match(
             "brief_id": brief_id
         }
         
-        # Thread-safe append with exclusive lock
-        with open(HISTORICAL_VIDEOS_PATH, 'a') as f:
-            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-            try:
+        # Thread-safe append with cross-platform lock
+        # Using threading lock for cross-platform compatibility (works on Windows and Unix)
+        with _file_lock:
+            with open(HISTORICAL_VIDEOS_PATH, 'a', encoding='utf-8') as f:
                 f.write(json.dumps(entry) + '\n')
-                _recorded_entries.add(entry_key)
-            finally:
-                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                f.flush()  # Ensure data is written
+            _recorded_entries.add(entry_key)
                 
     except Exception as e:
         bt.logging.warning(f"Failed to record historical video match: {e}")
@@ -125,7 +128,7 @@ def get_historical_videos(channel_id: str, max_age_days: int = 90) -> List[str]:
         cutoff_date = (datetime.now() - timedelta(days=max_age_days)).strftime('%Y-%m-%d')
         video_ids = set()
         
-        with open(HISTORICAL_VIDEOS_PATH, 'r') as f:
+        with open(HISTORICAL_VIDEOS_PATH, 'r', encoding='utf-8') as f:
             for line in f:
                 if not line.strip():
                     continue
