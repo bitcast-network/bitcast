@@ -19,8 +19,8 @@ from bitcast.validator.utils.config import (
 from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt, get_latest_prompt_version
 
 # Model configuration - hardcoded for flexibility per function
-BRIEF_EVALUATION_MODEL = "deepseek-ai/DeepSeek-V3-0324"
-PROMPT_INJECTION_MODEL = "deepseek-ai/DeepSeek-V3-0324"
+BRIEF_EVALUATION_MODEL = "Qwen/Qwen3-32B"
+PROMPT_INJECTION_MODEL = "Qwen/Qwen3-32B"
 
 # Global counter to track the number of Chutes API requests
 chutes_request_count = 0
