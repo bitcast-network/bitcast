@@ -76,6 +76,10 @@ Bitcast employs a dynamic, multi-layered scoring and rewards mechanism to fairly
     - Sponsor’s message appears as a short, distinct segment.
     - Each YouTube account can be rewarded for up to **5 videos per ad-read brief** (oldest 5 by publish date).
     - Receives **20% of the dedicated reward**.
+  - **Integration:**  
+    - Sponsor's content is woven into the video content itself.
+    - Video limits are configured per-brief via `max_count`.
+    - Receives **20% of the dedicated reward** (same as ad-read).
 
 ### 3. Performance Metrics & Anti-Exploitation Controls
 
