@@ -19,8 +19,8 @@ from bitcast.validator.utils.config import (
 from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt, get_latest_prompt_version
 
 # Model configuration - hardcoded for flexibility per function
-BRIEF_EVALUATION_MODEL = "Qwen/Qwen3-32B"
-PROMPT_INJECTION_MODEL = "Qwen/Qwen3-32B"
+BRIEF_EVALUATION_MODEL = "MiniMaxAI/MiniMax-M2.1-TEE"
+PROMPT_INJECTION_MODEL = "MiniMaxAI/MiniMax-M2.1-TEE"
 
 # Global counter to track the number of Chutes API requests
 chutes_request_count = 0
