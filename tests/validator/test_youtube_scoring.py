@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch, Mock
-from bitcast.validator.platforms.youtube.main import update_video_score, check_video_brief_matches
+from bitcast.validator.platforms.youtube.main import update_video_score, check_video_brief_matches, _get_youtube_scaling_factor
 
 def test_update_video_score():
     # Setup
@@ -547,3 +547,23 @@ def test_boost_factor_applied_in_usd_calculations():
         # weight = usd_target / total_daily_usd = 125.0 / 10000.0 = 0.0125
         expected_weight = 0.0125
         assert abs(metrics["weight"] - expected_weight) < 1e-10, f"Weight should be {expected_weight}" 
+
+def test_get_youtube_scaling_factor():
+    """Test that _get_youtube_scaling_factor returns correct scaling factors for all brief formats."""
+    from bitcast.validator.utils.config import YT_SCALING_FACTOR_DEDICATED, YT_SCALING_FACTOR_AD_READ
+    
+    # Test dedicated format
+    assert _get_youtube_scaling_factor("dedicated") == YT_SCALING_FACTOR_DEDICATED
+    assert _get_youtube_scaling_factor("dedicated") == 2000
+    
+    # Test ad-read format
+    assert _get_youtube_scaling_factor("ad-read") == YT_SCALING_FACTOR_AD_READ
+    assert _get_youtube_scaling_factor("ad-read") == 400
+    
+    # Test integration format (should use ad-read scaling)
+    assert _get_youtube_scaling_factor("integration") == YT_SCALING_FACTOR_AD_READ
+    assert _get_youtube_scaling_factor("integration") == 400
+    
+    # Test unknown format (should default to dedicated)
+    assert _get_youtube_scaling_factor("unknown") == YT_SCALING_FACTOR_DEDICATED
+    assert _get_youtube_scaling_factor("") == YT_SCALING_FACTOR_DEDICATED

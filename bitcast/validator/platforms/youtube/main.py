@@ -317,7 +317,8 @@ def _get_youtube_scaling_factor(brief_format: str) -> float:
     """Get YouTube-specific scaling factor based on brief format."""
     scaling_factors = {
         "dedicated": YT_SCALING_FACTOR_DEDICATED,
-        "ad-read": YT_SCALING_FACTOR_AD_READ
+        "ad-read": YT_SCALING_FACTOR_AD_READ,
+        "integration": YT_SCALING_FACTOR_AD_READ,
     }
     
     factor = scaling_factors.get(brief_format, YT_SCALING_FACTOR_DEDICATED)
@@ -332,7 +333,7 @@ def _calculate_per_video_metrics(base_score: float, scaling_factor: float, boost
     
     Args:
         base_score: The base video score (e.g., from curve-based scoring)
-        scaling_factor: Platform-specific scaling (e.g., 400 for dedicated, 80 for ad-read)
+        scaling_factor: Platform-specific scaling (e.g., 2000 for dedicated, 400 for ad-read/integration)
         boost_factor: Brief-specific boost multiplier (e.g., 1.25, 2.0)
         
     Returns:
