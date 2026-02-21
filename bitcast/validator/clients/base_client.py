@@ -112,7 +112,8 @@ def crop_transcript(transcript: str) -> str:
 
 def get_prompt_version(brief: Dict) -> int:
     """Get the prompt version for a brief, defaulting to the latest available version."""
-    return brief.get('prompt_version', get_latest_prompt_version())
+    version = brief.get('prompt_version')
+    return version if version is not None else get_latest_prompt_version()
 
 
 def parse_llm_response(text_response: str, response_type: str = "brief_evaluation") -> Dict[str, Any]:

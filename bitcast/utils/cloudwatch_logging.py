@@ -17,12 +17,13 @@ def get_cloudwatch_handler(log_group: str, stream_name: str) -> logging.Handler 
         import boto3
         import watchtower
 
+        session = boto3.Session(region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        client = session.client("logs")
+
         handler = watchtower.CloudWatchLogHandler(
             log_group_name=log_group,
             log_stream_name=stream_name,
-            boto3_session=boto3.Session(
-                region_name=os.environ.get("AWS_REGION", "us-east-1")
-            ),
+            boto3_client=client,
             create_log_group=True,
             create_log_stream=True,
         )
