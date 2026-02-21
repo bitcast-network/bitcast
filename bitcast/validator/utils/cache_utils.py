@@ -3,7 +3,7 @@ import shutil
 import bittensor as bt
 from diskcache import Cache
 from bitcast.validator.utils.config import CACHE_DIRS, CACHE_ROOT
-from bitcast.validator.clients.ChuteClient import ChuteClient
+from bitcast.validator.clients.llm_client import get_llm_cache
 from bitcast.validator.utils.briefs import BriefsCache
 from bitcast.validator.utils.blacklist import BlacklistCache
 from bitcast.validator.platforms.youtube.cache.search import YouTubeSearchCache
@@ -45,8 +45,9 @@ def clear_llm_cache():
     """Clear LLM cache."""
     bt.logging.info("Clearing LLM cache")
     try:
-        if ChuteClient._cache:
-            ChuteClient._cache.clear()
+        cache = get_llm_cache()
+        if cache:
+            cache.clear()
             bt.logging.info("Successfully cleared LLM cache")
         else:
             bt.logging.warning("LLM cache not initialized")
@@ -84,8 +85,9 @@ def clear_expired_llm_cache():
     """Clear expired LLM cache entries."""
     bt.logging.info("Clearing expired LLM cache entries")
     try:
-        if ChuteClient._cache:
-            ChuteClient._cache.expire()
+        cache = get_llm_cache()
+        if cache:
+            cache.expire()
             bt.logging.info("Successfully cleared expired LLM cache entries")
         else:
             bt.logging.warning("LLM cache not initialized")

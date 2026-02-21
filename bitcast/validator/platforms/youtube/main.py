@@ -3,7 +3,7 @@ import time
 
 import bittensor as bt
 
-import bitcast.validator.clients.ChuteClient as chute_client_module
+from bitcast.validator.clients.llm_client import get_llm_request_count, reset_llm_request_count
 from bitcast.validator.platforms.youtube.api import (
     get_channel_analytics,
     get_channel_data,
@@ -37,7 +37,7 @@ def eval_youtube(creds, briefs, min_stake=False):
     result, youtube_data_client, youtube_analytics_client = initialize_youtube_evaluation(creds, briefs)
     # Reset API call counters for this token evaluation
     state.reset_api_call_counts()
-    chute_client_module.reset_chutes_request_count()
+    reset_llm_request_count()
     start = time.perf_counter()
     
     # Get and process channel information
@@ -48,7 +48,7 @@ def eval_youtube(creds, briefs, min_stake=False):
         result["performance_stats"] = {
             "data_api_calls": state.data_api_call_count,
             "analytics_api_calls": state.analytics_api_call_count,
-            "chutes_requests": chute_client_module.chutes_request_count,
+            "llm_requests": get_llm_request_count(),
             "evaluation_time_s": elapsed
         }
         return result
@@ -69,7 +69,7 @@ def eval_youtube(creds, briefs, min_stake=False):
         result["performance_stats"] = {
             "data_api_calls": state.data_api_call_count,
             "analytics_api_calls": state.analytics_api_call_count,
-            "chutes_requests": chute_client_module.chutes_request_count,
+            "llm_requests": get_llm_request_count(),
             "evaluation_time_s": elapsed
         }
         return result
@@ -81,7 +81,7 @@ def eval_youtube(creds, briefs, min_stake=False):
     result["performance_stats"] = {
         "data_api_calls": state.data_api_call_count,
         "analytics_api_calls": state.analytics_api_call_count,
-        "chutes_requests": chute_client_module.chutes_request_count,
+        "llm_requests": get_llm_request_count(),
         "evaluation_time_s": elapsed
     }
     

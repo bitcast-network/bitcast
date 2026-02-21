@@ -43,8 +43,12 @@ WEIGHT_CORRECTIONS_ENDPOINT = f"{DATA_CLIENT_URL}:7999/api/v1/weight-corrections
 RAPID_API_KEY = os.getenv('RAPID_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 CHUTES_API_KEY = os.getenv('CHUTES_API_KEY')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 WANDB_API_KEY = os.getenv('WANDB_API_KEY')
 WANDB_PROJECT = os.getenv('WANDB_PROJECT', 'bitcast_vali_logs')
+
+# LLM Provider selection: "chutes" or "openrouter"
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'chutes').lower()
 
 
 # optional
@@ -52,6 +56,9 @@ DISABLE_LLM_CACHING = os.getenv('DISABLE_LLM_CACHING', 'False').lower() == 'true
 
 # Only run LLM checks on videos that pass all other checks
 ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
+
+# Disable prompt injection checking (saves 15-28s per request)
+DISABLE_PROMPT_INJECTION = os.getenv('DISABLE_PROMPT_INJECTION', 'False').lower() == 'true'
 
 # youtube scoring
 YT_LOOKBACK = 90
@@ -112,7 +119,9 @@ bt.logging.info(f"YOUTUBE_SUBMIT_ENDPOINT: {YOUTUBE_SUBMIT_ENDPOINT}")
 bt.logging.info(f"ENABLE_DATA_PUBLISH: {ENABLE_DATA_PUBLISH}")
 bt.logging.info(f"WEIGHT_CORRECTIONS_ENDPOINT: {WEIGHT_CORRECTIONS_ENDPOINT}")
 bt.logging.info(f"DISABLE_LLM_CACHING: {DISABLE_LLM_CACHING}")
+bt.logging.info(f"LLM_PROVIDER: {LLM_PROVIDER}")
 bt.logging.info(f"ECO_MODE: {ECO_MODE}")
+bt.logging.info(f"DISABLE_PROMPT_INJECTION: {DISABLE_PROMPT_INJECTION}")
 bt.logging.info(f"YT_MIN_SUBS: {YT_MIN_SUBS}")
 bt.logging.info(f"YT_MAX_SUBS: {YT_MAX_SUBS}")
 bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")

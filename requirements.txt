@@ -95,6 +95,7 @@ uritemplate==4.1.1
 urllib3==2.4.0
 uvicorn==0.34.2
 wandb==0.19.10
+watchtower==3.4.0
 websockets==15.0.1
 wheel==0.45.1
 xxhash==3.5.0
