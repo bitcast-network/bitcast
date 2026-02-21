@@ -51,7 +51,7 @@ The Bitcast Validator is a sophisticated, modular system for evaluating content 
                    │                External APIs                        │
                    │                                                     │
                    │  • YouTube Data & Analytics API   • RapidAPI       │
-                   │  • Chutes LLM API (DeepSeek-V3)   • Bitcast Server │
+                   │  • LLM APIs (Chutes/OpenRouter)   • Bitcast Server │
                    │  • Transcript Services             • Monitoring     │
                    └─────────────────────────────────────────────────────┘
 ```
@@ -162,11 +162,26 @@ result = await evaluator.evaluate_accounts(response, briefs, metagraph_info)
 
 ### **Content Evaluation & Security Systems**
 
-#### **Chutes LLM Client** (`clients/ChuteClient.py`)
-- **Single Provider**: Uses Chutes API with DeepSeek-V3 for all evaluations
-- **Cost-Effective**: DeepSeek-V3 provides excellent performance at lower cost
-- **Integrated Caching**: Self-contained cache implementation with TTL and sliding expiration
-- **Double Validation**: Runs two concurrent evaluations with optimistic logic to reduce false negatives
+#### **LLM Client Abstraction** (`clients/`)
+The LLM client system uses a provider-agnostic abstraction layer allowing validators to choose their preferred LLM provider:
+
+- **`base_client.py`**: Abstract base class defining the LLM client interface
+- **`llm_client.py`**: Factory module with provider selection based on `LLM_PROVIDER` env var
+- **`ChuteClient.py`**: Chutes API implementation (default provider)
+- **`OpenRouterClient.py`**: OpenRouter API implementation (alternative provider)
+
+**Configuration via Environment:**
+```bash
+LLM_PROVIDER=chutes          # Default - uses Chutes API
+LLM_PROVIDER=openrouter      # Alternative - uses OpenRouter API
+OPENROUTER_API_KEY=sk-...    # Required when using OpenRouter
+```
+
+**Features:**
+- **Provider Switching**: Easy runtime selection via environment variable
+- **Unified Interface**: Same API regardless of provider (`evaluate_content_against_brief`, `check_for_prompt_injection`)
+- **Integrated Caching**: Shared cache implementation with TTL and sliding expiration
+- **Triple Validation**: Runs three concurrent evaluations with optimistic logic to reduce false negatives
 
 #### **Prompt Versioning System** (`clients/prompts.py`)
 - **Multi-Version Support**: Registry-based prompt management (v3, v4+)
@@ -201,13 +216,14 @@ def generate_brief_evaluation_prompt(brief, duration, description, transcript, v
 
 ### **Supporting Systems**
 
-#### **Enhanced Chutes Client** (`clients/ChuteClient.py`)
-- **Multi-Version Prompt Support**: Supports v3 and v4 prompt formats
+#### **LLM Client System** (`clients/`)
+- **Provider Abstraction**: Supports multiple LLM providers (Chutes, OpenRouter)
+- **Multi-Version Prompt Support**: Supports v4 and v5 prompt formats
 - **Intelligent Caching**: TTL-based caching with sliding expiration
 - **Retry Logic**: Exponential backoff with comprehensive error handling
 - **Security Integration**: Prompt injection detection and content safety
 - **Performance Monitoring**: Request tracking and response time metrics
-- **Double Validation**: Concurrent evaluations with optimistic logic
+- **Triple Validation**: Concurrent evaluations with optimistic logic
 
 #### **Comprehensive Error Handling** (`utils/error_handling.py`)
 - **Standardized Error Patterns**: Consistent error handling across all components
