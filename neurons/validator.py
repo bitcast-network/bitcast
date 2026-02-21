@@ -8,6 +8,7 @@ import random
 from bitcast.base.validator import BaseValidatorNeuron
 from bitcast.validator import forward
 from bitcast.validator.utils.config import __version__, WANDB_PROJECT
+from bitcast.utils.cloudwatch_logging import get_cloudwatch_handler
 from core.auto_update import run_auto_update
 
 class Validator(BaseValidatorNeuron):
@@ -21,6 +22,17 @@ class Validator(BaseValidatorNeuron):
 
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
+
+        try:
+            cw_handler = get_cloudwatch_handler(
+                log_group="/bitcast/validator",
+                stream_name=f"validator-uid-{self.uid}",
+            )
+            if cw_handler:
+                bt.logging._logger.addHandler(cw_handler)
+                bt.logging.info("CloudWatch logging enabled")
+        except Exception as e:
+            bt.logging.warning(f"Failed to set up CloudWatch logging: {e}")
 
         # Initialize wandb only if disable_set_weights is False
         if not self.config.neuron.disable_set_weights:

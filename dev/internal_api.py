@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from bitcast.validator.platforms.youtube.evaluation.video.orchestration import vet_video
+from bitcast.utils.cloudwatch_logging import get_cloudwatch_handler
 import asyncio
 import json
 
@@ -15,6 +16,14 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
+
+cw_handler = get_cloudwatch_handler(
+    log_group="/bitcast/internal-api",
+    stream_name="internal-api",
+)
+if cw_handler:
+    logging.getLogger().addHandler(cw_handler)
+    logging.info("CloudWatch logging enabled")
 
 # Note: This API is intended solely for the use of the subnet development team.
 # It can be ignored by anyone else.
