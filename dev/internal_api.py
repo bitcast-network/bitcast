@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 
 cw_handler = get_cloudwatch_handler(
-    log_group="/bitcast/internal-api",
+    log_group="/bitcast/youtube-validator-internal-api",
     stream_name="internal-api",
 )
 if cw_handler:

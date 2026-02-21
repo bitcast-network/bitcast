@@ -25,7 +25,7 @@ class Validator(BaseValidatorNeuron):
 
         try:
             cw_handler = get_cloudwatch_handler(
-                log_group="/bitcast/validator",
+                log_group="/bitcast/youtube-validator",
                 stream_name=f"validator-uid-{self.uid}",
             )
             if cw_handler:
