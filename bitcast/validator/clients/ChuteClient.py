@@ -43,7 +43,7 @@ class ChuteClient(BaseLLMClient):
                 self.API_URL,
                 headers=headers,
                 json=payload,
-                timeout=60
+                timeout=90
             )
             response.raise_for_status()
             

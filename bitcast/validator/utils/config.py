@@ -57,6 +57,9 @@ DISABLE_LLM_CACHING = os.getenv('DISABLE_LLM_CACHING', 'False').lower() == 'true
 # Only run LLM checks on videos that pass all other checks
 ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
 
+# Disable prompt injection checking (saves 15-28s per request)
+DISABLE_PROMPT_INJECTION = os.getenv('DISABLE_PROMPT_INJECTION', 'False').lower() == 'true'
+
 # youtube scoring
 YT_LOOKBACK = 90
 YT_ROLLING_WINDOW = 7
@@ -118,6 +121,7 @@ bt.logging.info(f"WEIGHT_CORRECTIONS_ENDPOINT: {WEIGHT_CORRECTIONS_ENDPOINT}")
 bt.logging.info(f"DISABLE_LLM_CACHING: {DISABLE_LLM_CACHING}")
 bt.logging.info(f"LLM_PROVIDER: {LLM_PROVIDER}")
 bt.logging.info(f"ECO_MODE: {ECO_MODE}")
+bt.logging.info(f"DISABLE_PROMPT_INJECTION: {DISABLE_PROMPT_INJECTION}")
 bt.logging.info(f"YT_MIN_SUBS: {YT_MIN_SUBS}")
 bt.logging.info(f"YT_MAX_SUBS: {YT_MAX_SUBS}")
 bt.logging.info(f"YT_MIN_CHANNEL_AGE: {YT_MIN_CHANNEL_AGE}")

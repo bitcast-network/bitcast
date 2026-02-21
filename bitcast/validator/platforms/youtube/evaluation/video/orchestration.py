@@ -17,7 +17,7 @@ from bitcast.validator.platforms.youtube.config import (
     get_youtube_metrics,
 )
 from bitcast.validator.platforms.youtube.utils import _format_error, state
-from bitcast.validator.utils.config import DISCRETE_MODE, ECO_MODE
+from bitcast.validator.utils.config import DISCRETE_MODE, ECO_MODE, DISABLE_PROMPT_INJECTION
 from bitcast.validator.utils.error_handling import log_and_raise_api_error
 
 from .brief_matching import (
@@ -189,10 +189,14 @@ def _process_video_transcript_and_briefs(video_id, video_data, briefs, decision_
         return [], ["Failed to get video transcript"] * len(briefs)
     
     # Check for prompt injection (only when briefs passed pre-screening)
-    if not check_prompt_injection(video_id, video_data, transcript, decision_details):
-        decision_details["video_vet_result"] = False
-        decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
-        return [], ["Video failed prompt injection check"] * len(briefs)
+    if DISABLE_PROMPT_INJECTION:
+        decision_details["promptInjectionCheck"] = True
+        bt.logging.info(f"Prompt injection check disabled via config, skipping for video {video_id}")
+    else:
+        if not check_prompt_injection(video_id, video_data, transcript, decision_details):
+            decision_details["video_vet_result"] = False
+            decision_details["contentAgainstBriefCheck"] = [False] * len(briefs)
+            return [], ["Video failed prompt injection check"] * len(briefs)
     
     # Evaluate eligible briefs against content (all pre-screening and safety checks passed)
     if eligible_briefs:
