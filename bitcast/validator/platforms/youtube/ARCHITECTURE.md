@@ -185,6 +185,27 @@ day2_avg = 7_day_cumulative_average(T-9 to T-3)   # Later period
 score = calculate_curve_value(day2_avg) - calculate_curve_value(day1_avg)
 ```
 
+### **Lifetime Deduction**
+
+A fixed USD amount is deducted from each video's lifetime reward total. This is
+applied statelessly by shifting the curve down by `deduction / scaling_factor`
+and clamping at zero before differencing:
+
+```python
+threshold = lifetime_deduction / scaling_factor
+adjusted = max(curve(day2) - threshold, 0) - max(curve(day1) - threshold, 0)
+usd_target = adjusted * scaling_factor * boost
+```
+
+The daily differences telescope, so the lifetime sum is reduced by exactly
+`lifetime_deduction` (or zeroed if the video never earns that much).
+
+| Brief Format | Scaling Factor | Lifetime Deduction | Env Var |
+|--------------|---------------|--------------------|---------|
+| dedicated    | 1800          | $100               | `YT_LIFETIME_DEDUCTION` |
+| ad-read      | 400           | $25                | `YT_LIFETIME_DEDUCTION_AD_READ` |
+| integration  | 400           | $25                | `YT_LIFETIME_DEDUCTION_AD_READ` |
+
 ### **YPP Account Scoring** (Actual Revenue)
 ```python
 # Standard YPP accounts with revenue > 0: "ypp_curve_based"
