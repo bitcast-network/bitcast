@@ -1,7 +1,6 @@
 """Handles score aggregation across platforms and accounts."""
 
 from typing import List, Dict, Any
-import numpy as np
 from ..interfaces.score_aggregator import ScoreAggregator
 from ..models.score_matrix import ScoreMatrix
 from ..models.evaluation_result import EvaluationResultCollection
