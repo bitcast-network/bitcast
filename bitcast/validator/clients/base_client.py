@@ -13,8 +13,6 @@ from abc import ABC, abstractmethod
 from threading import Lock
 from diskcache import Cache
 from typing import Optional, Dict, Any, Tuple
-from tenacity import retry, stop_after_attempt, wait_exponential
-from concurrent.futures import ThreadPoolExecutor
 
 from bitcast.validator.utils.config import (
     DISABLE_LLM_CACHING,
@@ -22,7 +20,7 @@ from bitcast.validator.utils.config import (
     TRANSCRIPT_MAX_LENGTH,
     OPENAI_CACHE_EXPIRY
 )
-from bitcast.validator.clients.prompts import generate_brief_evaluation_prompt, get_latest_prompt_version
+from bitcast.validator.clients.prompts import get_latest_prompt_version
 
 
 class BaseLLMClient(ABC):

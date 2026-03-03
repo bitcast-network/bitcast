@@ -1,7 +1,5 @@
 """Handles communication with miners - extracted from get_rewards()."""
 
-import asyncio
-from typing import List, Dict
 import bittensor as bt
 from bitcast.protocol import AccessTokenSynapse
 from ..models.miner_response import MinerResponse
