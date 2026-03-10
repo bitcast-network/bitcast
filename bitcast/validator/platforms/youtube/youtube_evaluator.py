@@ -44,38 +44,46 @@ class YouTubeEvaluator(PlatformEvaluator):
         briefs: List[Dict[str, Any]],
         metagraph_info: Dict[str, Any]
     ) -> EvaluationResult:
-        """
-        Evaluate YouTube accounts - replaces logic from reward() function.
-        """
-        result = EvaluationResult(
-            uid=miner_response.uid,
-            platform=self.platform_name(),
-            metagraph_info=metagraph_info,
-            aggregated_scores={brief["id"]: 0.0 for brief in briefs}
-        )
-        
-        # Process YouTube access tokens (existing logic)
+        """Evaluate all YouTube accounts in a miner response."""
         yt_tokens = miner_response.YT_access_tokens[:MAX_ACCOUNTS_PER_SYNAPSE]
         
         if len(miner_response.YT_access_tokens) > MAX_ACCOUNTS_PER_SYNAPSE:
             bt.logging.info(f"Limiting to {MAX_ACCOUNTS_PER_SYNAPSE} accounts per synapse (received {len(miner_response.YT_access_tokens)})")
         
-        for i, yt_access_token in enumerate(yt_tokens):
-            account_id = f"account_{i+1}"
+        return await self.evaluate_token_batch(
+            miner_response.uid, yt_tokens, 0, briefs, metagraph_info
+        )
+    
+    async def evaluate_token_batch(
+        self,
+        uid: int,
+        tokens: List[str],
+        account_offset: int,
+        briefs: List[Dict[str, Any]],
+        metagraph_info: Dict[str, Any]
+    ) -> EvaluationResult:
+        """Evaluate a batch of tokens with offset-based account naming."""
+        result = EvaluationResult(
+            uid=uid,
+            platform=self.platform_name(),
+            metagraph_info=metagraph_info,
+            aggregated_scores={brief["id"]: 0.0 for brief in briefs}
+        )
+        
+        for i, token in enumerate(tokens):
+            account_id = f"account_{account_offset + i + 1}"
             
-            if yt_access_token:
-                bt.logging.info(f"Processing {account_id} for UID {miner_response.uid}")
+            if token:
+                bt.logging.info(f"Processing {account_id} for UID {uid}")
                 account_result = await self._process_youtube_account(
-                    yt_access_token, briefs, metagraph_info, account_id
+                    token, briefs, metagraph_info, account_id
                 )
                 result.add_account_result(account_id, account_result)
                 
-                # Aggregate scores
                 for brief_id, score in account_result.scores.items():
                     result.aggregated_scores[brief_id] += score
             else:
-                bt.logging.warning(f"Empty token found at index {i} for UID {miner_response.uid}")
-                # Add empty account result for failed tokens
+                bt.logging.warning(f"Empty token at {account_id} for UID {uid}")
                 empty_result = AccountResult.create_error_result(
                     account_id, "Empty access token", briefs
                 )
