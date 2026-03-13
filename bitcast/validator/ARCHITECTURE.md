@@ -102,6 +102,7 @@ RewardDistributionService → [Final Rewards & Stats]
 
 #### **Orchestrator** (`orchestrator.py`)
 - **Sequential Processing**: Just-in-time miner querying to prevent token expiration
+- **Batched Credential Evaluation**: When a miner returns more tokens than `CREDENTIAL_BATCH_SIZE`, accounts are processed in batches with fresh tokens re-queried before each batch to prevent OAuth expiration
 - **Error Recovery**: Comprehensive error handling with fallback mechanisms
 - **Global Ratio Management**: Updates cached views-to-revenue ratios for Non-YPP scoring
 - **State Coordination**: Manages evaluation state and cleanup between cycles
@@ -336,6 +337,7 @@ final_rewards = distribute_rewards(emission_targets, uids)
 - **Intelligent Caching**: Multi-layer caching with TTL, sliding expiration, and size limits
 - **Batch Operations**: Optimized API usage with batch data retrieval
 - **Sequential Miner Processing**: Prevents OAuth token expiration through just-in-time processing
+- **Batched Credential Refresh**: Re-queries miners for fresh tokens between batches when processing many accounts per UID (configurable via `CREDENTIAL_BATCH_SIZE`)
 
 ### **Advanced Reliability Features**
 - **Graceful Degradation**: System continues with reduced functionality on component failures

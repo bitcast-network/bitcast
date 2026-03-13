@@ -91,6 +91,13 @@ class EvaluationResult:
         """Add an account result to this evaluation."""
         self.account_results[account_id] = result
     
+    def merge(self, other: 'EvaluationResult'):
+        """Merge another EvaluationResult's accounts and scores into this one."""
+        for account_id, account_result in other.account_results.items():
+            self.add_account_result(account_id, account_result)
+        for brief_id, score in other.aggregated_scores.items():
+            self.aggregated_scores[brief_id] = self.aggregated_scores.get(brief_id, 0.0) + score
+    
     def get_total_score_for_brief(self, brief_id: str) -> float:
         """Get aggregated score for a specific brief."""
         return self.aggregated_scores.get(brief_id, 0.0)

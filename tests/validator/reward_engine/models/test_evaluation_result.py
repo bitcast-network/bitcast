@@ -83,6 +83,86 @@ class TestEvaluationResult:
         assert result.get_total_score_for_brief("brief3") == 0.0
 
 
+class TestEvaluationResultMerge:
+    """Test EvaluationResult.merge method."""
+    
+    def test_merge_combines_accounts(self):
+        """Test that merge adds accounts from other result."""
+        result_a = EvaluationResult(
+            uid=1, platform="youtube",
+            aggregated_scores={"brief1": 1.0}
+        )
+        result_a.add_account_result("account_1", AccountResult(
+            account_id="account_1", platform_data={}, videos={},
+            scores={"brief1": 1.0}, performance_stats={}, success=True
+        ))
+        
+        result_b = EvaluationResult(
+            uid=1, platform="youtube",
+            aggregated_scores={"brief1": 2.0}
+        )
+        result_b.add_account_result("account_2", AccountResult(
+            account_id="account_2", platform_data={}, videos={},
+            scores={"brief1": 2.0}, performance_stats={}, success=True
+        ))
+        
+        result_a.merge(result_b)
+        
+        assert len(result_a.account_results) == 2
+        assert "account_1" in result_a.account_results
+        assert "account_2" in result_a.account_results
+    
+    def test_merge_sums_scores(self):
+        """Test that merge sums aggregated scores across briefs."""
+        result_a = EvaluationResult(
+            uid=1, platform="youtube",
+            aggregated_scores={"brief1": 1.0, "brief2": 0.5}
+        )
+        result_b = EvaluationResult(
+            uid=1, platform="youtube",
+            aggregated_scores={"brief1": 2.0, "brief2": 1.5}
+        )
+        
+        result_a.merge(result_b)
+        
+        assert result_a.aggregated_scores["brief1"] == 3.0
+        assert result_a.aggregated_scores["brief2"] == 2.0
+    
+    def test_merge_handles_new_brief_ids(self):
+        """Test merge when other has brief IDs not in self."""
+        result_a = EvaluationResult(
+            uid=1, platform="youtube",
+            aggregated_scores={"brief1": 1.0}
+        )
+        result_b = EvaluationResult(
+            uid=1, platform="youtube",
+            aggregated_scores={"brief2": 3.0}
+        )
+        
+        result_a.merge(result_b)
+        
+        assert result_a.aggregated_scores["brief1"] == 1.0
+        assert result_a.aggregated_scores["brief2"] == 3.0
+    
+    def test_merge_empty_other(self):
+        """Test merging an empty result changes nothing."""
+        result_a = EvaluationResult(
+            uid=1, platform="youtube",
+            aggregated_scores={"brief1": 5.0}
+        )
+        result_a.add_account_result("account_1", AccountResult(
+            account_id="account_1", platform_data={}, videos={},
+            scores={"brief1": 5.0}, performance_stats={}, success=True
+        ))
+        
+        result_b = EvaluationResult(uid=1, platform="youtube", aggregated_scores={})
+        
+        result_a.merge(result_b)
+        
+        assert len(result_a.account_results) == 1
+        assert result_a.aggregated_scores["brief1"] == 5.0
+
+
 class TestEvaluationResultCollection:
     """Test EvaluationResultCollection class."""
     

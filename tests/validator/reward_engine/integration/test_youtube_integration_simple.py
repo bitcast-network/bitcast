@@ -71,6 +71,69 @@ class TestYouTubeIntegrationSimple:
         assert account_result.scores == {"brief1": 0, "brief2": 0}
 
 
+class TestEvaluateTokenBatch:
+    """Test YouTubeEvaluator.evaluate_token_batch."""
+    
+    @pytest.mark.asyncio
+    async def test_evaluate_token_batch_offset_naming(self):
+        """Tokens are named with offset-based account IDs."""
+        evaluator = YouTubeEvaluator()
+        briefs = [{"id": "brief1", "title": "B1"}]
+        
+        result = await evaluator.evaluate_token_batch(
+            uid=42,
+            tokens=["invalid_tok_a", "invalid_tok_b"],
+            account_offset=5,
+            briefs=briefs,
+            metagraph_info={"alpha_stake": 10000.0}
+        )
+        
+        assert result.uid == 42
+        assert result.platform == "youtube"
+        assert "account_6" in result.account_results
+        assert "account_7" in result.account_results
+        assert len(result.account_results) == 2
+    
+    @pytest.mark.asyncio
+    async def test_evaluate_token_batch_empty_tokens(self):
+        """Empty tokens produce error results with correct naming."""
+        evaluator = YouTubeEvaluator()
+        briefs = [{"id": "brief1", "title": "B1"}]
+        
+        result = await evaluator.evaluate_token_batch(
+            uid=10,
+            tokens=["", None],
+            account_offset=0,
+            briefs=briefs,
+            metagraph_info={"alpha_stake": 10000.0}
+        )
+        
+        assert len(result.account_results) == 2
+        assert "account_1" in result.account_results
+        assert "account_2" in result.account_results
+        for ar in result.account_results.values():
+            assert ar.success is False
+    
+    @pytest.mark.asyncio
+    async def test_evaluate_token_batch_scores_aggregate(self):
+        """Aggregated scores sum across tokens in the batch."""
+        evaluator = YouTubeEvaluator()
+        briefs = [{"id": "brief1", "title": "B1"}, {"id": "brief2", "title": "B2"}]
+        
+        result = await evaluator.evaluate_token_batch(
+            uid=1,
+            tokens=["tok1", "tok2", "tok3"],
+            account_offset=0,
+            briefs=briefs,
+            metagraph_info={"alpha_stake": 10000.0}
+        )
+        
+        assert len(result.account_results) == 3
+        # All scores should be 0.0 since tokens are invalid, but structure is correct
+        for brief in briefs:
+            assert brief["id"] in result.aggregated_scores
+
+
 def test_eval_youtube_function_import():
     """Test that we can import the eval_youtube function directly."""
     from bitcast.validator.platforms.youtube.main import eval_youtube
