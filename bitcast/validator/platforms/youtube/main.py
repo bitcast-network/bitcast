@@ -282,6 +282,10 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     # Check if this video matches any briefs
     matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
     
+    # Add brief IDs to decision_details so ingestion knows the mapping
+    decision_details = video_decision_details.get(video_id, {})
+    decision_details["evaluated_brief_ids"] = [brief["id"] for brief in briefs]
+
     # Store video details in the result
     result["videos"][video_id] = {
         "details": video_data,
@@ -290,7 +294,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         "matching_brief_ids": matching_brief_ids,
         "url": f"https://www.youtube.com/watch?v={video_id}",
         "vet_outcomes": video_matches.get(video_id, []),
-        "decision_details": video_decision_details.get(video_id, {})
+        "decision_details": decision_details
     }
     
     # Check the overall vetting result

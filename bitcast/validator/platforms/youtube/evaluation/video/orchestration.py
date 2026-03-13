@@ -238,10 +238,11 @@ def _compile_evaluation_results(met_brief_ids, decision_details, brief_reasoning
     """
     # Set anyBriefMatched based on whether any brief matched
     decision_details["anyBriefMatched"] = any(decision_details["contentAgainstBriefCheck"])
-    
+    decision_details["brief_reasonings"] = brief_reasonings
+
     return {
-        "met_brief_ids": met_brief_ids, 
-        "decision_details": decision_details, 
+        "met_brief_ids": met_brief_ids,
+        "decision_details": decision_details,
         "brief_reasonings": brief_reasonings
     }
 
