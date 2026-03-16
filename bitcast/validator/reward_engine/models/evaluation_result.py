@@ -45,9 +45,17 @@ class AccountResult:
         # Deep copy videos (nested structure requires deepcopy) and clean
         cleaned_videos = copy.deepcopy(self.videos)
 
-        # Restore brief_reasonings on the originals
+        # Restore brief_reasonings on originals AND inject into cleaned copy
         for dd, reasonings in stripped:
             dd["brief_reasonings"] = reasonings
+        for video_id in cleaned_videos:
+            orig = self.videos.get(video_id)
+            if isinstance(orig, dict):
+                orig_dd = orig.get("decision_details")
+                if isinstance(orig_dd, dict) and "brief_reasonings" in orig_dd:
+                    cleaned_dd = cleaned_videos[video_id].get("decision_details")
+                    if isinstance(cleaned_dd, dict):
+                        cleaned_dd["brief_reasonings"] = orig_dd["brief_reasonings"]
 
         for video_id, video_data in cleaned_videos.items():
             if isinstance(video_data, dict) and "details" in video_data:
