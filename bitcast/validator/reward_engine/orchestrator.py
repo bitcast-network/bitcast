@@ -77,7 +77,7 @@ class RewardOrchestrator:
                 )
                 evaluation_results.add_result(uid, result)
                 
-                publish_miner_accounts_safe(result, run_id, validator_self.wallet)
+                await publish_miner_accounts_safe(result, run_id, validator_self.wallet)
             
             # 4. Aggregate scores across platforms
             bt.logging.info("🔄 PHASE 4: Aggregating individual video scores into score matrix")
