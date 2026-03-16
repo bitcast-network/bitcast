@@ -18,7 +18,7 @@ from .services.weight_corrections_service import WeightCorrectionsService
 from .models.evaluation_result import EvaluationResultCollection, EvaluationResult
 from .models.miner_response import MinerResponse
 from ..utils.weight_corrections_publisher import publish_weight_corrections
-from ..utils.config import WEIGHT_CORRECTIONS_ENDPOINT, ENABLE_DATA_PUBLISH
+from ..utils.config import WEIGHT_CORRECTIONS_ENDPOINT, ENABLE_DATA_PUBLISH, CREDENTIAL_BATCH_SIZE, MAX_ACCOUNTS_PER_SYNAPSE
 
 
 class RewardOrchestrator:
@@ -70,15 +70,14 @@ class RewardOrchestrator:
             evaluation_results = EvaluationResultCollection()
             
             for uid in uids:
-                # Query this miner just-in-time
                 miner_response = await self.miner_query.query_single_miner(validator_self, uid)
                 
-                # Evaluate immediately while token is fresh
-                result = await self._evaluate_single_miner(miner_response, briefs, validator_self.metagraph)
+                result = await self._evaluate_single_miner(
+                    miner_response, briefs, validator_self.metagraph, validator_self
+                )
                 evaluation_results.add_result(uid, result)
                 
-                # 🌊 STREAMING: Publish this miner's accounts immediately (fire and forget)
-                publish_miner_accounts_safe(result, run_id, validator_self.wallet)
+                await publish_miner_accounts_safe(result, run_id, validator_self.wallet)
             
             # 4. Aggregate scores across platforms
             bt.logging.info("🔄 PHASE 4: Aggregating individual video scores into score matrix")
@@ -107,7 +106,12 @@ class RewardOrchestrator:
                 await self._publish_weight_corrections(
                     evaluation_results, pre_constraint_weights, post_constraint_weights, briefs, run_id, validator_self.wallet
                 )
-            
+
+            # Release heavy evaluation data now that all phases are complete.
+            # account_results hold the bulk of memory (videos, platform_data per miner).
+            for eval_result in evaluation_results.results.values():
+                eval_result.account_results.clear()
+
             return rewards, stats_list
             
         except Exception as e:
@@ -118,13 +122,13 @@ class RewardOrchestrator:
         self, 
         miner_response: MinerResponse, 
         briefs: List[dict],
-        metagraph
+        metagraph,
+        validator_self
     ) -> EvaluationResult:
-        """Evaluate a single miner's response immediately after querying."""
+        """Evaluate a single miner's response, batching credentials to prevent expiration."""
         uid = miner_response.uid
         
         try:
-            # Special handling for burn UID
             if uid == 0:
                 bt.logging.debug(f"Burn UID {uid}: setting scores to 0")
                 return EvaluationResult(
@@ -133,25 +137,27 @@ class RewardOrchestrator:
                     aggregated_scores={brief["id"]: 0.0 for brief in briefs}
                 )
             
-            # Find platform evaluator for this response
             evaluator = self.platforms.get_evaluator_for_response(miner_response)
             
-            if evaluator:
-                bt.logging.debug(f"Using {evaluator.platform_name()} for UID {uid}")
-                
-                # Extract metagraph info and evaluate
-                metagraph_info = self._extract_metagraph_info(metagraph, uid)
-                result = await evaluator.evaluate_accounts(miner_response, briefs, metagraph_info)
-                
-                bt.logging.debug(f"Evaluated UID {uid}: {len(result.account_results)} accounts")
-                return result
-            else:
+            if not evaluator:
                 bt.logging.warning(f"No evaluator found for UID {uid}")
                 return EvaluationResult(
                     uid=uid,
                     platform="unknown",
                     aggregated_scores={brief["id"]: 0.0 for brief in briefs}
                 )
+            
+            metagraph_info = self._extract_metagraph_info(metagraph, uid)
+            total_tokens = len(miner_response.YT_access_tokens[:MAX_ACCOUNTS_PER_SYNAPSE])
+            
+            if total_tokens <= CREDENTIAL_BATCH_SIZE or not hasattr(evaluator, 'evaluate_token_batch'):
+                result = await evaluator.evaluate_accounts(miner_response, briefs, metagraph_info)
+                bt.logging.debug(f"Evaluated UID {uid}: {len(result.account_results)} accounts")
+                return result
+            
+            return await self._evaluate_in_batches(
+                uid, total_tokens, evaluator, briefs, metagraph_info, validator_self
+            )
                 
         except Exception as e:
             bt.logging.error(f"Failed to evaluate UID {uid}: {e}")
@@ -160,6 +166,53 @@ class RewardOrchestrator:
                 platform="error",
                 aggregated_scores={brief["id"]: 0.0 for brief in briefs}
             )
+    
+    async def _evaluate_in_batches(
+        self,
+        uid: int,
+        total_tokens: int,
+        evaluator,
+        briefs: List[dict],
+        metagraph_info: Dict[str, Any],
+        validator_self
+    ) -> EvaluationResult:
+        """Process a miner's credentials in batches, re-querying for fresh tokens each batch."""
+        num_batches = (total_tokens + CREDENTIAL_BATCH_SIZE - 1) // CREDENTIAL_BATCH_SIZE
+        bt.logging.info(
+            f"UID {uid}: batching {total_tokens} tokens into {num_batches} "
+            f"batches of {CREDENTIAL_BATCH_SIZE}"
+        )
+        
+        combined = EvaluationResult(
+            uid=uid,
+            platform=evaluator.platform_name(),
+            metagraph_info=metagraph_info,
+            aggregated_scores={brief["id"]: 0.0 for brief in briefs}
+        )
+        
+        for batch_idx in range(num_batches):
+            offset = batch_idx * CREDENTIAL_BATCH_SIZE
+            
+            fresh_response = await self.miner_query.query_single_miner(validator_self, uid)
+            all_tokens = fresh_response.YT_access_tokens[:MAX_ACCOUNTS_PER_SYNAPSE]
+            batch_tokens = all_tokens[offset:offset + CREDENTIAL_BATCH_SIZE]
+            
+            if not batch_tokens:
+                bt.logging.info(f"UID {uid}: no tokens in batch {batch_idx + 1}, stopping")
+                break
+            
+            bt.logging.info(
+                f"UID {uid}: processing batch {batch_idx + 1}/{num_batches} "
+                f"(accounts {offset + 1}-{offset + len(batch_tokens)})"
+            )
+            
+            batch_result = await evaluator.evaluate_token_batch(
+                uid, batch_tokens, offset, briefs, metagraph_info
+            )
+            combined.merge(batch_result)
+        
+        bt.logging.info(f"UID {uid}: batched evaluation complete, {len(combined.account_results)} accounts total")
+        return combined
     
     def _extract_metagraph_info(self, metagraph, uid: int) -> Dict[str, Any]:
         """Extract relevant metagraph information for a UID."""

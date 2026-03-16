@@ -6,7 +6,6 @@ returns curve to prevent linear scaling exploitation while fairly rewarding grow
 """
 
 import math
-from typing import Optional
 
 import bittensor as bt
 
@@ -90,10 +89,39 @@ def calculate_curve_difference(day1_avg: float, day2_avg: float) -> float:
     day1_curve = calculate_curve_value(day1_avg)
     day2_curve = calculate_curve_value(day2_avg)
     
-    difference = day2_curve - day1_curve
+    return day2_curve - day1_curve
+
+
+def calculate_adjusted_curve_difference(
+    day1_avg: float, day2_avg: float, scaling_factor: float, lifetime_deduction: float
+) -> float:
+    """
+    Calculate curve difference with lifetime deduction threshold applied.
     
-    # Curve difference calculated
+    Shifts the curve down by (lifetime_deduction / scaling_factor) and clamps
+    at zero before differencing. This guarantees the lifetime sum of daily scores
+    is reduced by exactly lifetime_deduction (in USD terms) via telescoping:
     
-    return difference
+      sum(daily) = max(curve(final) - threshold, 0) * scaling * boost
+                 = max(curve(final) * scaling - deduction, 0) * boost
+    
+    Args:
+        day1_avg: Average value for the earlier period
+        day2_avg: Average value for the later period
+        scaling_factor: Brief-specific scaling factor (e.g. 1800 for dedicated)
+        lifetime_deduction: USD amount to deduct from lifetime total (e.g. 100 for dedicated, 25 for ad-read)
+        
+    Returns:
+        float: The adjusted curve difference
+    """
+    if scaling_factor <= 0 or lifetime_deduction <= 0:
+        return calculate_curve_difference(day1_avg, day2_avg)
+
+    threshold = lifetime_deduction / scaling_factor
+
+    day1_curve = calculate_curve_value(day1_avg)
+    day2_curve = calculate_curve_value(day2_avg)
+
+    return max(day2_curve - threshold, 0) - max(day1_curve - threshold, 0)
 
 

@@ -35,9 +35,9 @@ class TestWeightCorrectionsIntegration:
                     "brief_metrics": {
                         "brief_1": {
                             "base_score": 2.5,
-                            "scaling_factor": 2000,
-                            "usd_target": 5000.0,
-                            "weight": 5000.0,
+                            "scaling_factor": 1800,
+                            "usd_target": 4500.0,
+                            "weight": 4500.0,
                             "limitation_status": "active"
                         },
                         "brief_2": {
@@ -54,15 +54,15 @@ class TestWeightCorrectionsIntegration:
                     "brief_metrics": {
                         "brief_1": {
                             "base_score": 1.8,
-                            "scaling_factor": 2000,
-                            "usd_target": 3600.0,
-                            "weight": 3600.0,
+                            "scaling_factor": 1800,
+                            "usd_target": 3240.0,
+                            "weight": 3240.0,
                             "limitation_status": "limited_fifo"  # This video was limited
                         }
                     }
                 }
             },
-            scores={"brief_1": 8600.0, "brief_2": 400.0},
+            scores={"brief_1": 7740.0, "brief_2": 400.0},
             performance_stats={},
             success=True
         )
@@ -83,7 +83,7 @@ class TestWeightCorrectionsIntegration:
             EmissionTarget(
                 brief_id="brief_1",
                 usd_target=100.0,
-                allocation_details={"per_miner_weights": [8600.0]},
+                allocation_details={"per_miner_weights": [7740.0]},
                 scaling_factors={"boost_factor": 1.0}
             ),
             EmissionTarget(

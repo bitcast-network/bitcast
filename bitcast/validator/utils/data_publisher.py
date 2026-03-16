@@ -58,59 +58,59 @@ class DataPublisher(ABC):
     def _sign_message(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Sign message data using unified format that supports both legacy and new payload structures.
-        
+
         Args:
             data: Full payload including metadata and core data
-            
+
         Returns:
             Dict containing signed payload with signature and signer
         """
-        # Get hotkey for signing
         keypair = self.wallet.hotkey
         signer = keypair.ss58_address
-        
-        # Extract core data to sign - supports both payload formats
-        core_data_to_sign = self._extract_signable_data(data)
-        
+
+        # Convert numpy types once for the entire payload
+        converted_payload = convert_numpy_types(data)
+
+        # Extract core data to sign from the already-converted payload
+        core_data_to_sign = self._extract_signable_data(converted_payload)
+
         # Generate timestamp for BOTH signing and payload (must be identical!)
         timestamp = datetime.utcnow().isoformat()
-        
+
         # Create message to sign (format: signer:timestamp:core_data)
         message = f"{signer}:{timestamp}:{json.dumps(core_data_to_sign, sort_keys=True)}"
-        
+
         # Sign the message
         signature = keypair.sign(data=message)
-        
+
         # Create final payload with SAME timestamp used for signing
-        converted_payload = convert_numpy_types(data)
         signed_payload = {
-            **converted_payload,  # Include all metadata
-            "time": timestamp,  # Use same timestamp as signature
+            **converted_payload,
+            "time": timestamp,
             "signature": signature.hex(),
             "signer": signer,
-            "vali_hotkey": signer  # Required for unified API format
+            "vali_hotkey": signer
         }
-        
+
         return signed_payload
-    
+
     def _extract_signable_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Extract the core data that should be signed from the payload.
         Supports both unified format ('payload' field) and legacy format ('account_data' field).
-        
+
+        Data is expected to already have numpy types converted.
+
         Args:
-            data: Full payload data
-            
+            data: Full payload data (already converted)
+
         Returns:
             Core data to include in signature
         """
-        # Unified API format uses 'payload' field
         if 'payload' in data:
-            return convert_numpy_types(data.get('payload', {}))
-        
-        # Legacy format uses 'account_data' field
-        account_data = data.get('account_data', {})
-        return convert_numpy_types(account_data)
+            return data.get('payload', {})
+
+        return data.get('account_data', {})
     
     def _log_success(self, endpoint: str, data_type: str = "data") -> None:
         """Log successful publication."""

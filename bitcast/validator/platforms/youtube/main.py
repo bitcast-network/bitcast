@@ -26,7 +26,10 @@ from bitcast.validator.utils.config import (
     YT_LOOKBACK,
     YT_SCALING_FACTOR_DEDICATED,
     YT_SCALING_FACTOR_AD_READ,
+    YT_LIFETIME_DEDUCTION,
+    YT_LIFETIME_DEDUCTION_AD_READ,
 )
+from bitcast.validator.platforms.youtube.evaluation.curve_scoring import calculate_adjusted_curve_difference
 from bitcast.validator.utils.token_pricing import get_bitcast_alpha_price, get_total_miner_emissions
 
 
@@ -279,6 +282,10 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
     # Check if this video matches any briefs
     matches_any_brief, matching_brief_ids = check_video_brief_matches(video_id, video_matches, briefs)
     
+    # Add brief IDs to decision_details so ingestion knows the mapping
+    decision_details = video_decision_details.get(video_id, {})
+    decision_details["evaluated_brief_ids"] = [brief["id"] for brief in briefs]
+
     # Store video details in the result
     result["videos"][video_id] = {
         "details": video_data,
@@ -287,7 +294,7 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         "matching_brief_ids": matching_brief_ids,
         "url": f"https://www.youtube.com/watch?v={video_id}",
         "vet_outcomes": video_matches.get(video_id, []),
-        "decision_details": video_decision_details.get(video_id, {})
+        "decision_details": decision_details
     }
     
     # Check the overall vetting result
@@ -328,20 +335,47 @@ def _get_youtube_scaling_factor(brief_format: str) -> float:
     return factor
 
 
-def _calculate_per_video_metrics(base_score: float, scaling_factor: float, boost_factor: float) -> dict:
+def _get_lifetime_deduction(brief_format: str) -> float:
+    """Get lifetime deduction amount based on brief format."""
+    deductions = {
+        "dedicated": YT_LIFETIME_DEDUCTION,
+        "ad-read": YT_LIFETIME_DEDUCTION_AD_READ,
+        "integration": YT_LIFETIME_DEDUCTION_AD_READ,
+    }
+    return deductions.get(brief_format, YT_LIFETIME_DEDUCTION)
+
+
+def _calculate_per_video_metrics(
+    base_score: float,
+    scaling_factor: float,
+    boost_factor: float,
+    curve_input_day1: float,
+    curve_input_day2: float,
+    lifetime_deduction: float,
+) -> dict:
     """Calculate comprehensive per-video metrics for streaming publisher.
     
+    Applies the lifetime deduction threshold before computing the USD target.
+    This shifts the curve down by (lifetime_deduction / scaling_factor) and
+    clamps at zero, guaranteeing the lifetime sum is reduced by exactly
+    lifetime_deduction in USD terms.
+    
     Args:
-        base_score: The base video score (e.g., from curve-based scoring)
-        scaling_factor: Platform-specific scaling (e.g., 2000 for dedicated, 400 for ad-read/integration)
+        base_score: The base video score (raw curve difference, before deduction)
+        scaling_factor: Platform-specific scaling (e.g., 1800 for dedicated, 400 for ad-read/integration)
         boost_factor: Brief-specific boost multiplier (e.g., 1.25, 2.0)
+        curve_input_day1: Average value for the earlier scoring period (fed to curve function)
+        curve_input_day2: Average value for the later scoring period (fed to curve function)
+        lifetime_deduction: USD amount to deduct from lifetime total (e.g., 100 for dedicated, 25 for ad-read)
         
     Returns:
         dict: Per-video metrics including USD/Alpha targets with ALL scaling applied
     """
     try:
-        # Calculate USD target with ALL factors (platform scaling + boost) - this is the actual USD value
-        usd_target = base_score * scaling_factor * boost_factor
+        adjusted_score = calculate_adjusted_curve_difference(
+            curve_input_day1, curve_input_day2, scaling_factor, lifetime_deduction
+        )
+        usd_target = adjusted_score * scaling_factor * boost_factor
         
         # Get pricing information for weight normalization
         alpha_price_usd = get_bitcast_alpha_price()
@@ -434,6 +468,10 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
         
         result["videos"][video_id]["cap_info"] = cap_info_dict
     
+    # Extract curve inputs for lifetime deduction calculation
+    curve_input_day1 = video_score_result.get("curve_input_day1")
+    curve_input_day2 = video_score_result.get("curve_input_day2")
+    
     # Apply YouTube-specific scaling and boost factors per brief match
     usd_targets_by_brief = {}
     per_video_metrics_by_brief = {}
@@ -445,11 +483,15 @@ def update_video_score(video_id, youtube_analytics_client, video_matches, briefs
             brief_format = brief.get("format", "dedicated")
             boost_factor = brief.get("boost", 1.0)
             
-            # Get platform-specific scaling factor
+            # Get platform-specific scaling factor and lifetime deduction
             scaling_factor = _get_youtube_scaling_factor(brief_format)
+            lifetime_deduction = _get_lifetime_deduction(brief_format)
             
             # Calculate comprehensive per-video metrics with ALL scaling factors applied
-            video_metrics = _calculate_per_video_metrics(base_video_score, scaling_factor, boost_factor)
+            video_metrics = _calculate_per_video_metrics(
+                base_video_score, scaling_factor, boost_factor,
+                curve_input_day1, curve_input_day2, lifetime_deduction
+            )
             
             # Extract the USD target (this is now the actual meaningful USD value)
             usd_target = video_metrics["usd_target"]

@@ -124,6 +124,8 @@ def calculate_curve_based_score(
                         "score": 0.0,
                         "scoring_method": "ypp_zero_revenue_no_stake",
                         "daily_analytics": daily_analytics,
+                        "curve_input_day1": 0.0,
+                        "curve_input_day2": 0.0,
                         "zero_revenue_detected": True,
                         "min_stake_met": False
                     }
@@ -147,6 +149,8 @@ def calculate_curve_based_score(
             "score": 0.0,
             "daily_analytics": daily_analytics,
             "scoring_method": "curve_error_fallback",
+            "curve_input_day1": 0.0,
+            "curve_input_day2": 0.0,
             "error": str(e)
         }
 
@@ -194,6 +198,8 @@ def _calculate_ypp_curve_score(
             "scoring_method": "ypp_curve_based",
             "day1_average": day1_avg,
             "day2_average": day2_avg,
+            "curve_input_day1": day1_avg,
+            "curve_input_day2": day2_avg,
             "median_capping_applied": channel_analytics is not None,
             "periods": {
                 "day1": f"{day1_start} to {day1_end}",
@@ -207,6 +213,8 @@ def _calculate_ypp_curve_score(
             "score": 0.0,
             "daily_analytics": daily_analytics,
             "scoring_method": "ypp_curve_error",
+            "curve_input_day1": 0.0,
+            "curve_input_day2": 0.0,
             "error": str(e)
         }
 
@@ -263,6 +271,8 @@ def _calculate_non_ypp_curve_score(
             "day2_minutes_average": day2_minutes_avg,
             "day1_revenue_estimate": day1_revenue_avg,
             "day2_revenue_estimate": day2_revenue_avg,
+            "curve_input_day1": day1_revenue_avg,
+            "curve_input_day2": day2_revenue_avg,
             "revenue_multiplier": YT_NON_YPP_REVENUE_MULTIPLIER,
             "median_capping_applied": channel_analytics is not None,
             "periods": {
@@ -277,6 +287,8 @@ def _calculate_non_ypp_curve_score(
             "score": 0.0,
             "daily_analytics": daily_analytics,
             "scoring_method": "non_ypp_curve_error",
+            "curve_input_day1": 0.0,
+            "curve_input_day2": 0.0,
             "error": str(e)
         }
 

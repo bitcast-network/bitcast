@@ -290,6 +290,144 @@ class TestRewardOrchestoratorIntegration:
         # and returns the expected reward and stats structure
 
 
+class TestOrchestratorBatching:
+    """Tests for credential batching in the orchestrator."""
+    
+    def setup_method(self):
+        self.orchestrator = RewardOrchestrator()
+        self.briefs = [
+            {"id": "brief1", "title": "Brief 1", "format": "dedicated", "weight": 100},
+        ]
+        self.metagraph_info = {"stake": 100.0, "alpha_stake": 2000.0}
+    
+    @pytest.mark.asyncio
+    @patch('bitcast.validator.reward_engine.orchestrator.CREDENTIAL_BATCH_SIZE', 3)
+    @patch('bitcast.validator.reward_engine.orchestrator.MAX_ACCOUNTS_PER_SYNAPSE', 1000)
+    async def test_batching_triggers_when_tokens_exceed_batch_size(self):
+        """Verify re-query happens per batch when tokens exceed CREDENTIAL_BATCH_SIZE."""
+        evaluator = Mock(spec=YouTubeEvaluator)
+        evaluator.platform_name.return_value = "youtube"
+        evaluator.can_evaluate.return_value = True
+        
+        def make_batch_result(uid, tokens, offset, briefs, metagraph_info):
+            result = EvaluationResult(uid=uid, platform="youtube", aggregated_scores={})
+            for i, t in enumerate(tokens):
+                account_id = f"account_{offset + i + 1}"
+                ar = AccountResult(
+                    account_id=account_id, platform_data={}, videos={},
+                    scores={"brief1": 1.0}, performance_stats={}, success=True
+                )
+                result.add_account_result(account_id, ar)
+                result.aggregated_scores["brief1"] = result.aggregated_scores.get("brief1", 0.0) + 1.0
+            return result
+        
+        evaluator.evaluate_token_batch = AsyncMock(side_effect=make_batch_result)
+        self.orchestrator.platforms.register_evaluator(evaluator)
+        
+        mock_response = Mock()
+        mock_response.YT_access_tokens = ["t1", "t2", "t3", "t4", "t5"]
+        miner_response = MinerResponse.from_response(5, mock_response)
+        
+        self.orchestrator.miner_query.query_single_miner = AsyncMock(return_value=miner_response)
+        
+        mock_metagraph = Mock()
+        mock_metagraph.S = [0.0] * 10
+        mock_metagraph.alpha_stake = [2000.0] * 10
+        mock_metagraph.I = [0.0] * 10
+        mock_metagraph.E = [0.0] * 10
+        
+        mock_validator = Mock()
+        
+        result = await self.orchestrator._evaluate_single_miner(
+            miner_response, self.briefs, mock_metagraph, mock_validator
+        )
+        
+        # 5 tokens / batch_size 3 = 2 batches, each triggers a re-query
+        assert self.orchestrator.miner_query.query_single_miner.call_count == 2
+        assert len(result.account_results) == 5
+        assert result.aggregated_scores["brief1"] == 5.0
+    
+    @pytest.mark.asyncio
+    @patch('bitcast.validator.reward_engine.orchestrator.CREDENTIAL_BATCH_SIZE', 10)
+    @patch('bitcast.validator.reward_engine.orchestrator.MAX_ACCOUNTS_PER_SYNAPSE', 1000)
+    async def test_single_batch_skips_re_query(self):
+        """When tokens fit in one batch, no batching loop is used."""
+        evaluator = Mock(spec=YouTubeEvaluator)
+        evaluator.platform_name.return_value = "youtube"
+        evaluator.can_evaluate.return_value = True
+        
+        eval_result = EvaluationResult(
+            uid=5, platform="youtube",
+            aggregated_scores={"brief1": 3.0}
+        )
+        evaluator.evaluate_accounts = AsyncMock(return_value=eval_result)
+        self.orchestrator.platforms.register_evaluator(evaluator)
+        
+        mock_response = Mock()
+        mock_response.YT_access_tokens = ["t1", "t2", "t3"]
+        miner_response = MinerResponse.from_response(5, mock_response)
+        
+        self.orchestrator.miner_query.query_single_miner = AsyncMock()
+        
+        mock_metagraph = Mock()
+        mock_metagraph.S = [0.0] * 10
+        mock_metagraph.alpha_stake = [2000.0] * 10
+        mock_metagraph.I = [0.0] * 10
+        mock_metagraph.E = [0.0] * 10
+        
+        result = await self.orchestrator._evaluate_single_miner(
+            miner_response, self.briefs, mock_metagraph, Mock()
+        )
+        
+        # Should use evaluate_accounts directly, no re-query
+        evaluator.evaluate_accounts.assert_called_once()
+        self.orchestrator.miner_query.query_single_miner.assert_not_called()
+        assert result.aggregated_scores["brief1"] == 3.0
+    
+    @pytest.mark.asyncio
+    @patch('bitcast.validator.reward_engine.orchestrator.CREDENTIAL_BATCH_SIZE', 2)
+    @patch('bitcast.validator.reward_engine.orchestrator.MAX_ACCOUNTS_PER_SYNAPSE', 1000)
+    async def test_batched_result_has_correct_account_ids(self):
+        """Verify offset-based account naming across batches."""
+        evaluator = Mock(spec=YouTubeEvaluator)
+        evaluator.platform_name.return_value = "youtube"
+        evaluator.can_evaluate.return_value = True
+        
+        def make_batch_result(uid, tokens, offset, briefs, metagraph_info):
+            result = EvaluationResult(uid=uid, platform="youtube", aggregated_scores={"brief1": 0.0})
+            for i, t in enumerate(tokens):
+                account_id = f"account_{offset + i + 1}"
+                ar = AccountResult(
+                    account_id=account_id, platform_data={}, videos={},
+                    scores={"brief1": 0.0}, performance_stats={}, success=True
+                )
+                result.add_account_result(account_id, ar)
+            return result
+        
+        evaluator.evaluate_token_batch = AsyncMock(side_effect=make_batch_result)
+        self.orchestrator.platforms.register_evaluator(evaluator)
+        
+        mock_response = Mock()
+        mock_response.YT_access_tokens = ["t1", "t2", "t3", "t4"]
+        miner_response = MinerResponse.from_response(5, mock_response)
+        
+        self.orchestrator.miner_query.query_single_miner = AsyncMock(return_value=miner_response)
+        
+        mock_metagraph = Mock()
+        mock_metagraph.S = [0.0] * 10
+        mock_metagraph.alpha_stake = [2000.0] * 10
+        mock_metagraph.I = [0.0] * 10
+        mock_metagraph.E = [0.0] * 10
+        
+        result = await self.orchestrator._evaluate_single_miner(
+            miner_response, self.briefs, mock_metagraph, Mock()
+        )
+        
+        assert set(result.account_results.keys()) == {
+            "account_1", "account_2", "account_3", "account_4"
+        }
+
+
 @pytest.fixture
 def mock_brief_data():
     """Fixture providing mock brief data."""

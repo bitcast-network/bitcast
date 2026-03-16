@@ -33,27 +33,37 @@ class AccountResult:
         Returns:
             Dict containing formatted payload for per-account posting
         """
-        # Deep copy videos and clean descriptions
+        # Strip brief_reasonings from decision_details before deep copy
+        # to avoid copying paragraphs of LLM text per brief per video.
+        stripped = []
+        for video_data in self.videos.values():
+            if isinstance(video_data, dict):
+                dd = video_data.get("decision_details")
+                if isinstance(dd, dict) and "brief_reasonings" in dd:
+                    stripped.append((dd, dd.pop("brief_reasonings")))
+
+        # Deep copy videos (nested structure requires deepcopy) and clean
         cleaned_videos = copy.deepcopy(self.videos)
+
+        # Restore brief_reasonings on the originals
+        for dd, reasonings in stripped:
+            dd["brief_reasonings"] = reasonings
+
         for video_id, video_data in cleaned_videos.items():
             if isinstance(video_data, dict) and "details" in video_data:
                 if isinstance(video_data["details"], dict):
-                    # Remove description and transcript fields to reduce payload size
                     video_data["details"].pop("description", None)
                     video_data["details"].pop("transcript", None)
-            
-            # Include per-video metrics for streaming publisher
+
             if isinstance(video_data, dict) and "brief_metrics" in video_data:
-                # Per-video metrics are already calculated at platform level
-                # Include them in the payload for BA analysis
                 video_data["per_video_metrics"] = video_data["brief_metrics"]
-        
+
         return {
             "account_data": {
-                "yt_account": copy.deepcopy(self.platform_data),
+                "yt_account": self.platform_data.copy(),
                 "videos": cleaned_videos,
-                "scores": copy.deepcopy(self.scores),
-                "performance_stats": copy.deepcopy(self.performance_stats),
+                "scores": self.scores.copy(),
+                "performance_stats": self.performance_stats.copy(),
                 "success": self.success,
                 "error_message": self.error_message
             }
@@ -90,6 +100,13 @@ class EvaluationResult:
     def add_account_result(self, account_id: str, result: AccountResult):
         """Add an account result to this evaluation."""
         self.account_results[account_id] = result
+    
+    def merge(self, other: 'EvaluationResult'):
+        """Merge another EvaluationResult's accounts and scores into this one."""
+        for account_id, account_result in other.account_results.items():
+            self.add_account_result(account_id, account_result)
+        for brief_id, score in other.aggregated_scores.items():
+            self.aggregated_scores[brief_id] = self.aggregated_scores.get(brief_id, 0.0) + score
     
     def get_total_score_for_brief(self, brief_id: str) -> float:
         """Get aggregated score for a specific brief."""
