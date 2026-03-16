@@ -33,21 +33,31 @@ class AccountResult:
         Returns:
             Dict containing formatted payload for per-account posting
         """
-        # Deep copy videos and clean descriptions
+        # Strip brief_reasonings from decision_details before deep copy
+        # to avoid copying paragraphs of LLM text per brief per video.
+        stripped = []
+        for video_data in self.videos.values():
+            if isinstance(video_data, dict):
+                dd = video_data.get("decision_details")
+                if isinstance(dd, dict) and "brief_reasonings" in dd:
+                    stripped.append((dd, dd.pop("brief_reasonings")))
+
+        # Deep copy videos (nested structure requires deepcopy) and clean
         cleaned_videos = copy.deepcopy(self.videos)
+
+        # Restore brief_reasonings on the originals
+        for dd, reasonings in stripped:
+            dd["brief_reasonings"] = reasonings
+
         for video_id, video_data in cleaned_videos.items():
             if isinstance(video_data, dict) and "details" in video_data:
                 if isinstance(video_data["details"], dict):
-                    # Remove description and transcript fields to reduce payload size
                     video_data["details"].pop("description", None)
                     video_data["details"].pop("transcript", None)
-            
-            # Include per-video metrics for streaming publisher
+
             if isinstance(video_data, dict) and "brief_metrics" in video_data:
-                # Per-video metrics are already calculated at platform level
-                # Include them in the payload for BA analysis
                 video_data["per_video_metrics"] = video_data["brief_metrics"]
-        
+
         return {
             "account_data": {
                 "yt_account": copy.deepcopy(self.platform_data),
