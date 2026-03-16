@@ -106,7 +106,12 @@ class RewardOrchestrator:
                 await self._publish_weight_corrections(
                     evaluation_results, pre_constraint_weights, post_constraint_weights, briefs, run_id, validator_self.wallet
                 )
-            
+
+            # Release heavy evaluation data now that all phases are complete.
+            # account_results hold the bulk of memory (videos, platform_data per miner).
+            for eval_result in evaluation_results.results.values():
+                eval_result.account_results.clear()
+
             return rewards, stats_list
             
         except Exception as e:
