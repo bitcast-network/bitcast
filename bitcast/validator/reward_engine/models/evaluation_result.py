@@ -60,10 +60,10 @@ class AccountResult:
 
         return {
             "account_data": {
-                "yt_account": copy.deepcopy(self.platform_data),
+                "yt_account": self.platform_data.copy(),
                 "videos": cleaned_videos,
-                "scores": copy.deepcopy(self.scores),
-                "performance_stats": copy.deepcopy(self.performance_stats),
+                "scores": self.scores.copy(),
+                "performance_stats": self.performance_stats.copy(),
                 "success": self.success,
                 "error_message": self.error_message
             }
