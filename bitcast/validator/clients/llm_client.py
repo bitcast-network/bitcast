@@ -15,6 +15,7 @@ Usage:
     )
 """
 
+import time
 import bittensor as bt
 import requests
 from typing import Dict, Any, Tuple
@@ -138,9 +139,12 @@ def evaluate_content_against_brief(brief: Dict, duration: str, description: str,
             return meets_brief, reasoning
 
         # Run three concurrent evaluations
+        triple_start = time.time()
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(_make_single_brief_evaluation, client, prompt_content) for _ in range(3)]
             results = [future.result() for future in futures]
+        triple_elapsed = time.time() - triple_start
+        bt.logging.info(f"Triple validation for brief '{brief['id']}' completed in {triple_elapsed:.1f}s")
         
         # Optimistic: pass if either passes
         meets_brief = any(r["meets_brief"] for r in results)

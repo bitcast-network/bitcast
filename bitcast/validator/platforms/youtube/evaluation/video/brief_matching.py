@@ -6,6 +6,7 @@ including unique identifier checking, prescreening, concurrent evaluation,
 and priority-based selection.
 """
 
+import time
 from concurrent.futures import as_completed, ThreadPoolExecutor
 
 import bittensor as bt
@@ -188,6 +189,7 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
     
     bt.logging.info(f"Evaluating {len(briefs)} briefs concurrently with {max_workers} workers")
     
+    batch_start = time.time()
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all brief evaluation tasks
         future_to_brief = {
@@ -221,6 +223,9 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
                     }
                 )
     
+    batch_elapsed = time.time() - batch_start
+    bt.logging.info(f"All {len(briefs)} brief evaluations completed in {batch_elapsed:.1f}s")
+
     # Apply single brief matching limitation using weight-based priority
     selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
     

@@ -58,7 +58,7 @@ DISABLE_LLM_CACHING = os.getenv('DISABLE_LLM_CACHING', 'False').lower() == 'true
 ECO_MODE = os.getenv('ECO_MODE', 'True').lower() == 'true'
 
 # Disable prompt injection checking (saves 15-28s per request)
-DISABLE_PROMPT_INJECTION = os.getenv('DISABLE_PROMPT_INJECTION', 'False').lower() == 'true'
+DISABLE_PROMPT_INJECTION = os.getenv('DISABLE_PROMPT_INJECTION', 'True').lower() == 'true'
 
 # youtube scoring
 YT_LOOKBACK = 90
