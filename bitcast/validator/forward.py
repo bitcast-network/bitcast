@@ -1,4 +1,5 @@
 import time
+import threading
 import bittensor as bt
 
 # New reward system imports
@@ -10,34 +11,38 @@ from bitcast.validator.utils.publish_stats import publish_stats
 from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.utils.config import VALIDATOR_WAIT, VALIDATOR_STEPS_INTERVAL
 
-# Singleton for efficiency
+# Singleton for efficiency with thread-safe initialization
 _reward_orchestrator = None
+_orchestrator_lock = threading.Lock()
 
 
 def get_reward_orchestrator() -> RewardOrchestrator:
-    """Get reward orchestrator singleton."""
+    """Get reward orchestrator singleton (thread-safe)."""
     global _reward_orchestrator
     if _reward_orchestrator is None:
-        # Create services with dependency injection
-        from bitcast.validator.reward_engine.services.miner_query_service import MinerQueryService
-        from bitcast.validator.reward_engine.services.platform_registry import PlatformRegistry
-        from bitcast.validator.reward_engine.services.score_aggregation_service import ScoreAggregationService
-        from bitcast.validator.reward_engine.services.emission_calculation_service import EmissionCalculationService
-        from bitcast.validator.reward_engine.services.reward_distribution_service import RewardDistributionService
-        
-        # Create platform registry and register YouTube evaluator
-        platform_registry = PlatformRegistry()
-        youtube_evaluator = YouTubeEvaluator()
-        platform_registry.register_evaluator(youtube_evaluator)
-        
-        # Create orchestrator with all services
-        _reward_orchestrator = RewardOrchestrator(
-            miner_query_service=MinerQueryService(),
-            platform_registry=platform_registry,
-            score_aggregator=ScoreAggregationService(),
-            emission_calculator=EmissionCalculationService(),
-            reward_distributor=RewardDistributionService()
-        )
+        with _orchestrator_lock:
+            # Double-check pattern to prevent race condition
+            if _reward_orchestrator is None:
+                # Create services with dependency injection
+                from bitcast.validator.reward_engine.services.miner_query_service import MinerQueryService
+                from bitcast.validator.reward_engine.services.platform_registry import PlatformRegistry
+                from bitcast.validator.reward_engine.services.score_aggregation_service import ScoreAggregationService
+                from bitcast.validator.reward_engine.services.emission_calculation_service import EmissionCalculationService
+                from bitcast.validator.reward_engine.services.reward_distribution_service import RewardDistributionService
+                
+                # Create platform registry and register YouTube evaluator
+                platform_registry = PlatformRegistry()
+                youtube_evaluator = YouTubeEvaluator()
+                platform_registry.register_evaluator(youtube_evaluator)
+                
+                # Create orchestrator with all services
+                _reward_orchestrator = RewardOrchestrator(
+                    miner_query_service=MinerQueryService(),
+                    platform_registry=platform_registry,
+                    score_aggregator=ScoreAggregationService(),
+                    emission_calculator=EmissionCalculationService(),
+                    reward_distributor=RewardDistributionService()
+                )
     
     return _reward_orchestrator
 
@@ -57,6 +62,14 @@ async def forward(self):
         # Use the new reward orchestrator
         orchestrator = get_reward_orchestrator()
         rewards, yt_stats_list = await orchestrator.calculate_rewards(self, miner_uids)
+
+        # Validate that all lists have the same length
+        if len(miner_uids) != len(rewards) or len(miner_uids) != len(yt_stats_list):
+            bt.logging.error(
+                f"Length mismatch: miner_uids={len(miner_uids)}, "
+                f"rewards={len(rewards)}, yt_stats_list={len(yt_stats_list)}"
+            )
+            return
 
         # Log the rewards for monitoring purposes
         bt.logging.info("UID Rewards:")
