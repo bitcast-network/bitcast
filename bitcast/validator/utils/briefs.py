@@ -65,12 +65,24 @@ def get_briefs(all: bool = False):
     
     try:
         # Always try to fetch from API first
-        response = requests.get(BITCAST_BRIEFS_ENDPOINT)
+        response = requests.get(BITCAST_BRIEFS_ENDPOINT, timeout=30)
         response.raise_for_status()
-        briefs_data = response.json()
         
-        # Handle both "items" and "briefs" keys in the response
-        briefs_list = briefs_data.get("items") or []
+        # Validate JSON response
+        try:
+            briefs_data = response.json()
+        except ValueError as e:
+            raise ValueError(f"Invalid JSON response from briefs endpoint: {e}")
+        
+        # Handle response structure - could be dict with "items" key or list directly
+        if isinstance(briefs_data, list):
+            briefs_list = briefs_data
+        elif isinstance(briefs_data, dict):
+            briefs_list = briefs_data.get("items") or briefs_data.get("briefs") or []
+        else:
+            bt.logging.warning(f"Unexpected response type from briefs endpoint: {type(briefs_data)}")
+            briefs_list = []
+        
         bt.logging.info(f"Fetched {len(briefs_list)} briefs.")
 
         filtered_briefs = []
@@ -79,16 +91,31 @@ def get_briefs(all: bool = False):
             
             for brief in briefs_list:
                 try:
-                    start_date = datetime.strptime(brief["start_date"], "%Y-%m-%d").date()
-                    end_date = datetime.strptime(brief["end_date"], "%Y-%m-%d").date()
+                    # Validate brief structure
+                    if not isinstance(brief, dict):
+                        bt.logging.warning(f"Skipping invalid brief entry (not a dict): {brief}")
+                        continue
+                    
+                    # Use .get() with validation for required fields
+                    start_date_str = brief.get("start_date")
+                    end_date_str = brief.get("end_date")
+                    
+                    if not start_date_str or not end_date_str:
+                        bt.logging.warning(f"Skipping brief {brief.get('id', 'unknown')}: missing start_date or end_date")
+                        continue
+                    
+                    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
                     # Apply new window: start_date + YT_REWARD_DELAY, end_date + YT_SCORING_WINDOW + YT_REWARD_DELAY
                     start_window = start_date + timedelta(days=YT_REWARD_DELAY)
                     end_window = end_date + timedelta(days=YT_SCORING_WINDOW + YT_REWARD_DELAY)
                     
                     if start_window <= current_date <= end_window:
                         filtered_briefs.append(brief)
-                except Exception as e:
+                except (ValueError, KeyError) as e:
                     bt.logging.error(f"Error parsing dates for brief {brief.get('id', 'unknown')}: {e}")
+                except Exception as e:
+                    bt.logging.error(f"Unexpected error processing brief {brief.get('id', 'unknown')}: {e}")
             
             if not filtered_briefs:
                 bt.logging.info("No briefs have an active date range or are within the reward delay period.")

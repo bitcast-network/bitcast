@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 
 def read_requirements(path):
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         requirements = f.read().splitlines()
         processed_requirements = []
 
@@ -38,6 +38,8 @@ with codecs.open(
     version_match = re.search(
         r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
     )
+    if version_match is None:
+        raise RuntimeError("Unable to find version string in bitcast/__init__.py")
     version_string = version_match.group(1)
 
 setup(
