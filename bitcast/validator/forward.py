@@ -6,7 +6,6 @@ from bitcast.validator.reward_engine.orchestrator import RewardOrchestrator
 from bitcast.validator.platforms.youtube.youtube_evaluator import YouTubeEvaluator
 
 from bitcast.utils.uids import get_all_uids
-from bitcast.validator.utils.publish_stats import publish_stats
 from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.utils.config import VALIDATOR_WAIT, VALIDATOR_STEPS_INTERVAL
 
@@ -74,11 +73,6 @@ async def forward(self):
         # Update the scores based on the rewards
         self.update_scores(rewards, miner_uids, blacklisted_uids)
 
-        # Only publish stats if weights are not disabled
-        if not self.config.neuron.disable_set_weights:
-            publish_stats(self.wallet, yt_stats_list, miner_uids)
-        else:
-            bt.logging.info("Skipping stats publishing due to disable_set_weights flag")
         
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
