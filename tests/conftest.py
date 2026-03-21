@@ -19,7 +19,6 @@ def mock_external_apis():
     with patch('bitcast.validator.utils.briefs.get_briefs') as mock_briefs, \
          patch('bitcast.validator.utils.token_pricing.get_bitcast_alpha_price') as mock_price, \
          patch('bitcast.validator.utils.token_pricing.get_total_miner_emissions') as mock_emissions, \
-         patch('bitcast.validator.utils.blacklist.get_blacklist_sources') as mock_blacklist, \
          patch('bitcast.validator.clients.llm_client.evaluate_content_against_brief') as mock_llm_eval, \
          patch('bitcast.validator.clients.llm_client.check_for_prompt_injection') as mock_llm_inject, \
          patch('bitcast.validator.platforms.youtube.api.transcript._fetch_transcript') as mock_transcript, \
@@ -36,7 +35,6 @@ def mock_external_apis():
         mock_emissions.return_value = 1000.0  # 1000 tokens per day
         
         # Mock blacklist API
-        mock_blacklist.return_value = ["ADVERTISING"]
         
         mock_llm_eval.return_value = (True, "Content matches brief criteria")
         mock_llm_inject.return_value = False
@@ -55,7 +53,6 @@ def mock_external_apis():
             'briefs': mock_briefs,
             'price': mock_price,
             'emissions': mock_emissions,
-            'blacklist': mock_blacklist,
             'llm_eval': mock_llm_eval,
             'llm_inject': mock_llm_inject,
             'transcript': mock_transcript,

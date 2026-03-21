@@ -53,7 +53,7 @@ class TestDataPublisher:
     @patch('bitcast.validator.utils.data_publisher.convert_numpy_types')
     @patch('bitcast.validator.utils.data_publisher.datetime')
     def test_sign_message(self, mock_datetime, mock_convert):
-        """Test message signing follows publish_stats.py pattern exactly."""
+        """Test message signing follows data_publisher pattern exactly."""
         # Mock datetime
         mock_datetime.utcnow.return_value.isoformat.return_value = "2025-01-06T12:00:00"
         
@@ -87,7 +87,7 @@ class TestDataPublisher:
         assert result["signature"] == "0x123456789abcdef"
         assert result["signer"] == "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
         
-        # Verify signing call - should sign only the account_data portion (like publish_stats.py)
+        # Verify signing call - should sign only the account_data portion (like data_publisher)
         expected_message = f"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY:2025-01-06T12:00:00:{json.dumps(account_data, sort_keys=True)}"
         self.mock_hotkey.sign.assert_called_once_with(data=expected_message)
     

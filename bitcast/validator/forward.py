@@ -12,7 +12,6 @@ from bitcast.validator.utils.config import VALIDATOR_WAIT, VALIDATOR_STEPS_INTER
 # Singleton for efficiency
 _reward_orchestrator = None
 
-
 def get_reward_orchestrator() -> RewardOrchestrator:
     """Get reward orchestrator singleton."""
     global _reward_orchestrator
@@ -40,7 +39,6 @@ def get_reward_orchestrator() -> RewardOrchestrator:
     
     return _reward_orchestrator
 
-
 async def forward(self):
     """Forward function using the new modular reward system."""
     if self.step % VALIDATOR_STEPS_INTERVAL != 0:
@@ -63,17 +61,9 @@ async def forward(self):
             bt.logging.info(f"UID {uid}: {reward}")
             yt_stats_list[i]["reward"] = float(reward)
 
-        # Extract blacklisted UIDs from the stats
-        blacklisted_uids = []
-        for uid, yt_stats in zip(miner_uids, yt_stats_list):
-            if yt_stats.get("yt_account", {}).get("blacklisted", False):
-                blacklisted_uids.append(uid)
-                bt.logging.info(f"UID {uid} is blacklisted")
-
         # Update the scores based on the rewards
-        self.update_scores(rewards, miner_uids, blacklisted_uids)
+        self.update_scores(rewards, miner_uids)
 
-        
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
 

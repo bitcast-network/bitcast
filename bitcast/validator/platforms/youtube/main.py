@@ -61,9 +61,8 @@ def eval_youtube(creds, briefs, min_stake=False):
     result["yt_account"]["analytics"] = channel_analytics
     
     # Vet the channel and store the result
-    channel_vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake)
+    channel_vet_result = vet_channel(channel_data, channel_analytics, min_stake)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
-    result["yt_account"]["blacklisted"] = is_blacklisted
 
     if not channel_vet_result and ECO_MODE:
         bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")

@@ -2,14 +2,13 @@
 Channel evaluation logic for YouTube validation.
 
 This module contains functions for vetting YouTube channels against criteria
-such as subscriber count, channel age, retention rates, and blacklist status.
+such as subscriber count, channel age, and retention rates.
 """
 
 from datetime import datetime
 
 import bittensor as bt
 
-from bitcast.validator.utils.blacklist import is_blacklisted
 from bitcast.validator.utils.config import (
     YT_LOOKBACK,
     YT_MAX_SUBS,
@@ -30,18 +29,9 @@ def vet_channel(channel_data, channel_analytics, min_stake=False):
         min_stake (bool): Whether the miner meets the minimum alpha_stake threshold for acceptance filter
         
     Returns:
-        tuple: (vet_result: bool, blacklisted: bool)
+        bool: Whether the channel passed vetting
     """
     bt.logging.info(f"Checking channel")
-
-    # Check if channel is blacklisted
-    try:
-        if is_blacklisted(channel_data["bitcastChannelId"]):
-            bt.logging.warning(f"Channel is blacklisted: {channel_data['bitcastChannelId']}")
-            return False, True  # Return (vet_result, blacklisted)
-    except ConnectionError as e:
-        bt.logging.warning(f"Failed to check blacklist status, assuming not blacklisted: {e}")
-        # Continue with evaluation as if not blacklisted
 
     # Calculate channel age
     channel_age_days = calculate_channel_age(channel_data)
@@ -51,10 +41,10 @@ def vet_channel(channel_data, channel_analytics, min_stake=False):
     
     if criteria_met:
         bt.logging.info(f"Channel Evaluation Passed")
-        return True, False  # Return (vet_result, blacklisted)
+        return True
     else:
         bt.logging.info(f"Channel Evaluation Failed")
-        return False, False  # Return (vet_result, blacklisted)
+        return False
 
 
 def calculate_channel_age(channel_data):
