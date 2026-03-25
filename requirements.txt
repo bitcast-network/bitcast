@@ -11,7 +11,7 @@ bittensor==9.12.2
 bittensor-cli==9.15.3
 bittensor-commit-reveal==0.4.0
 bittensor-wallet==4.0.0
-bt-decode==0.6.0
+bt-decode==0.8.0
 cachetools==5.5.2
 certifi==2025.1.31
 cffi==1.17.1
