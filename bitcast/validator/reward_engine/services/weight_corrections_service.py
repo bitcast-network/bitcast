@@ -114,7 +114,7 @@ class WeightCorrectionsService:
             float: Scaling factor (0.0-2.0+)
                 - 1.0 = No scaling applied
                 - 0.0-0.99 = Weight reduced by constraints
-                - 0.0 = Content was limited/blacklisted
+                - 0.0 = Content was limited
                 - 1.01+ = Weight increased (rare, minimum scaling)
         """
         # Handle matrix bounds checking

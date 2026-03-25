@@ -5,7 +5,6 @@ from diskcache import Cache
 from bitcast.validator.utils.config import CACHE_DIRS, CACHE_ROOT
 from bitcast.validator.clients.llm_client import get_llm_cache
 from bitcast.validator.utils.briefs import BriefsCache
-from bitcast.validator.utils.blacklist import BlacklistCache
 from bitcast.validator.platforms.youtube.cache.search import YouTubeSearchCache
 
 def clear_all_caches():
@@ -14,7 +13,6 @@ def clear_all_caches():
     try:
         clear_llm_cache()
         clear_briefs_cache()
-        clear_blacklist_cache()
         clear_youtube_search_cache()
         
         # Clear all cache directories
@@ -34,7 +32,6 @@ def clear_expired_caches():
     try:
         clear_expired_llm_cache()
         clear_expired_briefs_cache()
-        clear_expired_blacklist_cache()
         clear_expired_youtube_search_cache()
         bt.logging.info("Successfully cleared expired cache entries")
     except Exception as e:
@@ -68,19 +65,6 @@ def clear_briefs_cache():
         bt.logging.error(f"Error clearing Briefs cache: {str(e)}")
         raise
 
-def clear_blacklist_cache():
-    """Clear Blacklist cache."""
-    bt.logging.info("Clearing Blacklist cache")
-    try:
-        if BlacklistCache._cache:
-            BlacklistCache._cache.clear()
-            bt.logging.info("Successfully cleared Blacklist cache")
-        else:
-            bt.logging.warning("Blacklist cache not initialized")
-    except Exception as e:
-        bt.logging.error(f"Error clearing Blacklist cache: {str(e)}")
-        raise
-
 def clear_expired_llm_cache():
     """Clear expired LLM cache entries."""
     bt.logging.info("Clearing expired LLM cache entries")
@@ -106,19 +90,6 @@ def clear_expired_briefs_cache():
             bt.logging.warning("Briefs cache not initialized")
     except Exception as e:
         bt.logging.error(f"Error clearing expired Briefs cache entries: {str(e)}")
-        raise
-
-def clear_expired_blacklist_cache():
-    """Clear expired Blacklist cache entries."""
-    bt.logging.info("Clearing expired Blacklist cache entries")
-    try:
-        if BlacklistCache._cache:
-            BlacklistCache._cache.expire()
-            bt.logging.info("Successfully cleared expired Blacklist cache entries")
-        else:
-            bt.logging.warning("Blacklist cache not initialized")
-    except Exception as e:
-        bt.logging.error(f"Error clearing expired Blacklist cache entries: {str(e)}")
         raise
 
 def clear_youtube_search_cache():

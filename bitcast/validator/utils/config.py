@@ -12,24 +12,19 @@ CACHE_ROOT = Path(__file__).resolve().parents[2] / "cache"
 CACHE_DIRS = {
     "openai": os.path.join(CACHE_ROOT, "openai"),
     "briefs": os.path.join(CACHE_ROOT, "briefs"),
-    "blacklist": os.path.join(CACHE_ROOT, "blacklist"),
     "youtube_search": os.path.join(CACHE_ROOT, "youtube_search"),
     "minutes_revenue_ratio": os.path.join(CACHE_ROOT, "minutes_revenue_ratio")
 }
 
 # Cache expiry times (in seconds)
 YOUTUBE_SEARCH_CACHE_EXPIRY = 12 * 60 * 60  # 12 hours
-BLACKLIST_CACHE_EXPIRY = 10 * 60  # 10 minutes
 OPENAI_CACHE_EXPIRY = 3 * 24 * 60 * 60  # 3 days
 
 __version__ = "2.6.1"
 
 # required
-BITCAST_SERVER_URL = os.getenv('BITCAST_SERVER_URL', 'http://44.227.253.127')
-BITCAST_BRIEFS_ENDPOINT = f"{BITCAST_SERVER_URL}:8013/briefs"
-BITCAST_STATS_ENDPOINT = f"{BITCAST_SERVER_URL}:8003/submit"
-BITCAST_BLACKLIST_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist"
-BITCAST_BLACKLIST_SOURCES_ENDPOINT = f"{BITCAST_SERVER_URL}:8004/blacklist-sources"
+BITCAST_API_URL = os.getenv('BITCAST_API_URL', 'https://bitcast-api.bitcast.network')
+BITCAST_BRIEFS_ENDPOINT = os.getenv('BITCAST_BRIEFS_ENDPOINT', f"{BITCAST_API_URL}/api/v2/validator/briefs")
 
 # subnet mechanism configuration
 MECHID = int(os.getenv('MECHID', '0'))
@@ -117,7 +112,6 @@ SUBNET_TREASURY_UID = int(os.getenv('SUBNET_TREASURY_UID', '106'))
 
 # Log out all non-sensitive config variables
 bt.logging.info(f"BITCAST_BRIEFS_ENDPOINT: {BITCAST_BRIEFS_ENDPOINT}")
-bt.logging.info(f"BITCAST_STATS_ENDPOINT: {BITCAST_STATS_ENDPOINT}")
 bt.logging.info(f"YOUTUBE_SUBMIT_ENDPOINT: {YOUTUBE_SUBMIT_ENDPOINT}")
 bt.logging.info(f"ENABLE_DATA_PUBLISH: {ENABLE_DATA_PUBLISH}")
 bt.logging.info(f"WEIGHT_CORRECTIONS_ENDPOINT: {WEIGHT_CORRECTIONS_ENDPOINT}")

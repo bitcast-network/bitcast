@@ -61,9 +61,8 @@ def eval_youtube(creds, briefs, min_stake=False):
     result["yt_account"]["analytics"] = channel_analytics
     
     # Vet the channel and store the result
-    channel_vet_result, is_blacklisted = vet_channel(channel_data, channel_analytics, min_stake)
+    channel_vet_result = vet_channel(channel_data, channel_analytics, min_stake)
     result["yt_account"]["channel_vet_result"] = channel_vet_result
-    result["yt_account"]["blacklisted"] = is_blacklisted
 
     if not channel_vet_result and ECO_MODE:
         bt.logging.info("Channel vetting failed and ECO_MODE is enabled - exiting early")
@@ -154,9 +153,9 @@ def apply_video_limits(briefs, result):
         scored_videos = []
         for video_id, video_data in result["videos"].items():
             if video_data.get("matching_brief_ids") and brief_id in video_data["matching_brief_ids"]:
-                # Use raw base score for this specific brief (not USD-scaled value)
+                # Use USD-scaled score — must match the unit added to result["scores"] in update_video_score()
                 brief_metrics = video_data.get("brief_metrics", {}).get(brief_id, {})
-                video_score = brief_metrics.get("base_score", 0)
+                video_score = brief_metrics.get("usd_target", 0)
                 if video_score > 0:
                     scored_videos.append({
                         "video_id": video_id,

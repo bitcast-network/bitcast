@@ -6,13 +6,11 @@ from bitcast.validator.reward_engine.orchestrator import RewardOrchestrator
 from bitcast.validator.platforms.youtube.youtube_evaluator import YouTubeEvaluator
 
 from bitcast.utils.uids import get_all_uids
-from bitcast.validator.utils.publish_stats import publish_stats
 from bitcast.validator.utils.briefs import get_briefs
 from bitcast.validator.utils.config import VALIDATOR_WAIT, VALIDATOR_STEPS_INTERVAL
 
 # Singleton for efficiency
 _reward_orchestrator = None
-
 
 def get_reward_orchestrator() -> RewardOrchestrator:
     """Get reward orchestrator singleton."""
@@ -41,7 +39,6 @@ def get_reward_orchestrator() -> RewardOrchestrator:
     
     return _reward_orchestrator
 
-
 async def forward(self):
     """Forward function using the new modular reward system."""
     if self.step % VALIDATOR_STEPS_INTERVAL != 0:
@@ -64,22 +61,9 @@ async def forward(self):
             bt.logging.info(f"UID {uid}: {reward}")
             yt_stats_list[i]["reward"] = float(reward)
 
-        # Extract blacklisted UIDs from the stats
-        blacklisted_uids = []
-        for uid, yt_stats in zip(miner_uids, yt_stats_list):
-            if yt_stats.get("yt_account", {}).get("blacklisted", False):
-                blacklisted_uids.append(uid)
-                bt.logging.info(f"UID {uid} is blacklisted")
-
         # Update the scores based on the rewards
-        self.update_scores(rewards, miner_uids, blacklisted_uids)
+        self.update_scores(rewards, miner_uids)
 
-        # Only publish stats if weights are not disabled
-        if not self.config.neuron.disable_set_weights:
-            publish_stats(self.wallet, yt_stats_list, miner_uids)
-        else:
-            bt.logging.info("Skipping stats publishing due to disable_set_weights flag")
-        
     except Exception as e:
         bt.logging.error(f"Error in forward pass: {e}")
 
