@@ -2,9 +2,9 @@ name: Semgrep SAST
 
 on:
   pull_request:
-    branches: [main, main]
+    branches: [main]
   push:
-    branches: [main, main]
+    branches: [main]
 
 permissions:
   contents: read
