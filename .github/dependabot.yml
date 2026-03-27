@@ -10,6 +10,9 @@ updates:
   - dependencies
   commit-message:
     prefix: deps
+  allow:
+    - dependency-name: bittensor
+    - dependency-name: opentensor
   automerge: true
 - package-ecosystem: github-actions
   directory: /
@@ -21,4 +24,7 @@ updates:
   - ci
   commit-message:
     prefix: ci
+  allow:
+    - dependency-name: bittensor
+    - dependency-name: opentensor
   automerge: true
