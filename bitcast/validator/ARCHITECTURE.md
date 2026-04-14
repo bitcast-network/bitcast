@@ -142,7 +142,7 @@ Platform-specific content evaluation implementations with advanced capabilities:
   - **Enhanced Security**: Prompt injection detection and content manipulation prevention
   - **Performance Optimization**: Brief prescreening (60-80% LLM cost reduction) and ECO_MODE
   - **Dual Scoring System**: YPP/Non-YPP account support with anti-exploitation protection
-  - **Advanced Analytics**: Comprehensive retention analysis and revenue-based scoring
+  - **Advanced Analytics**: Channel retention analysis and revenue-based scoring
 
 #### **Platform Evaluation Flow**
 ```python
@@ -154,7 +154,7 @@ result = await evaluator.evaluate_accounts(response, briefs, metagraph_info)
 1. OAuth credential validation
 2. Channel data retrieval and qualification
 3. Video discovery and batch data fetching
-4. Multi-stage validation pipeline (privacy, retention, captions, security)
+4. Multi-stage validation pipeline (privacy, publish date, captions, security)
 5. Brief prescreening and intelligent filtering
 6. Concurrent LLM evaluation with priority selection
 7. Dual scoring with anti-exploitation protection
@@ -301,7 +301,7 @@ result = await evaluator.evaluate_accounts(response, briefs, metagraph_info)
 5. Multi-stage validation pipeline:
    - Privacy and accessibility checks
    - Publish date validation against brief windows
-   - Retention analysis and threshold validation
+   - Video age limit validation for scoring eligibility
    - Caption verification (auto-generated only)
 6. Security auditing:
    - Transcript retrieval with error handling

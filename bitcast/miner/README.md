@@ -21,7 +21,6 @@ A YouTube token server which enables mining on the Bitcast subnet. Responds to v
 
 2. **Videos**  
    - Public  
-   - ≥ 10% retention  
    - Auto-generated captions only  
    - Matches at least one [content brief](http://dashboard.bitcast.network/briefs)  
    - Published during the brief content window

@@ -5,7 +5,7 @@ This module provides comprehensive video evaluation functionality split into
 specialized components for better maintainability and clarity.
 
 Modules:
-- validation: Basic video validation checks (privacy, retention, etc.)
+- validation: Basic video validation checks (privacy, etc.)
 - transcript: Transcript fetching and prompt injection detection
 - brief_matching: Brief evaluation, prescreening, and priority selection
 - orchestration: Main workflow coordination and batch processing
@@ -25,7 +25,6 @@ from .validation import (
     check_video_age_limit,
     check_video_privacy,
     check_video_publish_date,
-    check_video_retention,
     initialize_decision_details,
 )
 
@@ -61,7 +60,6 @@ __all__ = [
     "check_video_privacy",
     "check_video_publish_date", 
     "check_video_age_limit",
-    "check_video_retention",
     "check_manual_captions",
     
     # Transcript handling

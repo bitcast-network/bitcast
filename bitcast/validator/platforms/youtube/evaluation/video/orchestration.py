@@ -31,7 +31,6 @@ from .validation import (
     check_video_age_limit,
     check_video_privacy,
     check_video_publish_date,
-    check_video_retention,
     initialize_decision_details,
 )
 
@@ -74,7 +73,7 @@ def get_video_analytics_batch(youtube_analytics_client, video_ids, is_ypp_accoun
 
 def _run_video_validation_checks(video_id, video_data, video_analytics, briefs, decision_details):
     """
-    Run basic video validation checks (privacy, publish date, retention, captions).
+    Run basic video validation checks (privacy, publish date, captions).
     
     Args:
         video_id (str): Video ID
@@ -124,11 +123,6 @@ def _run_video_validation_checks(video_id, video_data, video_analytics, briefs, 
         decision_details["video_vet_result"] = False
         decision_details["publishDateCheck"] = False
         return False
-    
-    # Check video retention
-    if not check_video_retention(video_data, video_analytics, decision_details):
-        if handle_check_failure():
-            return False
     
     # Check for manual captions
     if not check_manual_captions(video_id, video_data, decision_details):

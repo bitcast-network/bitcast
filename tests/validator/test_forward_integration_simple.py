@@ -74,7 +74,7 @@ class TestForwardIntegrationSimple:
     @pytest.mark.asyncio
     @patch('bitcast.validator.forward.get_all_uids')  # Fix: Mock get_all_uids
     @patch('bitcast.validator.forward.get_reward_orchestrator')
-    async def test_forward_error_resilience(self, mock_get_orchestrator):
+    async def test_forward_error_resilience(self, mock_get_orchestrator, mock_get_uids):
         """Test forward function error handling."""
         
         # Mock validator with proper wallet structure

@@ -8,7 +8,6 @@ from bitcast.validator.platforms.youtube.evaluation import (
     check_channel_criteria,
     process_video_vetting,
     check_video_publish_date,
-    check_video_retention,
     vet_videos
 )
 from bitcast.validator.utils.config import (
@@ -16,7 +15,6 @@ from bitcast.validator.utils.config import (
     YT_MAX_SUBS,
     YT_MIN_CHANNEL_AGE,
     YT_MIN_CHANNEL_RETENTION,
-    YT_MIN_VIDEO_RETENTION,
     YT_MIN_MINS_WATCHED,
     YT_LOOKBACK,
     YT_VIDEO_RELEASE_BUFFER
@@ -25,12 +23,6 @@ from bitcast.validator.utils.config import (
 # ============================================================================
 # Channel Evaluation Tests
 # ============================================================================
-
-@pytest.fixture(autouse=True)
-def mock_blacklist():
-    with patch('bitcast.validator.utils.blacklist.get_blacklist') as mock_get_blacklist:
-        mock_get_blacklist.return_value = []  # Return empty blacklist
-        yield mock_get_blacklist
 
 def test_calculate_channel_age():
     """Test channel age calculation with different date formats."""
@@ -243,31 +235,6 @@ def test_check_video_publish_date():
     with pytest.raises(RuntimeError, match="Processing operation 'video publish date validation' failed"):
         check_video_publish_date(video_data, malformed_briefs, decision_details)
 
-def test_check_video_retention():
-    """Test video retention validation with different scenarios."""
-    # Test case 1: Video meets retention criteria
-    video_data = {"bitcastVideoId": "test_video_1"}
-    video_analytics = {"averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5}
-    decision_details = {"contentAgainstBriefCheck": []}
-    
-    assert check_video_retention(video_data, video_analytics, decision_details) == True
-    assert decision_details["averageViewPercentageCheck"] == True
-
-    # Test case 2: Video fails retention criteria
-    video_analytics["averageViewPercentage"] = YT_MIN_VIDEO_RETENTION - 5
-    decision_details = {"contentAgainstBriefCheck": []}
-    
-    assert check_video_retention(video_data, video_analytics, decision_details) == False
-    assert decision_details["averageViewPercentageCheck"] == False
-    # We don't check contentAgainstBriefCheck as the implementation doesn't modify it
-
-    # Test case 3: Missing analytics data
-    video_analytics = {}
-    decision_details = {"contentAgainstBriefCheck": []}
-    
-    assert check_video_retention(video_data, video_analytics, decision_details) == False
-    assert decision_details["averageViewPercentageCheck"] == False
-
 @pytest.mark.asyncio
 @patch('bitcast.validator.platforms.youtube.api.clients.build')
 @patch('bitcast.validator.platforms.youtube.evaluation.video.get_video_data_batch')
@@ -317,7 +284,7 @@ async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_
 
     # Mock video analytics
     video_analytics = {
-        "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
+        "averageViewPercentage": 75,
         "estimatedMinutesWatched": {
             "2025-07-01": 400,
             "2025-07-02": 300,
@@ -372,7 +339,6 @@ async def test_process_video_vetting(mock_executor, mock_evaluate_content, mock_
     assert video_decision_details[video_id]["contentAgainstBriefCheck"] == [True]
     assert video_decision_details[video_id]["publicVideo"] == True
     assert video_decision_details[video_id]["publishDateCheck"] == True
-    assert video_decision_details[video_id]["averageViewPercentageCheck"] == True
     assert video_decision_details[video_id]["manualCaptionsCheck"] == True
     assert video_decision_details[video_id]["promptInjectionCheck"] == True
     assert video_decision_details[video_id]["preScreeningCheck"] == [True] 
