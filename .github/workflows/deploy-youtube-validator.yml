@@ -11,6 +11,7 @@ on:
       - 'neurons/validator.py'
       - 'neurons/base/**'
       - 'core/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
