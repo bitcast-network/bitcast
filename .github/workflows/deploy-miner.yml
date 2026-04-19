@@ -46,10 +46,61 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
+      - name: Register new task definition with secrets
+        env:
+          BITCAST_API_KEY: ${{ secrets.BITCAST_API_KEY }}
+          BT_WALLET_HOTKEY: ${{ secrets.BT_WALLET_HOTKEY }}
+        run: |
+          # Build task definition with GitHub secrets injected as env vars
+          python3 << 'PYEOF'
+          import json, os
+
+          task_def = {
+            "family": "bitcast-miner-prod",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "1024",
+            "memory": "2048",
+            "containerDefinitions": [{
+              "name": "bitcast-miner",
+              "image": f"${{ steps.login-ecr.outputs.registry }}/bitcast-miner:${{ github.sha }}",
+              "essential": True,
+              "environment": [
+                {"name": "TOKEN_SOURCE", "value": "api"},
+                {"name": "BITCAST_API_URL", "value": "${{ vars.BITCAST_API_URL }}"},
+                {"name": "BITCAST_API_KEY", "value": os.environ["BITCAST_API_KEY"]},
+                {"name": "BT_WALLET_HOTKEY", "value": os.environ["BT_WALLET_HOTKEY"]},
+              ],
+              "command": [
+                "--wallet.name", "${{ vars.BT_WALLET_NAME }}",
+                "--wallet.hotkey", "${{ vars.BT_WALLET_HOTKEY_NAME }}",
+                "--netuid", "93",
+                "--subtensor.network", "finney",
+                "--neuron.disable_auto_update",
+              ],
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/bitcast-miner-prod",
+                  "awslogs-region": "us-east-1",
+                  "awslogs-stream-prefix": "ecs"
+                }
+              }
+            }]
+          }
+
+          with open("task-def.json", "w") as f:
+              json.dump(task_def, f)
+          PYEOF
+
+          aws ecs register-task-definition \
+            --cli-input-json file://task-def.json \
+            --region us-east-1
+
       - name: Force new ECS deployment
         run: |
           aws ecs update-service \
             --cluster bitcast-prod \
             --service bitcast-miner-prod \
             --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
+            --region us-east-1

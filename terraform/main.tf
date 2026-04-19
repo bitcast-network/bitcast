@@ -48,30 +48,6 @@ variable "subnet_ids" {
   type        = list(string)
 }
 
-variable "bitcast_api_url" {
-  description = "Bitcast API base URL"
-  type        = string
-  default     = "https://api.bitcast.so"
-}
-
-variable "token_source" {
-  description = "Token source: local or api"
-  type        = string
-  default     = "api"
-}
-
-variable "cpu" {
-  description = "Fargate CPU units"
-  type        = number
-  default     = 1024
-}
-
-variable "memory" {
-  description = "Fargate memory (MiB)"
-  type        = number
-  default     = 2048
-}
-
 variable "tags" {
   description = "Additional tags"
   type        = map(string)
@@ -79,7 +55,7 @@ variable "tags" {
 }
 
 locals {
-  name     = "bitcast-miner"
+  name      = "bitcast-miner"
   full_name = "${local.name}-${var.environment}"
 }
 
@@ -123,7 +99,6 @@ resource "aws_cloudwatch_log_group" "miner" {
 }
 
 # ─── Security Group ──────────────────────────────────────────────────────────
-# Outbound only — the miner doesn't accept inbound connections.
 
 resource "aws_security_group" "miner" {
   name_prefix = "${local.name}-task-"
@@ -167,20 +142,6 @@ resource "aws_iam_role_policy_attachment" "execution_base" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-resource "aws_iam_role_policy" "execution_secrets" {
-  name = "${local.name}-secrets"
-  role = aws_iam_role.execution.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = values(var.secrets)
-    }]
-  })
-}
-
 resource "aws_iam_role" "task" {
   name = "${local.name}-task"
 
@@ -196,20 +157,16 @@ resource "aws_iam_role" "task" {
   tags = var.tags
 }
 
-variable "secrets" {
-  description = "Map of env var name to Secrets Manager ARN"
-  type        = map(string)
-  default     = {}
-}
-
-# ─── Task Definition ────────────────────────────────────────────────────────
+# ─── Task Definition (initial — GHA overwrites on deploy) ────────────────────
+# This is a bootstrap definition. The GitHub Actions pipeline registers a new
+# task definition on every deploy with secrets injected from GitHub Secrets.
 
 resource "aws_ecs_task_definition" "miner" {
   family                   = local.full_name
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = var.cpu
-  memory                   = var.memory
+  cpu                      = 1024
+  memory                   = 2048
   execution_role_arn       = aws_iam_role.execution.arn
   task_role_arn            = aws_iam_role.task.arn
 
@@ -219,17 +176,13 @@ resource "aws_ecs_task_definition" "miner" {
     essential = true
 
     environment = [
-      { name = "TOKEN_SOURCE", value = var.token_source },
-      { name = "BITCAST_API_URL", value = var.bitcast_api_url },
+      { name = "TOKEN_SOURCE", value = "api" },
     ]
 
-    secrets = [for k, arn in var.secrets : { name = k, valueFrom = arn }]
-
     command = [
-      "--wallet.name", "default",
-      "--wallet.hotkey", "default",
       "--netuid", "93",
       "--subtensor.network", "finney",
+      "--neuron.disable_auto_update",
     ]
 
     logConfiguration = {
@@ -260,8 +213,8 @@ resource "aws_ecs_service" "miner" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = var.subnet_ids
-    security_groups = [aws_security_group.miner.id]
+    subnets          = var.subnet_ids
+    security_groups  = [aws_security_group.miner.id]
     assign_public_ip = true
   }
 
@@ -287,6 +240,10 @@ output "log_group_name" {
   value = aws_cloudwatch_log_group.miner.name
 }
 
-output "task_definition_arn" {
-  value = aws_ecs_task_definition.miner.arn
+output "execution_role_arn" {
+  value = aws_iam_role.execution.arn
+}
+
+output "task_role_arn" {
+  value = aws_iam_role.task.arn
 }
