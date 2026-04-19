@@ -1,4 +1,4 @@
-name: Build and Push Miner Image
+name: Deploy
 
 on:
   push:
@@ -11,96 +11,81 @@ on:
       - 'neurons/**'
       - 'core/**'
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: bitcast-miner
+  ECS_CLUSTER: bitcast
+  ECR_REPO: bitcast-miner
+  TASK_FAMILY: bitcast-miner
 
 jobs:
   build-and-push:
+    name: Build & Push to ECR
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ASSUME_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image
+      - name: Build, tag, and push image to ECR
+        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest .
+          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPO:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Register new task definition with secrets
+  deploy-prod:
+    name: Deploy to Production
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update task definition
         env:
-          BITCAST_API_KEY: ${{ secrets.BITCAST_API_KEY }}
-          BT_WALLET_HOTKEY: ${{ secrets.BT_WALLET_HOTKEY }}
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
         run: |
-          # Build task definition with GitHub secrets injected as env vars
-          python3 << 'PYEOF'
-          import json, os
+          FAMILY="${{ env.TASK_FAMILY }}"
+          echo "Updating task definition: $FAMILY"
 
-          task_def = {
-            "family": "bitcast-miner-prod",
-            "networkMode": "awsvpc",
-            "requiresCompatibilities": ["FARGATE"],
-            "cpu": "1024",
-            "memory": "2048",
-            "containerDefinitions": [{
-              "name": "bitcast-miner",
-              "image": f"${{ steps.login-ecr.outputs.registry }}/bitcast-miner:${{ github.sha }}",
-              "essential": True,
-              "environment": [
-                {"name": "TOKEN_SOURCE", "value": "api"},
-                {"name": "BITCAST_API_URL", "value": "${{ vars.BITCAST_API_URL }}"},
-                {"name": "BITCAST_API_KEY", "value": os.environ["BITCAST_API_KEY"]},
-                {"name": "BT_WALLET_HOTKEY", "value": os.environ["BT_WALLET_HOTKEY"]},
-              ],
-              "command": [
-                "--wallet.name", "${{ vars.BT_WALLET_NAME }}",
-                "--wallet.hotkey", "${{ vars.BT_WALLET_HOTKEY_NAME }}",
-                "--netuid", "93",
-                "--subtensor.network", "finney",
-                "--neuron.disable_auto_update",
-              ],
-              "logConfiguration": {
-                "logDriver": "awslogs",
-                "options": {
-                  "awslogs-group": "/ecs/bitcast-miner-prod",
-                  "awslogs-region": "us-east-1",
-                  "awslogs-stream-prefix": "ecs"
-                }
-              }
-            }]
-          }
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition "$FAMILY" \
+            --query 'taskDefinition')
 
-          with open("task-def.json", "w") as f:
-              json.dump(task_def, f)
-          PYEOF
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | \
+            jq --arg IMAGE "$IMAGE" \
+            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) |
+             .containerDefinitions[0].image = $IMAGE')
 
-          aws ecs register-task-definition \
-            --cli-input-json file://task-def.json \
-            --region us-east-1
+          aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" > /dev/null
+          echo "Registered new revision for $FAMILY"
 
-      - name: Force new ECS deployment
+      - name: Force new deployment
         run: |
           aws ecs update-service \
-            --cluster bitcast-prod \
-            --service bitcast-miner-prod \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.TASK_FAMILY }} \
             --force-new-deployment \
-            --region us-east-1
+            --region ${{ env.AWS_REGION }}

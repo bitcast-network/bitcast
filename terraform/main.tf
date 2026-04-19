@@ -54,6 +54,48 @@ variable "tags" {
   default     = {}
 }
 
+variable "bitcast_api_url" {
+  description = "Bitcast API base URL"
+  type        = string
+  default     = "https://api.bitcast.so"
+}
+
+variable "bitcast_api_key" {
+  description = "Bitcast API key for fetching access tokens"
+  type        = string
+  sensitive   = true
+}
+
+variable "bt_wallet_hotkey" {
+  description = "Bittensor wallet hotkey JSON"
+  type        = string
+  sensitive   = true
+}
+
+variable "bt_wallet_name" {
+  description = "Bittensor wallet name"
+  type        = string
+  default     = "default"
+}
+
+variable "bt_wallet_hotkey_name" {
+  description = "Bittensor hotkey name"
+  type        = string
+  default     = "default"
+}
+
+variable "subnet_netuid" {
+  description = "Bittensor subnet netuid"
+  type        = number
+  default     = 93
+}
+
+variable "subtensor_network" {
+  description = "Bittensor subtensor network (finney, test, local)"
+  type        = string
+  default     = "finney"
+}
+
 locals {
   name      = "bitcast-miner"
   full_name = "${local.name}-${var.environment}"
@@ -157,12 +199,11 @@ resource "aws_iam_role" "task" {
   tags = var.tags
 }
 
-# ─── Task Definition (initial — GHA overwrites on deploy) ────────────────────
-# This is a bootstrap definition. The GitHub Actions pipeline registers a new
-# task definition on every deploy with secrets injected from GitHub Secrets.
+# ─── Task Definition ────────────────────────────────────────────────────────
+# Secrets are in the environment block here. GHA only swaps the image on deploy.
 
 resource "aws_ecs_task_definition" "miner" {
-  family                   = local.full_name
+  family                   = local.name
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 1024
@@ -177,11 +218,18 @@ resource "aws_ecs_task_definition" "miner" {
 
     environment = [
       { name = "TOKEN_SOURCE", value = "api" },
+      { name = "BITCAST_API_URL", value = var.bitcast_api_url },
+      { name = "BITCAST_API_KEY", value = var.bitcast_api_key },
+      { name = "BT_WALLET_HOTKEY", value = var.bt_wallet_hotkey },
+      { name = "BT_WALLET_NAME", value = var.bt_wallet_name },
+      { name = "BT_WALLET_HOTKEY_NAME", value = var.bt_wallet_hotkey_name },
     ]
 
     command = [
-      "--netuid", "93",
-      "--subtensor.network", "finney",
+      "--wallet.name", var.bt_wallet_name,
+      "--wallet.hotkey", var.bt_wallet_hotkey_name,
+      "--netuid", tostring(var.subnet_netuid),
+      "--subtensor.network", var.subtensor_network,
       "--neuron.disable_auto_update",
     ]
 
@@ -206,7 +254,7 @@ resource "aws_ecs_task_definition" "miner" {
 # ─── ECS Service ────────────────────────────────────────────────────────────
 
 resource "aws_ecs_service" "miner" {
-  name            = local.full_name
+  name            = local.name
   cluster         = var.ecs_cluster_id
   task_definition = aws_ecs_task_definition.miner.arn
   desired_count   = 1
@@ -238,12 +286,4 @@ output "ecs_service_name" {
 
 output "log_group_name" {
   value = aws_cloudwatch_log_group.miner.name
-}
-
-output "execution_role_arn" {
-  value = aws_iam_role.execution.arn
-}
-
-output "task_role_arn" {
-  value = aws_iam_role.task.arn
 }
