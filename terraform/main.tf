@@ -61,6 +61,7 @@ module "youtube_miner" {
   vpc_id          = var.vpc_id
   subnet_ids      = var.subnet_ids
   tags            = var.tags
+  aws_region      = var.aws_region
 
   cpu             = 1024
   memory          = 2048
@@ -101,6 +102,7 @@ module "youtube_validator" {
   vpc_id          = var.vpc_id
   subnet_ids      = var.subnet_ids
   tags            = var.tags
+  aws_region      = var.aws_region
 
   cpu             = 2048
   memory          = 4096
@@ -130,8 +132,7 @@ module "youtube_validator" {
 # ─── YouTube Miner Secrets ──────────────────────────────────────────────────
 
 variable "youtube_miner_bitcast_api_url" {
-  type    = string
-  default = "https://api.bitcast.so"
+  type = string
 }
 
 variable "youtube_miner_bitcast_api_key" {

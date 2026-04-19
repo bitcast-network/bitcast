@@ -28,6 +28,11 @@ variable "cpu" {
   default     = 1024
 }
 
+variable "aws_region" {
+  type    = string
+  default = "us-east-1"
+}
+
 variable "memory" {
   description = "Fargate memory (MiB)"
   type        = number
@@ -63,7 +68,7 @@ variable "secrets" {
 }
 
 locals {
-  ecr_url    = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com/${var.ecr_image}"
+  ecr_url    = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.ecr_image}"
   image      = "${local.ecr_url}:latest"
 }
 
@@ -118,6 +123,15 @@ resource "aws_security_group" "this" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Bittensor axon port (miners and validators)
+  ingress {
+    description = "Allow Bittensor axon traffic"
+    from_port   = 8091
+    to_port     = 8092
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -190,7 +204,7 @@ resource "aws_ecs_task_definition" "this" {
       logDriver = "awslogs"
       options = {
         "awslogs-group"         = aws_cloudwatch_log_group.this.name
-        "awslogs-region"        = data.aws_region.current.name
+        "awslogs-region"        = var.aws_region
         "awslogs-stream-prefix" = "ecs"
       }
     }
@@ -229,7 +243,6 @@ resource "aws_ecs_service" "this" {
 
 # ─── Data Sources ───────────────────────────────────────────────────────────
 
-data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 # ─── Outputs ────────────────────────────────────────────────────────────────

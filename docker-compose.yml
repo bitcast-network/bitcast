@@ -11,6 +11,8 @@ services:
       "--neuron.disable_auto_update",
       "--logging.debug",
     ]
+    ports:
+      - "${AXON_PORT:-8091}:8091"
     environment:
       PYTHONUNBUFFERED: "1"
     env_file: .env
@@ -28,6 +30,8 @@ services:
       "--subtensor.network", "${SUBTENSOR_NETWORK:-finney}",
       "--neuron.disable_auto_update",
     ]
+    ports:
+      - "8092:8092"
     environment:
       PYTHONUNBUFFERED: "1"
     env_file: .env
