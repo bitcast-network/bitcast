@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.venv/
+venv/
+secrets/
+*.pkl
+.env
+.terraform/
+terraform.tfstate*
+*.tfvars
+tests/
+.github/
+docs/
