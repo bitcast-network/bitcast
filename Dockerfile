@@ -16,11 +16,13 @@ COPY setup.py .
 COPY bitcast/ bitcast/
 RUN pip install --no-cache-dir -e .
 
+# Source code (neurons, core)
 COPY neurons/ neurons/
 COPY core/ core/
 
-# Bittensor wallet data (hotkey/coldkey)
+# Bittensor wallet data
 ENV BT_WALLET_PATH=/root/.bittensor/wallets
 
-# Entrypoint
-ENTRYPOINT ["python", "neurons/miner.py"]
+# Entrypoint: override per role (miner vs validator)
+ARG ROLE=miner
+ENTRYPOINT ["python", "neurons/${ROLE}.py"]

@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy YouTube Validator
 
 on:
   push:
@@ -8,7 +8,8 @@ on:
       - 'requirements.txt'
       - 'setup.py'
       - 'bitcast/**'
-      - 'neurons/**'
+      - 'neurons/validator.py'
+      - 'neurons/base/**'
       - 'core/**'
 
 permissions:
@@ -18,8 +19,8 @@ permissions:
 env:
   AWS_REGION: us-east-1
   ECS_CLUSTER: bitcast
-  ECR_REPO: bitcast-miner
-  TASK_FAMILY: bitcast-miner
+  ECR_REPO: bitcast-youtube-validator
+  TASK_FAMILY: bitcast-youtube-validator
 
 jobs:
   build-and-push:
@@ -46,7 +47,8 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest .
+          docker build --build-arg ROLE=validator \
+            -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPO:latest .
           docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPO:latest
           echo "image=$ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
@@ -67,11 +69,8 @@ jobs:
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
         run: |
-          FAMILY="${{ env.TASK_FAMILY }}"
-          echo "Updating task definition: $FAMILY"
-
           TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition "$FAMILY" \
+            --task-definition ${{ env.TASK_FAMILY }} \
             --query 'taskDefinition')
 
           NEW_TASK_DEF=$(echo "$TASK_DEF" | \
@@ -80,7 +79,6 @@ jobs:
              .containerDefinitions[0].image = $IMAGE')
 
           aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" > /dev/null
-          echo "Registered new revision for $FAMILY"
 
       - name: Force new deployment
         run: |

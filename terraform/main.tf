@@ -1,9 +1,14 @@
+# Bitcast Subnet Infrastructure
+#
+# Shared Terraform for YouTube miner and validator on ECS Fargate.
+# Add X miner/validator by duplicating the module blocks with X_ prefix.
+
 terraform {
   required_version = ">= 1.0"
 
   backend "s3" {
     # bucket = "bitcast-terraform-state"
-    # key    = "miner/terraform.tfstate"
+    # key    = "subnet/terraform.tfstate"
     # region = "us-east-1"
   }
 
@@ -22,15 +27,8 @@ provider "aws" {
 # ─── Variables ───────────────────────────────────────────────────────────────
 
 variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "us-east-1"
-}
-
-variable "environment" {
-  description = "Environment name"
-  type        = string
-  default     = "prod"
+  type    = string
+  default = "us-east-1"
 }
 
 variable "ecs_cluster_id" {
@@ -49,241 +47,134 @@ variable "subnet_ids" {
 }
 
 variable "tags" {
-  description = "Additional tags"
-  type        = map(string)
-  default     = {}
+  type    = map(string)
+  default = {}
 }
 
-variable "bitcast_api_url" {
-  description = "Bitcast API base URL"
-  type        = string
-  default     = "https://api.bitcast.so"
-}
+# ─── YouTube Miner ──────────────────────────────────────────────────────────
 
-variable "bitcast_api_key" {
-  description = "Bitcast API key for fetching access tokens"
-  type        = string
-  sensitive   = true
-}
+module "youtube_miner" {
+  source = "./modules/bittensor-neuron"
 
-variable "bt_wallet_hotkey" {
-  description = "Bittensor wallet hotkey JSON"
-  type        = string
-  sensitive   = true
-}
+  name            = "bitcast-youtube-miner"
+  ecs_cluster_id  = var.ecs_cluster_id
+  vpc_id          = var.vpc_id
+  subnet_ids      = var.subnet_ids
+  tags            = var.tags
 
-variable "bt_wallet_name" {
-  description = "Bittensor wallet name"
-  type        = string
-  default     = "default"
-}
+  cpu             = 1024
+  memory          = 2048
 
-variable "bt_wallet_hotkey_name" {
-  description = "Bittensor hotkey name"
-  type        = string
-  default     = "default"
-}
+  ecr_image       = "bitcast-youtube-miner"
+  entrypoint      = ["python", "neurons/miner.py"]
+  command         = [
+    "--wallet.name",     var.youtube_miner_bt_wallet_name,
+    "--wallet.hotkey",   var.youtube_miner_bt_hotkey_name,
+    "--netuid",          "93",
+    "--subtensor.network", "finney",
+    "--neuron.disable_auto_update",
+  ]
 
-variable "subnet_netuid" {
-  description = "Bittensor subnet netuid"
-  type        = number
-  default     = 93
-}
-
-variable "subtensor_network" {
-  description = "Bittensor subtensor network (finney, test, local)"
-  type        = string
-  default     = "finney"
-}
-
-locals {
-  name      = "bitcast-miner"
-  full_name = "${local.name}-${var.environment}"
-}
-
-# ─── ECR ────────────────────────────────────────────────────────────────────
-
-resource "aws_ecr_repository" "miner" {
-  name                 = local.name
-  image_tag_mutability = "MUTABLE"
-  force_delete         = false
-
-  image_scanning_configuration {
-    scan_on_push = true
+  environment = {
+    TOKEN_SOURCE       = "api"
+    BITCAST_API_URL    = var.youtube_miner_bitcast_api_url
+    BITCAST_API_KEY    = var.youtube_miner_bitcast_api_key
+    BT_WALLET_HOTKEY   = var.youtube_miner_bt_wallet_hotkey
+    BT_WALLET_NAME     = var.youtube_miner_bt_wallet_name
+    BT_WALLET_HOTKEY_NAME = var.youtube_miner_bt_hotkey_name
   }
 
-  tags = var.tags
-}
-
-resource "aws_ecr_lifecycle_policy" "miner" {
-  repository = aws_ecr_repository.miner.name
-
-  policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "Keep last 10 images"
-      selection = {
-        tagStatus   = "any"
-        countType   = "imageCountMoreThan"
-        countNumber = 10
-      }
-      action = { type = "expire" }
-    }]
-  })
-}
-
-# ─── CloudWatch ──────────────────────────────────────────────────────────────
-
-resource "aws_cloudwatch_log_group" "miner" {
-  name              = "/ecs/${local.full_name}"
-  retention_in_days = 30
-  tags              = var.tags
-}
-
-# ─── Security Group ──────────────────────────────────────────────────────────
-
-resource "aws_security_group" "miner" {
-  name_prefix = "${local.name}-task-"
-  description = "Bitcast miner task — outbound only"
-  vpc_id      = var.vpc_id
-
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, { Name = "${local.name}-task" })
-
-  lifecycle {
-    create_before_destroy = true
+  secrets = {
+    BITCAST_API_KEY  = var.youtube_miner_bitcast_api_key
+    BT_WALLET_HOTKEY = var.youtube_miner_bt_wallet_hotkey
   }
 }
 
-# ─── IAM ────────────────────────────────────────────────────────────────────
+# ─── YouTube Validator ──────────────────────────────────────────────────────
 
-resource "aws_iam_role" "execution" {
-  name = "${local.name}-execution"
+module "youtube_validator" {
+  source = "./modules/bittensor-neuron"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
-  })
+  name            = "bitcast-youtube-validator"
+  ecs_cluster_id  = var.ecs_cluster_id
+  vpc_id          = var.vpc_id
+  subnet_ids      = var.subnet_ids
+  tags            = var.tags
 
-  tags = var.tags
-}
+  cpu             = 2048
+  memory          = 4096
 
-resource "aws_iam_role_policy_attachment" "execution_base" {
-  role       = aws_iam_role.execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
+  ecr_image       = "bitcast-youtube-validator"
+  entrypoint      = ["python", "neurons/validator.py"]
+  command         = [
+    "--wallet.name",     var.youtube_validator_bt_wallet_name,
+    "--wallet.hotkey",   var.youtube_validator_bt_hotkey_name,
+    "--netuid",          "93",
+    "--subtensor.network", "finney",
+    "--neuron.disable_auto_update",
+  ]
 
-resource "aws_iam_role" "task" {
-  name = "${local.name}-task"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
-  })
-
-  tags = var.tags
-}
-
-# ─── Task Definition ────────────────────────────────────────────────────────
-# Secrets are in the environment block here. GHA only swaps the image on deploy.
-
-resource "aws_ecs_task_definition" "miner" {
-  family                   = local.name
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = 1024
-  memory                   = 2048
-  execution_role_arn       = aws_iam_role.execution.arn
-  task_role_arn            = aws_iam_role.task.arn
-
-  container_definitions = jsonencode([{
-    name      = local.name
-    image     = "${aws_ecr_repository.miner.repository_url}:latest"
-    essential = true
-
-    environment = [
-      { name = "TOKEN_SOURCE", value = "api" },
-      { name = "BITCAST_API_URL", value = var.bitcast_api_url },
-      { name = "BITCAST_API_KEY", value = var.bitcast_api_key },
-      { name = "BT_WALLET_HOTKEY", value = var.bt_wallet_hotkey },
-      { name = "BT_WALLET_NAME", value = var.bt_wallet_name },
-      { name = "BT_WALLET_HOTKEY_NAME", value = var.bt_wallet_hotkey_name },
-    ]
-
-    command = [
-      "--wallet.name", var.bt_wallet_name,
-      "--wallet.hotkey", var.bt_wallet_hotkey_name,
-      "--netuid", tostring(var.subnet_netuid),
-      "--subtensor.network", var.subtensor_network,
-      "--neuron.disable_auto_update",
-    ]
-
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.miner.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "ecs"
-      }
-    }
-  }])
-
-  runtime_platform {
-    operating_system_family = "LINUX"
-    cpu_architecture        = "X86_64"
+  environment = {
+    BT_WALLET_HOTKEY       = var.youtube_validator_bt_wallet_hotkey
+    BT_WALLET_NAME         = var.youtube_validator_bt_wallet_name
+    BT_WALLET_HOTKEY_NAME  = var.youtube_validator_bt_hotkey_name
   }
 
-  tags = var.tags
+  secrets = {
+    BT_WALLET_HOTKEY = var.youtube_validator_bt_wallet_hotkey
+  }
 }
 
-# ─── ECS Service ────────────────────────────────────────────────────────────
+# ─── YouTube Miner Secrets ──────────────────────────────────────────────────
 
-resource "aws_ecs_service" "miner" {
-  name            = local.name
-  cluster         = var.ecs_cluster_id
-  task_definition = aws_ecs_task_definition.miner.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+variable "youtube_miner_bitcast_api_url" {
+  type    = string
+  default = "https://api.bitcast.so"
+}
 
-  network_configuration {
-    subnets          = var.subnet_ids
-    security_groups  = [aws_security_group.miner.id]
-    assign_public_ip = true
-  }
+variable "youtube_miner_bitcast_api_key" {
+  type      = string
+  sensitive = true
+}
 
-  health_check_grace_period_seconds = 120
+variable "youtube_miner_bt_wallet_hotkey" {
+  type      = string
+  sensitive = true
+}
 
-  deployment_maximum_percent         = 200
-  deployment_minimum_healthy_percent = 0
+variable "youtube_miner_bt_wallet_name" {
+  type    = string
+  default = "default"
+}
 
-  tags = var.tags
+variable "youtube_miner_bt_hotkey_name" {
+  type    = string
+  default = "default"
+}
+
+# ─── YouTube Validator Secrets ──────────────────────────────────────────────
+
+variable "youtube_validator_bt_wallet_hotkey" {
+  type      = string
+  sensitive = true
+}
+
+variable "youtube_validator_bt_wallet_name" {
+  type    = string
+  default = "default"
+}
+
+variable "youtube_validator_bt_hotkey_name" {
+  type    = string
+  default = "default"
 }
 
 # ─── Outputs ────────────────────────────────────────────────────────────────
 
-output "ecr_repository_url" {
-  value = aws_ecr_repository.miner.repository_url
-}
+output "youtube_miner_ecr_url"   { value = module.youtube_miner.ecr_repository_url }
+output "youtube_miner_service"   { value = module.youtube_miner.service_name }
+output "youtube_miner_log_group" { value = module.youtube_miner.log_group_name }
 
-output "ecs_service_name" {
-  value = aws_ecs_service.miner.name
-}
-
-output "log_group_name" {
-  value = aws_cloudwatch_log_group.miner.name
-}
+output "youtube_validator_ecr_url"   { value = module.youtube_validator.ecr_repository_url }
+output "youtube_validator_service"   { value = module.youtube_validator.service_name }
+output "youtube_validator_log_group" { value = module.youtube_validator.log_group_name }
