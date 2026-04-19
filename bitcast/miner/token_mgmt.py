@@ -14,7 +14,7 @@ current_dir = os.path.dirname(__file__)
 TOKEN_SOURCE = os.getenv("TOKEN_SOURCE", "local")
 
 # Bitcast API config (only used when TOKEN_SOURCE=api)
-BITCAST_API_URL = os.getenv("BITCAST_API_URL", "https://api.bitcast.so")
+BITCAST_API_URL = os.getenv("BITCAST_API_URL", "")
 BITCAST_API_KEY = os.getenv("BITCAST_API_KEY", "")
 
 
@@ -32,6 +32,10 @@ def init():
     bt.logging.info(f"Token source: {source}")
 
     if source == "api":
+        if not BITCAST_API_URL:
+            bt.logging.error("❌ TOKEN_SOURCE=api but BITCAST_API_URL is not set.")
+            bt.logging.error("Set BITCAST_API_URL env var (e.g. https://bitcast-api.bitcast.network)")
+            sys.exit(1)
         if not BITCAST_API_KEY:
             bt.logging.error("❌ TOKEN_SOURCE=api but BITCAST_API_KEY is not set.")
             bt.logging.error("Set BITCAST_API_KEY env var or switch to TOKEN_SOURCE=local")

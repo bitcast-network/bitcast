@@ -14,5 +14,4 @@ build/
 .cursor/
 .dev_planning/
 .vscode
-historical_videos.jsonlterraform/.terraform/
-terraform/.terraform.lock.hcl
+historical_videos.jsonl
