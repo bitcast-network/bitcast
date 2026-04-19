@@ -2,6 +2,11 @@
 # Helper to extract Bittensor wallet data into base64 env var format
 # Usage: ./scripts/wallet-env.sh <wallet_name> <hotkey_name>
 # Outputs env vars that can be appended to .env
+#
+# Bittensor layout:
+#   wallets/<wallet>/hotkeys/<hotkey>           ← hotkey JSON (file)
+#   wallets/<wallet>/hotkeys/<hotkey>pub.txt    ← public key
+#   wallets/<wallet>/coldkeypub.txt
 
 set -euo pipefail
 
@@ -10,19 +15,20 @@ HOTKEY_NAME="${2:-default}"
 WALLET_BASE="${HOME}/.bittensor/wallets"
 
 WALLET_DIR="${WALLET_BASE}/${WALLET_NAME}"
-HOTKEY_DIR="${WALLET_DIR}/hotkeys/${HOTKEY_NAME}"
+HOTKEY_PATH="${WALLET_DIR}/hotkeys/${HOTKEY_NAME}"
 
-if [ ! -f "${HOTKEY_DIR}/hotkey" ]; then
-    echo "ERROR: Hotkey not found at ${HOTKEY_DIR}/hotkey" >&2
+if [ ! -f "${HOTKEY_PATH}" ]; then
+    echo "ERROR: Hotkey not found at ${HOTKEY_PATH}" >&2
     echo "Check: ls ${WALLET_DIR}/hotkeys/" >&2
     exit 1
 fi
 
 echo "# Wallet: ${WALLET_NAME}/${HOTKEY_NAME}"
-echo "HOTKEY_DATA=$(base64 -w0 "${HOTKEY_DIR}/hotkey")"
+echo "HOTKEY_DATA=$(base64 -w0 "${HOTKEY_PATH}")"
 
-if [ -f "${HOTKEY_DIR}/hotkeypub.txt" ]; then
-    echo "HOTKEYPUB_DATA=$(cat "${HOTKEY_DIR}/hotkeypub.txt")"
+PUB_PATH="${WALLET_DIR}/hotkeys/${HOTKEY_NAME}pub.txt"
+if [ -f "${PUB_PATH}" ]; then
+    echo "HOTKEYPUB_DATA=$(cat "${PUB_PATH}")"
 fi
 
 if [ -f "${WALLET_DIR}/coldkeypub.txt" ]; then
