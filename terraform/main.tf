@@ -76,12 +76,9 @@ module "youtube_miner" {
   ]
 
   environment = {
-    TOKEN_SOURCE       = "api"
-    BITCAST_API_URL    = var.youtube_miner_bitcast_api_url
-    BITCAST_API_KEY    = var.youtube_miner_bitcast_api_key
-    BT_WALLET_HOTKEY   = var.youtube_miner_bt_wallet_hotkey
-    BT_WALLET_NAME     = var.youtube_miner_bt_wallet_name
-    BT_WALLET_HOTKEY_NAME = var.youtube_miner_bt_hotkey_name
+    TOKEN_SOURCE    = "api"
+    BITCAST_API_URL = var.youtube_miner_bitcast_api_url
+    BITCAST_API_KEY = var.youtube_miner_bitcast_api_key
   }
 
   secrets = {
@@ -114,11 +111,7 @@ module "youtube_validator" {
     "--neuron.disable_auto_update",
   ]
 
-  environment = {
-    BT_WALLET_HOTKEY       = var.youtube_validator_bt_wallet_hotkey
-    BT_WALLET_NAME         = var.youtube_validator_bt_wallet_name
-    BT_WALLET_HOTKEY_NAME  = var.youtube_validator_bt_hotkey_name
-  }
+  environment = {}
 
   secrets = {
     BT_WALLET_HOTKEY = var.youtube_validator_bt_wallet_hotkey
