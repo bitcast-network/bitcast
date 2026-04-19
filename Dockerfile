@@ -20,9 +20,13 @@ RUN pip install --no-cache-dir -e .
 COPY neurons/ neurons/
 COPY core/ core/
 
-# Bittensor wallet data
+# Entrypoint script (bootstraps wallet from secrets)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Bittensor wallet path
 ENV BT_WALLET_PATH=/root/.bittensor/wallets
 
-# Entrypoint: override per role (miner vs validator)
+# Role: miner or validator
 ARG ROLE=miner
-ENTRYPOINT ["python", "neurons/${ROLE}.py"]
+ENTRYPOINT ["/entrypoint.sh", "python", "neurons/${ROLE}.py"]

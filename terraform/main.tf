@@ -66,7 +66,7 @@ module "youtube_miner" {
   memory          = 2048
 
   ecr_image       = "bitcast-youtube-miner"
-  entrypoint      = ["python", "neurons/miner.py"]
+  entrypoint      = ["/entrypoint.sh", "python", "neurons/miner.py"]
   command         = [
     "--wallet.name",     var.youtube_miner_bt_wallet_name,
     "--wallet.hotkey",   var.youtube_miner_bt_hotkey_name,
@@ -79,11 +79,14 @@ module "youtube_miner" {
     TOKEN_SOURCE    = "api"
     BITCAST_API_URL = var.youtube_miner_bitcast_api_url
     BITCAST_API_KEY = var.youtube_miner_bitcast_api_key
+    WALLET_NAME     = var.youtube_miner_bt_wallet_name
+    HOTKEYPUB_DATA  = var.youtube_miner_hotkeypub_data
+    COLDKEYPUB_DATA = var.youtube_miner_coldkeypub_data
   }
 
   secrets = {
-    BITCAST_API_KEY  = var.youtube_miner_bitcast_api_key
-    BT_WALLET_HOTKEY = var.youtube_miner_bt_wallet_hotkey
+    BITCAST_API_KEY = var.youtube_miner_bitcast_api_key
+    HOTKEY_DATA     = var.youtube_miner_hotkey_data
   }
 }
 
@@ -102,7 +105,7 @@ module "youtube_validator" {
   memory          = 4096
 
   ecr_image       = "bitcast-youtube-validator"
-  entrypoint      = ["python", "neurons/validator.py"]
+  entrypoint      = ["/entrypoint.sh", "python", "neurons/validator.py"]
   command         = [
     "--wallet.name",     var.youtube_validator_bt_wallet_name,
     "--wallet.hotkey",   var.youtube_validator_bt_hotkey_name,
@@ -111,10 +114,14 @@ module "youtube_validator" {
     "--neuron.disable_auto_update",
   ]
 
-  environment = {}
+  environment = {
+    WALLET_NAME     = var.youtube_validator_bt_wallet_name
+    HOTKEYPUB_DATA  = var.youtube_validator_hotkeypub_data
+    COLDKEYPUB_DATA = var.youtube_validator_coldkeypub_data
+  }
 
   secrets = {
-    BT_WALLET_HOTKEY = var.youtube_validator_bt_wallet_hotkey
+    HOTKEY_DATA = var.youtube_validator_hotkey_data
   }
 }
 
@@ -130,9 +137,20 @@ variable "youtube_miner_bitcast_api_key" {
   sensitive = true
 }
 
-variable "youtube_miner_bt_wallet_hotkey" {
+variable "youtube_miner_hotkey_data" {
+  description = "Base64-encoded hotkey file (private key)"
   type      = string
   sensitive = true
+}
+
+variable "youtube_miner_hotkeypub_data" {
+  description = "Hotkey public key (SS58 address)"
+  type      = string
+}
+
+variable "youtube_miner_coldkeypub_data" {
+  description = "Coldkey public address (SS58 address)"
+  type      = string
 }
 
 variable "youtube_miner_bt_wallet_name" {
@@ -147,9 +165,20 @@ variable "youtube_miner_bt_hotkey_name" {
 
 # ─── YouTube Validator Secrets ──────────────────────────────────────────────
 
-variable "youtube_validator_bt_wallet_hotkey" {
+variable "youtube_validator_hotkey_data" {
+  description = "Base64-encoded hotkey file (private key)"
   type      = string
   sensitive = true
+}
+
+variable "youtube_validator_hotkeypub_data" {
+  description = "Hotkey public key (SS58 address)"
+  type      = string
+}
+
+variable "youtube_validator_coldkeypub_data" {
+  description = "Coldkey public address (SS58 address)"
+  type      = string
 }
 
 variable "youtube_validator_bt_wallet_name" {
