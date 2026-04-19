@@ -80,6 +80,7 @@ module "youtube_miner" {
     BITCAST_API_URL = var.youtube_miner_bitcast_api_url
     BITCAST_API_KEY = var.youtube_miner_bitcast_api_key
     WALLET_NAME     = var.youtube_miner_bt_wallet_name
+    HOTKEY_NAME     = var.youtube_miner_bt_hotkey_name
     HOTKEYPUB_DATA  = var.youtube_miner_hotkeypub_data
     COLDKEYPUB_DATA = var.youtube_miner_coldkeypub_data
   }
@@ -116,6 +117,7 @@ module "youtube_validator" {
 
   environment = {
     WALLET_NAME     = var.youtube_validator_bt_wallet_name
+    HOTKEY_NAME     = var.youtube_validator_bt_hotkey_name
     HOTKEYPUB_DATA  = var.youtube_validator_hotkeypub_data
     COLDKEYPUB_DATA = var.youtube_validator_coldkeypub_data
   }

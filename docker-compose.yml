@@ -1,0 +1,27 @@
+services:
+  miner:
+    build: .
+    entrypoint: ["/entrypoint.sh"]
+    command: [
+      "python", "neurons/miner.py",
+      "--wallet.name", "default",
+      "--wallet.hotkey", "default",
+      "--netuid", "93",
+      "--subtensor.network", "finney",
+      "--neuron.disable_auto_update",
+    ]
+    env_file: .env
+
+  validator:
+    build: .
+    profiles: ["validator"]
+    entrypoint: ["/entrypoint.sh"]
+    command: [
+      "python", "neurons/validator.py",
+      "--wallet.name", "default",
+      "--wallet.hotkey", "default",
+      "--netuid", "93",
+      "--subtensor.network", "finney",
+      "--neuron.disable_auto_update",
+    ]
+    env_file: .env

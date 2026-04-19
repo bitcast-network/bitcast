@@ -7,6 +7,8 @@
 #
 # Environment variables consumed:
 #   WALLET_PATH        - base path for wallet storage (default: /root/.bittensor/wallets)
+#   WALLET_NAME        - wallet name (default: default)
+#   HOTKEY_NAME        - hotkey name (default: default)
 #   HOTKEY_DATA        - base64-encoded hotkey file (private key)
 #   HOTKEYPUB_DATA     - content for hotkeypub.txt (public key)
 #   COLDKEYPUB_DATA    - content for coldkeypub.txt (public address)
@@ -15,15 +17,17 @@ set -euo pipefail
 
 WALLET_BASE="${WALLET_PATH:-/root/.bittensor/wallets}"
 WALLET_NAME="${WALLET_NAME:-default}"
+HOTKEY_NAME="${HOTKEY_NAME:-default}"
 
 WALLET_DIR="${WALLET_BASE}/${WALLET_NAME}"
-mkdir -p "${WALLET_DIR}"
+HOTKEY_DIR="${WALLET_DIR}/hotkeys/${HOTKEY_NAME}"
+mkdir -p "${HOTKEY_DIR}"
 
 # --- Write hotkey (private key) ---
 if [ -n "${HOTKEY_DATA:-}" ]; then
-    echo "[entrypoint] Writing hotkey: ${WALLET_NAME}"
-    echo "${HOTKEY_DATA}" | base64 -d > "${WALLET_DIR}/hotkey"
-    chmod 600 "${WALLET_DIR}/hotkey"
+    echo "[entrypoint] Writing hotkey: ${WALLET_NAME}/${HOTKEY_NAME}"
+    echo "${HOTKEY_DATA}" | base64 -d > "${HOTKEY_DIR}/hotkey"
+    chmod 600 "${HOTKEY_DIR}/hotkey"
 else
     echo "[entrypoint] ERROR: HOTKEY_DATA not set - cannot run without hotkey"
     exit 1
@@ -31,8 +35,8 @@ fi
 
 # --- Write hotkeypub (public key) ---
 if [ -n "${HOTKEYPUB_DATA:-}" ]; then
-    echo "${HOTKEYPUB_DATA}" > "${WALLET_DIR}/hotkeypub.txt"
-    chmod 644 "${WALLET_DIR}/hotkeypub.txt"
+    echo "${HOTKEYPUB_DATA}" > "${HOTKEY_DIR}/hotkeypub.txt"
+    chmod 644 "${HOTKEY_DIR}/hotkeypub.txt"
 fi
 
 # --- Write coldkeypub (public address only) ---
@@ -44,6 +48,6 @@ fi
 # --- Clear sensitive env vars ---
 unset HOTKEY_DATA
 
-echo "[entrypoint] Wallet bootstrapped at ${WALLET_DIR}"
+echo "[entrypoint] Wallet bootstrapped at ${HOTKEY_DIR}"
 echo "[entrypoint] Starting: $*"
 exec "$@"
