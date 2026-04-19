@@ -27,6 +27,7 @@ RUN chmod +x /entrypoint.sh
 # Bittensor wallet path
 ENV BT_WALLET_PATH=/root/.bittensor/wallets
 
-# Role: miner or validator
+# Entrypoint and command are set via Terraform task definition.
+# ARG ROLE is not used at build time — it's documented here for clarity.
 ARG ROLE=miner
-ENTRYPOINT ["/entrypoint.sh", "python", "neurons/${ROLE}.py"]
+ENTRYPOINT ["/entrypoint.sh"]
