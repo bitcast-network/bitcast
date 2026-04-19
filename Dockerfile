@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install the package
-COPY setup.py .
+COPY setup.py README.md .
 COPY bitcast/ bitcast/
 RUN pip install --no-cache-dir -e .
 
