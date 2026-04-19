@@ -11,8 +11,6 @@ from bitcast.validator.platforms.youtube.evaluation.video import (
     initialize_decision_details,
     prescreen_briefs_for_video
 )
-from bitcast.validator.utils.config import YT_MIN_VIDEO_RETENTION
-
 # Calculate recent dates for tests
 current_date = datetime.now()
 brief_start = (current_date - timedelta(days=10)).strftime("%Y-%m-%d")
@@ -107,7 +105,7 @@ class TestBriefPreScreening:
             "privacyStatus": "public"
         }
         video_analytics = {
-            "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
+            "averageViewPercentage": 75,
             "estimatedMinutesWatched": 1000
         }
 
@@ -171,7 +169,7 @@ class TestBriefPreScreening:
             "privacyStatus": "public"
         }
         video_analytics = {
-            "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
+            "averageViewPercentage": 75,
             "estimatedMinutesWatched": 1000
         }
 
@@ -215,7 +213,7 @@ class TestBriefPreScreening:
             "privacyStatus": "public"
         }
         video_analytics = {
-            "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
+            "averageViewPercentage": 75,
             "estimatedMinutesWatched": 1000
         }
 
@@ -261,7 +259,7 @@ class TestBriefPreScreening:
             "privacyStatus": "public"
         }
         video_analytics = {
-            "averageViewPercentage": YT_MIN_VIDEO_RETENTION + 5,
+            "averageViewPercentage": 75,
             "estimatedMinutesWatched": 1000
         }
 

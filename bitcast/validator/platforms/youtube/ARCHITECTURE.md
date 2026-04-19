@@ -29,7 +29,7 @@ bitcast/validator/platforms/youtube/
 │   ├── score_cap.py            # Legacy median cap utilities
 │   ├── scoring.py              # Video scoring orchestration
 │   └── video/                  # Modular video evaluation pipeline
-│       ├── validation.py       # Privacy, retention, captions, publish date checks
+│       ├── validation.py       # Privacy, captions, publish date checks
 │       ├── transcript.py       # Transcript fetching and prompt injection detection
 │       ├── brief_matching.py   # Prescreening, evaluation, and priority selection
 │       └── orchestration.py    # Workflow coordination and batch processing
@@ -44,7 +44,7 @@ The YouTube evaluation system implements a sophisticated multi-stage pipeline:
 
 1. **Channel Qualification**: OAuth validation → channel data retrieval → criteria vetting → blacklist checking
 2. **Video Discovery**: Recent uploads retrieval → batch data fetching → basic validation filtering
-3. **Video Validation Pipeline**: Privacy → Publish date → Retention → Manual captions → Security checks
+3. **Video Validation Pipeline**: Privacy → Publish date → Manual captions → Security checks
 4. **Content Evaluation**: Brief prescreening → Transcript analysis → LLM evaluation → Priority selection
 5. **Scoring & Anti-Exploitation**: Curve-based scoring (YPP/Non-YPP) → Median capping → Diminishing returns calculation
 
@@ -57,15 +57,13 @@ The video evaluation has been restructured into specialized, testable components
 #### **`validation.py`** - Core Video Validation
 - **Privacy Check**: Ensures videos are public and accessible
 - **Publish Date Validation**: Verifies video publication against brief time windows
-- **Retention Analysis**: Calculates and validates minimum retention thresholds
 - **Caption Verification**: Confirms auto-generated captions (manual captions rejected)
 - **Early Exit Optimization**: ECO_MODE support for performance optimization
 
 ```python
 # Key validation functions
 def check_video_privacy(video_data, decision_details) -> bool
-def check_video_publish_date(video_data, briefs, decision_details) -> bool  
-def check_video_retention(video_data, video_analytics, decision_details) -> bool
+def check_video_publish_date(video_data, briefs, decision_details) -> bool
 def check_manual_captions(video_id, video_data, decision_details) -> bool
 ```
 
@@ -364,7 +362,6 @@ day2_avg = score_result.get("day2_average", 0)
                 "video_vet_result": bool,
                 "privacyCheck": bool,
                 "publishDateCheck": bool,
-                "retentionCheck": bool,
                 "manualCaptionsCheck": bool,
                 "promptInjectionCheck": bool,
                 "preScreeningCheck": [bool, ...],   # Per-brief prescreening results
@@ -422,7 +419,6 @@ day2_avg = score_result.get("day2_average", 0)
 - `vet_video(video_id, briefs, video_data, video_analytics) -> dict` - Single video evaluation
 - `check_video_privacy(video_data, decision_details) -> bool` - Privacy validation
 - `check_video_publish_date(video_data, briefs, decision_details) -> bool` - Timing validation
-- `check_video_retention(video_data, video_analytics, decision_details) -> bool` - Retention analysis
 - `check_manual_captions(video_id, video_data, decision_details) -> bool` - Caption verification
 
 ### **Content Security & Transcript Management**

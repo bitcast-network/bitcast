@@ -2,7 +2,7 @@
 Video validation checks for YouTube evaluation.
 
 This module contains functions for validating YouTube videos against basic criteria
-including privacy status, publish date, retention rates, and manual captions.
+including privacy status, publish date, and manual captions.
 """
 
 from datetime import datetime, timedelta
@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 import bittensor as bt
 
 from bitcast.validator.utils.config import (
-    YT_MIN_VIDEO_RETENTION,
     YT_VIDEO_RELEASE_BUFFER,
     YT_SCORING_WINDOW,
     YT_REWARD_DELAY,
@@ -20,12 +19,11 @@ from bitcast.validator.utils.config import (
 def initialize_decision_details():
     """
     Initialize the decision details structure.
-    
+
     Returns:
         dict: Empty decision details structure
     """
     return {
-        "averageViewPercentageCheck": None,
         "manualCaptionsCheck": None,
         "promptInjectionCheck": None,
         "preScreeningCheck": [],
@@ -182,33 +180,6 @@ def check_video_age_limit(video_data, decision_details):
             operation="video age limit validation",
             context={"video_id": video_data.get("bitcastVideoId", "unknown")}
         )
-
-
-def check_video_retention(video_data, video_analytics, decision_details):
-    """
-    Check if the video meets minimum retention requirements.
-    
-    Args:
-        video_data (dict): Video metadata
-        video_analytics (dict): Video analytics data
-        decision_details (dict): Decision details to update
-        
-    Returns:
-        bool: True if retention is acceptable, False otherwise
-    """
-    average_view_percentage = video_analytics.get("averageViewPercentage", 0)
-    
-    # Handle case where averageViewPercentage is None (API returns null)
-    if average_view_percentage is None:
-        average_view_percentage = 0
-
-    if average_view_percentage < YT_MIN_VIDEO_RETENTION:
-        bt.logging.warning(f"Video retention too low: {average_view_percentage}% < {YT_MIN_VIDEO_RETENTION}%")
-        decision_details["averageViewPercentageCheck"] = False
-        return False
-    else:
-        decision_details["averageViewPercentageCheck"] = True
-        return True
 
 
 def check_manual_captions(video_id, video_data, decision_details):
