@@ -307,7 +307,9 @@ def process_single_video(video_id, video_data_dict, video_analytics_dict, video_
         result["videos"][video_id]["score"] = 0
 
 def check_video_brief_matches(video_id, video_matches, briefs):
-    """Check if a video matches any briefs and return the matching brief IDs as a list (max length 1)."""
+    """Check if a video matches any briefs and return the matching brief IDs as a list.
+    
+    Returns at most one regular brief plus any matching product placement briefs."""
     matches_any_brief = False
     matching_brief_ids = []
     
@@ -325,6 +327,7 @@ def _get_youtube_scaling_factor(brief_format: str) -> float:
         "dedicated": YT_SCALING_FACTOR_DEDICATED,
         "ad-read": YT_SCALING_FACTOR_AD_READ,
         "integration": YT_SCALING_FACTOR_AD_READ,
+        "productPlacement": 133,
     }
     
     factor = scaling_factors.get(brief_format, YT_SCALING_FACTOR_DEDICATED)
@@ -340,6 +343,7 @@ def _get_lifetime_deduction(brief_format: str) -> float:
         "dedicated": YT_LIFETIME_DEDUCTION,
         "ad-read": YT_LIFETIME_DEDUCTION_AD_READ,
         "integration": YT_LIFETIME_DEDUCTION_AD_READ,
+        "productPlacement": 8,
     }
     return deductions.get(brief_format, YT_LIFETIME_DEDUCTION)
 
