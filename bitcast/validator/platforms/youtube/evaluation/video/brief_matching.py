@@ -134,24 +134,40 @@ def map_brief_results_to_original_order(eligible_brief_reasonings, eligible_brie
 
 def select_highest_priority_brief(matching_briefs, brief_results):
     """
-    Select the highest priority brief from matching briefs using weight * boost.
+    Select the highest priority regular brief and collect all product placement briefs.
+    
+    Splits matches into two pools:
+    - Regular briefs (format != "productPlacement"): select highest weight*boost winner
+    - Product placement briefs (format == "productPlacement"): keep ALL that matched
     
     Args:
         matching_briefs (list): List of brief dictionaries
         brief_results (list): List of boolean results indicating which briefs matched
         
     Returns:
-        tuple: (selected_index, selected_brief) or (None, None) if no matches
+        tuple: (selected_index, selected_brief, pp_briefs)
+            - selected_index/selected_brief: highest-priority regular brief or (None, None)
+            - pp_briefs: list of (index, brief) tuples for all matching PP briefs
     """
     if not any(brief_results):
-        return None, None
+        return None, None, []
     
     best_brief = None
     best_index = None
     best_priority = -1
+    pp_briefs = []
     
     for i, (brief, matched) in enumerate(zip(matching_briefs, brief_results)):
-        if matched:
+        if not matched:
+            continue
+        
+        brief_format = brief.get("format", "")
+        
+        if brief_format == "productPlacement":
+            # Product placement briefs: keep all matches
+            pp_briefs.append((i, brief))
+        else:
+            # Regular briefs: select highest weight*boost
             weight = brief.get("weight", 0)
             boost = brief.get("boost", 1.0)
             priority = weight * boost
@@ -161,7 +177,7 @@ def select_highest_priority_brief(matching_briefs, brief_results):
                 best_brief = brief
                 best_index = i
     
-    return best_index, best_brief
+    return best_index, best_brief, pp_briefs
 
 
 def evaluate_content_against_briefs(briefs, video_data, transcript, decision_details):
@@ -226,10 +242,10 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
     batch_elapsed = time.time() - batch_start
     bt.logging.info(f"All {len(briefs)} brief evaluations completed in {batch_elapsed:.1f}s")
 
-    # Apply single brief matching limitation using weight-based priority
-    selected_index, selected_brief = select_highest_priority_brief(briefs, brief_results)
+    # Apply brief selection: one regular brief (highest weight*boost) + all product placement matches
+    selected_index, selected_brief, pp_briefs = select_highest_priority_brief(briefs, brief_results)
     
-    # Reset all results and only set the selected brief to True
+    # Reset all results and only set selected brief(s) to True
     final_brief_results = [False] * len(briefs)
     final_met_brief_ids = []
     
@@ -243,10 +259,19 @@ def evaluate_content_against_briefs(briefs, video_data, transcript, decision_det
         selected_boost = selected_brief.get("boost", 1.0)
         priority_value = selected_weight * selected_boost
         bt.logging.info(
-            f"Selected brief '{selected_brief['id']}' (weight: {selected_weight}, boost: {selected_boost}, priority: {priority_value}) "
+            f"Selected regular brief '{selected_brief['id']}' (weight: {selected_weight}, boost: {selected_boost}, priority: {priority_value}) "
             f"from {total_matches} matching briefs for video: {video_data.get('bitcastVideoId')}"
         )
-    else:
+    
+    # Add all product placement matches
+    for pp_index, pp_brief in pp_briefs:
+        final_brief_results[pp_index] = True
+        final_met_brief_ids.append(pp_brief["id"])
+        bt.logging.info(
+            f"Product placement brief '{pp_brief['id']}' also matched for video: {video_data.get('bitcastVideoId')}"
+        )
+    
+    if selected_index is None and not pp_briefs:
         bt.logging.info(f"No briefs matched for video: {video_data.get('bitcastVideoId')}")
     
     # Update decision_details with final results
