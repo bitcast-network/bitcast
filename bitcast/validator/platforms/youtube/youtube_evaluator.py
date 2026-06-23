@@ -107,7 +107,19 @@ class YouTubeEvaluator(PlatformEvaluator):
             
             # Use existing eval_youtube function
             account_stats = eval_youtube(creds, briefs, min_stake)
-            
+
+            # Check if channel data was actually retrieved — eval_youtube
+            # returns early with details=None when YouTube API calls fail
+            # (channel suspended, token expired, etc.). Don't submit these
+            # as successful results to avoid crashing db_ingestion's mapper.
+            yt_account = account_stats.get("yt_account", {})
+            if yt_account.get("details") is None:
+                error_msg = "YouTube channel data not retrieved (API error or token expired)"
+                bt.logging.warning(f"Account {account_id}: {error_msg}")
+                return AccountResult.create_error_result(
+                    account_id, error_msg, briefs
+                )
+
             return AccountResult(
                 account_id=account_id,
                 platform_data=account_stats.get("yt_account", {}),
