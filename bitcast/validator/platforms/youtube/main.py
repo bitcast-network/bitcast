@@ -327,7 +327,7 @@ def _get_youtube_scaling_factor(brief_format: str) -> float:
         "dedicated": YT_SCALING_FACTOR_DEDICATED,
         "ad-read": YT_SCALING_FACTOR_AD_READ,
         "integration": YT_SCALING_FACTOR_AD_READ,
-        "productPlacement": 133,
+        "productPlacement": 100,
     }
     
     factor = scaling_factors.get(brief_format, YT_SCALING_FACTOR_DEDICATED)
@@ -343,7 +343,7 @@ def _get_lifetime_deduction(brief_format: str) -> float:
         "dedicated": YT_LIFETIME_DEDUCTION,
         "ad-read": YT_LIFETIME_DEDUCTION_AD_READ,
         "integration": YT_LIFETIME_DEDUCTION_AD_READ,
-        "productPlacement": 8,
+        "productPlacement": 6.25,
     }
     return deductions.get(brief_format, YT_LIFETIME_DEDUCTION)
 
