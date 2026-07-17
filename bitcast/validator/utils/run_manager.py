@@ -14,7 +14,7 @@ import threading
 class RunManager:
     """Manages run ID generation and persistence for validation cycles."""
     
-    def __init__(self, wallet: bt.wallet):
+    def __init__(self, wallet: bt.Wallet):
         """
         Initialize RunManager with validator wallet.
         
@@ -68,7 +68,7 @@ _run_manager: Optional[RunManager] = None
 _manager_lock = threading.Lock()
 
 
-def get_run_manager(wallet: bt.wallet = None) -> RunManager:
+def get_run_manager(wallet: bt.Wallet = None) -> RunManager:
     """
     Get or create the global RunManager instance.
     
@@ -92,7 +92,7 @@ def get_run_manager(wallet: bt.wallet = None) -> RunManager:
         return _run_manager
 
 
-def generate_current_run_id(wallet: bt.wallet) -> str:
+def generate_current_run_id(wallet: bt.Wallet) -> str:
     """
     Convenience function to generate a run ID using the global manager.
     

@@ -30,7 +30,7 @@ async def _publish_with_semaphore(coro, uid: int, account_id: str) -> bool:
 async def publish_miner_accounts(
     evaluation_result: EvaluationResult,
     run_id: str,
-    wallet: bt.wallet
+    wallet: bt.Wallet
 ) -> None:
     """
     Publish all accounts for a single miner immediately after evaluation.
@@ -86,7 +86,7 @@ async def publish_miner_accounts(
 async def publish_miner_accounts_safe(
     evaluation_result: EvaluationResult,
     run_id: str,
-    wallet: bt.wallet
+    wallet: bt.Wallet
 ) -> None:
     """
     Safe wrapper for publish_miner_accounts that never raises exceptions.

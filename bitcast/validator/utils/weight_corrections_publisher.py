@@ -8,7 +8,7 @@ from .data_publisher import UnifiedDataPublisher
 async def publish_weight_corrections(
     corrections: List[Dict[str, Any]],
     run_id: str,
-    wallet: bt.wallet,
+    wallet: bt.Wallet,
     endpoint: str
 ) -> bool:
     """
