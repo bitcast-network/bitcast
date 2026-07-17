@@ -36,7 +36,7 @@ def convert_numpy_types(obj):
 class DataPublisher(ABC):
     """Abstract base class for data publishing with message signing."""
     
-    def __init__(self, wallet: bt.wallet, timeout_seconds: int = 10):
+    def __init__(self, wallet: bt.Wallet, timeout_seconds: int = 10):
         """
         Initialize DataPublisher with validator wallet.
         
@@ -140,7 +140,7 @@ class DataPublisher(ABC):
 class UnifiedDataPublisher(DataPublisher):
     """Unified publisher for both YouTube and Weight Corrections using new API format."""
     
-    def __init__(self, wallet: bt.wallet, timeout_seconds: int = 60):
+    def __init__(self, wallet: bt.Wallet, timeout_seconds: int = 60):
         """
         Initialize UnifiedDataPublisher with timeout for async processing.
         
@@ -272,7 +272,7 @@ class UnifiedDataPublisher(DataPublisher):
 async def publish_unified_data(
     payload_type: str,
     run_id: str, 
-    wallet: bt.wallet,
+    wallet: bt.Wallet,
     payload_data: Union[Dict[str, Any], List[Dict[str, Any]]],
     endpoint: str,
     miner_uid: Optional[int] = None
@@ -299,7 +299,7 @@ async def publish_unified_data(
 
 async def publish_single_account(
     run_id: str, 
-    wallet: bt.wallet,
+    wallet: bt.Wallet,
     account_data: Dict[str, Any],
     endpoint: str,
     miner_uid: int,
