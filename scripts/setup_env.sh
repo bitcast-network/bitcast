@@ -61,7 +61,14 @@ pip install --upgrade pip
 # pip install -r requirements.txt does NOT uninstall packages that are no longer listed,
 # so stale scalecodec/bt-decode/bittensor-cli from 9.x will crash bittensor 10.x at import
 # time with: RuntimeError: Conflict detected: 'scalecodec' is installed, conflicts with 'cyscale'.
-pip uninstall -y scalecodec bt-decode bittensor-cli 2>/dev/null || true
+#
+# IMPORTANT: cyscale installs its compiled .so files INTO the scalecodec/ directory.
+# If we only uninstall 'scalecodec', pip deletes cyscale's files but keeps cyscale's
+# metadata — so the subsequent 'pip install -r requirements.txt' skips reinstalling
+# cyscale, leaving scalecodec/ gutted and 'import bittensor' fails with
+# ModuleNotFoundError: No module named 'scalecodec'. Uninstall cyscale too so it
+# gets cleanly reinstalled.
+pip uninstall -y scalecodec cyscale bt-decode bittensor-cli 2>/dev/null || true
 
 pip install -r requirements.txt
 pip install -e .
