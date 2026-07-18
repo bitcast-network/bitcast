@@ -2,9 +2,9 @@ name: Semgrep SAST
 
 on:
   pull_request:
-    branches: [main, main]
+    branches: [main]
   push:
-    branches: [main, main]
+    branches: [main]
 
 permissions:
   contents: read
@@ -14,11 +14,12 @@ jobs:
   semgrep:
     name: Semgrep Security Scan
     runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install Semgrep
+        run: pip install semgrep
 
       - name: Run Semgrep
         run: semgrep scan --config auto --config p/python p/security-audit p/owasp-top-ten --error --severity ERROR --sarif --output semgrep-results.sarif .
