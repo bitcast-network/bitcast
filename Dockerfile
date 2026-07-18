@@ -7,6 +7,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ libssl-dev pkg-config curl git \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user for runtime security
+RUN useradd -m -s /bin/bash bitcast
+RUN chown -R bitcast:bitcast /app
+
 # Install Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -24,10 +28,12 @@ COPY core/ core/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Bittensor wallet path
-ENV BT_WALLET_PATH=/root/.bittensor/wallets
+# Bittensor wallet path (non-root)
+ENV BT_WALLET_PATH=/home/bitcast/.bittensor/wallets
+ENV HOME=/home/bitcast
+
+USER bitcast
 
 # Entrypoint and command are set via Terraform task definition.
-# ARG ROLE is not used at build time — it's documented here for clarity.
 ARG ROLE=miner
 ENTRYPOINT ["/entrypoint.sh"]

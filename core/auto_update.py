@@ -26,18 +26,19 @@ def run_auto_update(neuron_type):
             print("Updated local repo to latest version: {}", format(remote_commit))
             
             print("Running the autoupdate steps...")
-            # Run setup script with venv activation
+            # Run setup script with venv activation.
+            # Use ['bash', '-c', ...] instead of shell=True to avoid shell injection risk.
             project_root = os.path.abspath(os.path.join(script_dir, ".."))
             project_parent = os.path.abspath(os.path.join(project_root, ".."))
             venv_path = f"{project_parent}/venv_bitcast"
             setup_cmd = f"source {venv_path}/bin/activate && {project_root}/scripts/setup_env.sh"
-            subprocess.run(setup_cmd, shell=True, executable='/bin/bash')
+            subprocess.run(['bash', '-c', setup_cmd])
             
             time.sleep(20)
             print("Finished running the autoupdate steps")
             print("Restarting neuron")
             # Run start script with venv activation
             start_cmd = f"source {venv_path}/bin/activate && {project_root}/scripts/run_{neuron_type}.sh"
-            subprocess.run(start_cmd, shell=True, executable='/bin/bash')
+            subprocess.run(['bash', '-c', start_cmd])
     else:
         print("Repo is up-to-date.")
