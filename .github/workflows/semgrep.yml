@@ -16,17 +16,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@v4
 
       - name: Install Semgrep
         run: pip install semgrep
 
       - name: Run Semgrep
-        run: semgrep scan --config auto --config p/python p/security-audit p/owasp-top-ten --error --severity ERROR --sarif --output semgrep-results.sarif .
+        run: semgrep scan --config auto --config p/python --config p/security-audit --config p/owasp-top-ten --error --severity ERROR --sarif --output semgrep-results.sarif .
 
+      # github/codeql-action/upload-sarif cannot be used here: this repo has
+      # CodeQL default setup enabled, which makes any workflow referencing
+      # github/codeql-action fail at startup. Upload via the REST API instead.
       - name: Upload SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3.28.17
-        with:
-          sarif_file: semgrep-results.sarif
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ ! -f semgrep-results.sarif ]; then
+            echo "No SARIF file produced; skipping upload."
+            exit 0
+          fi
+          gh api "repos/$REPO/code-scanning/sarifs" \
+            -f commit_sha="$COMMIT_SHA" \
+            -f ref="$REF" \
+            -f sarif="$(gzip -c semgrep-results.sarif | base64 -w0)"
