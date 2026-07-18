@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-WALLET_BASE="${WALLET_PATH:-/root/.bittensor/wallets}"
+WALLET_BASE="${WALLET_PATH:-/home/bitcast/.bittensor/wallets}"
 WALLET_NAME="${WALLET_NAME:-default}"
 HOTKEY_NAME="${HOTKEY_NAME:-default}"
 
