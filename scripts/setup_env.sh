@@ -56,6 +56,13 @@ cd "$PROJECT_ROOT"
 
 # Install project dependencies
 pip install --upgrade pip
+
+# Remove packages that were removed in bittensor 10.x and conflict with their replacements.
+# pip install -r requirements.txt does NOT uninstall packages that are no longer listed,
+# so stale scalecodec/bt-decode/bittensor-cli from 9.x will crash bittensor 10.x at import
+# time with: RuntimeError: Conflict detected: 'scalecodec' is installed, conflicts with 'cyscale'.
+pip uninstall -y scalecodec bt-decode bittensor-cli 2>/dev/null || true
+
 pip install -r requirements.txt
 pip install -e .
 
