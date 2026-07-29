@@ -327,7 +327,7 @@ def _get_youtube_scaling_factor(brief_format: str) -> float:
         "dedicated": YT_SCALING_FACTOR_DEDICATED,
         "ad-read": YT_SCALING_FACTOR_AD_READ,
         "integration": YT_SCALING_FACTOR_AD_READ,
-        "productPlacement": 100,
+        "productPlacement": 200,
     }
     
     factor = scaling_factors.get(brief_format, YT_SCALING_FACTOR_DEDICATED)
