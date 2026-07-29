@@ -28,6 +28,10 @@ COPY core/ core/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Fix ownership: COPY runs as root, so re-chown so the non-root user can
+# write cache directories (e.g. /app/bitcast/cache/) at runtime.
+RUN chown -R bitcast:bitcast /app
+
 # Bittensor wallet path (non-root)
 ENV BT_WALLET_PATH=/home/bitcast/.bittensor/wallets
 ENV HOME=/home/bitcast
