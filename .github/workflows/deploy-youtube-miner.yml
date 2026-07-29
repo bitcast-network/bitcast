@@ -66,7 +66,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update task definition
+      - name: Deploy new task definition
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
         run: |
@@ -79,12 +79,12 @@ jobs:
             'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) |
              .containerDefinitions[0].image = $IMAGE')
 
-          aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" > /dev/null
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
 
-      - name: Force new deployment
-        run: |
           aws ecs update-service \
             --cluster ${{ env.ECS_CLUSTER }} \
             --service ${{ env.TASK_FAMILY }} \
+            --task-definition "$NEW_TASK_DEF_ARN" \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
