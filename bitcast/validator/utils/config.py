@@ -104,8 +104,11 @@ CREDENTIAL_BATCH_SIZE = 8
 DISCRETE_MODE = True
 
 # subnet treasury
-SUBNET_TREASURY_PERCENTAGE = 0
-SUBNET_TREASURY_UID = int(os.getenv('SUBNET_TREASURY_UID', '106'))
+# Consensus-critical: both values change the emitted weight vector, so every
+# validator must run the same ones. Keep in lockstep with bitcast-v2 and
+# bitcast-x. At 1.0 the whole burn-UID residual is diverted to the treasury UID.
+SUBNET_TREASURY_PERCENTAGE = 1.0
+SUBNET_TREASURY_UID = int(os.getenv('SUBNET_TREASURY_UID', '155'))
 
 # Log out all non-sensitive config variables
 bt.logging.info(f"BITCAST_BRIEFS_ENDPOINT: {BITCAST_BRIEFS_ENDPOINT}")
