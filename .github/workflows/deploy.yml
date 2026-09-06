@@ -3,6 +3,14 @@ name: Deploy Validator to AWS ECS
 on:
   push:
     branches: [main]
+    paths:
+      - 'bitcast/**'
+      - 'neurons/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+      - 'entrypoint.sh'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 env:
