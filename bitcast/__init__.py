@@ -1,13 +1,6 @@
-__version__ = "0.0.0"
-version_split = __version__.split(".")
-__spec_version__ = (
-    (1000 * int(version_split[0]))
-    + (10 * int(version_split[1]))
-    + (1 * int(version_split[2]))
-)
+"""Bitcast SN93 — decentralized creator economy subnet."""
 
-# Import all submodules.
-from . import protocol
-from . import base
-from . import validator
-from . import api
+__version__ = "2.0.0"
+
+_major, _minor, _patch = (int(part) for part in __version__.split("."))
+__spec_version__ = 1000 * _major + 10 * _minor + _patch

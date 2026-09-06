@@ -1,0 +1,3 @@
+# Require @mizu-tx review for any change to GitHub Actions workflows.
+# See Linear SUB-123.
+.github/workflows/ @mizu-tx

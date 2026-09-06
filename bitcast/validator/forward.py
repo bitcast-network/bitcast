@@ -1,70 +1,63 @@
-import time
+"""Main validation loop: fetch briefs, run the reward cycle, update scores."""
+
+import asyncio
+from typing import Any
+
 import bittensor as bt
 
-# New reward system imports
-from bitcast.validator.reward_engine.orchestrator import RewardOrchestrator
-from bitcast.validator.platforms.youtube.youtube_evaluator import YouTubeEvaluator
+from bitcast.config import VALIDATOR_STEPS_INTERVAL, VALIDATOR_WAIT
+from bitcast.events import log_event
+from bitcast.utils.briefs import get_briefs
+from bitcast.validator.reward.orchestrator import RewardOrchestrator
 
-from bitcast.utils.uids import get_all_uids
-from bitcast.validator.utils.briefs import get_briefs
-from bitcast.validator.utils.config import VALIDATOR_WAIT, VALIDATOR_STEPS_INTERVAL
 
-# Singleton for efficiency
-_reward_orchestrator = None
+def get_all_uids(validator: Any) -> list[int]:
+    """Every uid on the metagraph, burn UID (0) first."""
+    return list(range(int(validator.metagraph.n)))
 
-def get_reward_orchestrator() -> RewardOrchestrator:
-    """Get reward orchestrator singleton."""
-    global _reward_orchestrator
-    if _reward_orchestrator is None:
-        # Create services with dependency injection
-        from bitcast.validator.reward_engine.services.miner_query_service import MinerQueryService
-        from bitcast.validator.reward_engine.services.platform_registry import PlatformRegistry
-        from bitcast.validator.reward_engine.services.score_aggregation_service import ScoreAggregationService
-        from bitcast.validator.reward_engine.services.emission_calculation_service import EmissionCalculationService
-        from bitcast.validator.reward_engine.services.reward_distribution_service import RewardDistributionService
-        
-        # Create platform registry and register YouTube evaluator
-        platform_registry = PlatformRegistry()
-        youtube_evaluator = YouTubeEvaluator()
-        platform_registry.register_evaluator(youtube_evaluator)
-        
-        # Create orchestrator with all services
-        _reward_orchestrator = RewardOrchestrator(
-            miner_query_service=MinerQueryService(),
-            platform_registry=platform_registry,
-            score_aggregator=ScoreAggregationService(),
-            emission_calculator=EmissionCalculationService(),
-            reward_distributor=RewardDistributionService()
-        )
-    
-    return _reward_orchestrator
 
-async def forward(self):
-    """Forward function using the new modular reward system."""
-    if self.step % VALIDATOR_STEPS_INTERVAL != 0:
-        time.sleep(VALIDATOR_WAIT)
+async def forward(validator: Any, orchestrator: RewardOrchestrator) -> None:
+    """One validator step.
+
+    Most steps just sleep; every ``VALIDATOR_STEPS_INTERVAL`` steps (~4 h) the
+    full reward cycle runs: fetch briefs, query and evaluate all miners, and
+    fold the resulting reward vector into the moving-average scores that
+    ``sync()`` later sets on chain.
+    """
+    if validator.step % VALIDATOR_STEPS_INTERVAL != 0:
+        await asyncio.sleep(VALIDATOR_WAIT)
         return
 
-    bt.logging.info(f"Starting forward pass at step {self.step}")
-
+    bt.logging.info(f"Starting reward cycle at step {validator.step}")
+    briefs_cache_path = getattr(validator, "briefs_cache_path", None)
     try:
-        # Get all miner UIDs
-        miner_uids = get_all_uids(self)
-        
-        # Use the new reward orchestrator
-        orchestrator = get_reward_orchestrator()
-        rewards, yt_stats_list = await orchestrator.calculate_rewards(self, miner_uids)
+        briefs = await get_briefs(cache_path=briefs_cache_path)
+    except ConnectionError as err:
+        bt.logging.error(f"Could not fetch briefs: {err}")
+        briefs = []
 
-        # Log the rewards for monitoring purposes
-        bt.logging.info("UID Rewards:")
-        for i, (uid, reward) in enumerate(zip(miner_uids, rewards)):
-            bt.logging.info(f"UID {uid}: {reward}")
-            yt_stats_list[i]["reward"] = float(reward)
+    uids = get_all_uids(validator)
+    if orchestrator.publisher is not None:
+        orchestrator.publisher.new_run()
 
-        # Update the scores based on the rewards
-        self.update_scores(rewards, miner_uids)
+    rewards, stats_list = await orchestrator.calculate_rewards(validator, uids, briefs)
 
-    except Exception as e:
-        bt.logging.error(f"Error in forward pass: {e}")
+    earning = sum(1 for reward in rewards[1:] if reward > 0)
+    bt.logging.info(f"Reward cycle complete: {len(briefs)} briefs, {earning} earning miners, burn={rewards[0]:.4f}")
 
-    time.sleep(VALIDATOR_WAIT)
+    # Structured metric line for Grafana Loki dashboards.
+    # LogQL can parse this via | json to chart per-validator comparisons.
+    log_event(
+        {
+            "event": "reward_cycle",
+            "step": validator.step,
+            "briefs": len(briefs),
+            "earning_miners": earning,
+            "total_miners": len(uids),
+            "burn": round(float(rewards[0]), 6),
+            "videos_evaluated": len(stats_list),
+        }
+    )
+
+    validator.update_scores(rewards, uids)
+    await asyncio.sleep(VALIDATOR_WAIT)

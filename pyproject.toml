@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bitcast"
+version = "2.0.0"
+description = "Bitcast SN93 — Decentralized Creator Economy"
+requires-python = ">=3.12"
+dependencies = [
+    "bittensor==10.5.0",
+    "bittensor-wallet>=4.1.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.3.0",
+    "httpx>=0.27.0",
+    "numpy>=1.26",
+    "python-dotenv>=1.0",
+    "sentry-sdk>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bitcast*", "neurons*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Prompt text is ported verbatim from v1 and doubles as the LLM cache key.
+"bitcast/validator/llm/prompts.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bitcast"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+exclude = "bitcast/chain/weight_utils\\.py"
+
+[[tool.mypy.overrides]]
+module = ["bittensor.*", "bittensor_wallet.*", "sentry_sdk.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

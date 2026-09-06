@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -7,37 +7,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ libssl-dev pkg-config curl git \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for runtime security
+# Create non-root user for runtime security + bittensor HOME workaround
 RUN useradd -m -s /bin/bash bitcast
 RUN chown -R bitcast:bitcast /app
 
 # Install Python deps
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install the package
-COPY setup.py README.md .
+COPY pyproject.toml README.md ./
 COPY bitcast/ bitcast/
-RUN pip install --no-cache-dir -e .
-
-# Source code (neurons, core)
 COPY neurons/ neurons/
-COPY core/ core/
+RUN pip install --no-cache-dir .
 
 # Entrypoint script (bootstraps wallet from secrets)
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Fix ownership: COPY runs as root, so re-chown so the non-root user can
-# write cache directories (e.g. /app/bitcast/cache/) at runtime.
-RUN chown -R bitcast:bitcast /app
-
-# Bittensor wallet path (non-root)
+# Bittensor wallet path + HOME for non-root user
 ENV BT_WALLET_PATH=/home/bitcast/.bittensor/wallets
 ENV HOME=/home/bitcast
 
 USER bitcast
 
 # Entrypoint and command are set via Terraform task definition.
-ARG ROLE=miner
+# Default command runs the validator on SN93 mainnet.
 ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python", "-m", "neurons.validator", "--netuid", "93", "--subtensor.network", "finney"]

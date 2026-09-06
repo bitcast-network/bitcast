@@ -1,6 +1,6 @@
 #!/bin/bash
 # Container entrypoint - bootstraps Bittensor wallet files from secrets
-# before launching the miner or validator.
+# before launching the validator.
 #
 # Only the hotkey (private) and coldkeypub (public) are needed for runtime.
 # Coldkey private key is intentionally excluded for security.
@@ -11,11 +11,10 @@
 #   wallets/<wallet>/coldkeypub.txt
 #
 # Environment variables consumed:
-#   WALLET_PATH        - base path (default: /root/.bittensor/wallets)
+#   WALLET_PATH        - base path (default: /home/bitcast/.bittensor/wallets)
 #   WALLET_NAME        - wallet name (default: default)
 #   HOTKEY_NAME        - hotkey name (default: default)
 #   HOTKEY_DATA        - base64-encoded hotkey file (private key)
-#   HOTKEYPUB_DATA     - content for <hotkey>pub.txt (public key)
 #   COLDKEYPUB_DATA    - content for coldkeypub.txt (public address)
 
 set -euo pipefail
@@ -36,12 +35,6 @@ if [ -n "${HOTKEY_DATA:-}" ]; then
 else
     echo "[entrypoint] ERROR: HOTKEY_DATA not set - cannot run without hotkey"
     exit 1
-fi
-
-# --- Write hotkeypub (public key) ---
-if [ -n "${HOTKEYPUB_DATA:-}" ]; then
-    echo "${HOTKEYPUB_DATA}" > "${HOTKEY_DIR}/${HOTKEY_NAME}pub.txt"
-    chmod 644 "${HOTKEY_DIR}/${HOTKEY_NAME}pub.txt"
 fi
 
 # --- Write coldkeypub (public address only) ---

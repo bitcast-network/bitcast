@@ -1,138 +1,168 @@
-import os
-import pickle
-from google.auth.transport.requests import Request
-import bittensor as bt
-import sys
+"""YouTube OAuth token management for the miner.
 
+Two sources, selected by ``TOKEN_SOURCE``:
+
+* ``local`` — credential files in ``BITCAST_SECRETS_DIR`` (default
+  ``~/.bitcast/secrets``). Two formats are supported:
+
+  - **JSON** (``*.json``) — the preferred format, holding ``client_id``,
+    ``client_secret`` and ``refresh_token``.
+  - **Pickle** (``*.pkl``) — legacy V1 format containing a pickled
+    ``google.oauth2.credentials.Credentials`` object. The three fields are
+    extracted to the same dict shape so the refresh path is shared. Miners
+    upgrading from V1 can use existing ``.pkl`` files without conversion.
+
+* ``api`` — the Bitcast credentials API serves ready-to-use access tokens
+  (it owns the refresh tokens).
+
+Tokens are loaded fresh on every validator request so they are never stale.
+"""
+
+import json
+import pickle
+import time
+from pathlib import Path
+
+import bittensor as bt
 import httpx
 
-current_dir = os.path.dirname(__file__)
+from bitcast.config import Settings, get_settings
 
-# --- Configuration ---
-# Set TOKEN_SOURCE=api to use the Bitcast API endpoint.
-# Set TOKEN_SOURCE=local (or leave unset) to use local .pkl files.
-TOKEN_SOURCE = os.getenv("TOKEN_SOURCE", "local")
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
-# Bitcast API config (only used when TOKEN_SOURCE=api)
-BITCAST_API_URL = os.getenv("BITCAST_API_URL", "")
-BITCAST_API_KEY = os.getenv("BITCAST_API_KEY", "")
+_REQUEST_TIMEOUT = 30.0
+_EXPIRY_MARGIN = 300.0  # refresh this many seconds before actual expiry
 
 
-def _get_token_source():
-    """Determine token source: 'api' or 'local'."""
-    source = TOKEN_SOURCE.lower().strip()
-    if source not in ("api", "local"):
-        bt.logging.warning(f"Unknown TOKEN_SOURCE '{TOKEN_SOURCE}', falling back to 'local'")
-        return "local"
-    return source
+class TokenConfigError(Exception):
+    """The miner's token source is misconfigured."""
 
 
-def init():
-    source = _get_token_source()
-    bt.logging.info(f"Token source: {source}")
+class TokenManager:
+    """Loads and refreshes the miner's YouTube access tokens."""
 
-    if source == "api":
-        if not BITCAST_API_URL:
-            bt.logging.error("❌ TOKEN_SOURCE=api but BITCAST_API_URL is not set.")
-            bt.logging.error("Set BITCAST_API_URL env var (e.g. https://bitcast-api.bitcast.network)")
-            sys.exit(1)
-        if not BITCAST_API_KEY:
-            bt.logging.error("❌ TOKEN_SOURCE=api but BITCAST_API_KEY is not set.")
-            bt.logging.error("Set BITCAST_API_KEY env var or switch to TOKEN_SOURCE=local")
-            sys.exit(1)
-        return
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or get_settings()
+        self.secrets_dir = Path(self.settings.secrets_dir).expanduser()
+        self._token_cache: dict[str, tuple[str, float]] = {}  # file name -> (token, expires_at)
 
-    # Local mode: check for .pkl files
-    secrets_dir = os.path.join(current_dir, 'secrets')
-    if not os.path.exists(secrets_dir):
-        pkl_files = []
-    else:
-        pkl_files = [f for f in os.listdir(secrets_dir) if f.endswith('.pkl')]
-    
-    if not pkl_files:
-        bt.logging.error("❌ Authentication required.")
-        bt.logging.error("")
-        bt.logging.error("🔧 PLEASE RUN:")
-        bt.logging.error("    python manual_auth.py")
-        bt.logging.error("")
-        bt.logging.error("Or set TOKEN_SOURCE=api and BITCAST_API_KEY to use the API.")
-        bt.logging.error("Works in all environments (headless, SSH, Docker, etc.)")
-        bt.logging.error("")
-        sys.exit(1)
+    def init(self) -> None:
+        """Validate the configured token source; raise before serving if unusable."""
+        if self.settings.token_source == "api":
+            if not self.settings.bitcast_api_url or not self.settings.bitcast_api_key:
+                raise TokenConfigError("TOKEN_SOURCE=api requires BITCAST_API_URL and BITCAST_API_KEY")
+            return
+        if not self._credential_files():
+            raise TokenConfigError(
+                f"No credential files found in {self.secrets_dir}. Add JSON files with "
+                "client_id, client_secret and refresh_token."
+            )
 
+    def _credential_files(self) -> list[Path]:
+        if not self.secrets_dir.is_dir():
+            return []
+        json_files = sorted(self.secrets_dir.glob("*.json"))
+        pkl_files = sorted(self.secrets_dir.glob("*.pkl"))
+        return json_files + pkl_files
 
-def _load_token_from_api():
-    """
-    Fetch fresh access tokens from the Bitcast API endpoint.
-    The API handles refresh token decryption and exchange server-side.
-    """
-    try:
-        resp = httpx.get(
-            f"{BITCAST_API_URL}/api/v2/youtube/credentials/access-tokens",
-            headers={"X-API-Key": BITCAST_API_KEY},
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    async def load_tokens(self) -> list[str]:
+        """Current access tokens for every configured account."""
+        if self.settings.token_source == "api":
+            return await self._load_from_api()
+        return await self._load_from_local()
 
-        tokens = [item["access_token"] for item in data.get("tokens", [])]
-        bt.logging.info(f"Loaded {len(tokens)} access tokens from API")
-        return tokens
-
-    except httpx.HTTPStatusError as e:
-        bt.logging.error(f"API returned {e.response.status_code}: {e.response.text}")
-    except Exception as e:
-        bt.logging.error(f"Failed to fetch tokens from API: {e}")
-
-    return []
-
-
-def _load_token_from_local():
-    """
-    Load all .pkl token files from the secrets directory.
-    Returns a list of access tokens for the new multi-token synapse structure.
-    """
-    bt.logging.info("Loading tokens from files.")
-    secrets_dir = os.path.join(current_dir, 'secrets')
-    tokens = []
-    
-    if not os.path.exists(secrets_dir):
-        bt.logging.warning(f"Secrets directory not found: {secrets_dir}")
-        return tokens
-    
-    pkl_files = [f for f in os.listdir(secrets_dir) if f.endswith('.pkl')]
-    
-    if not pkl_files:
-        bt.logging.warning("No .pkl token files found in secrets directory.")
-        return tokens
-    
-    bt.logging.info(f"Found {len(pkl_files)} token files: {pkl_files}")
-    
-    for pkl_file in pkl_files:
+    async def _load_from_api(self) -> list[str]:
+        url = f"{self.settings.bitcast_api_url}/api/v2/youtube/credentials/access-tokens"
+        headers = {"X-API-Key": self.settings.bitcast_api_key or ""}
         try:
-            file_path = os.path.join(secrets_dir, pkl_file)
-            with open(file_path, 'rb') as f:
-                creds = pickle.load(f)
-            
-            if creds.expired and creds.refresh_token:
-                bt.logging.info(f"Token in {pkl_file} expired, refreshing token.")
-                creds.refresh(Request())
-            
-            tokens.append(creds.token)
-            bt.logging.info(f"Token loaded successfully from {pkl_file}")
-            
-        except Exception as e:
-            bt.logging.error(f"Error loading token from {pkl_file}: {e}")
-            continue
-    
-    bt.logging.info(f"Successfully loaded {len(tokens)} tokens.")
-    return tokens
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers, timeout=_REQUEST_TIMEOUT)
+                response.raise_for_status()
+                data = response.json()
+                return [item["access_token"] for item in data.get("tokens", []) if item.get("access_token")]
+        except (httpx.HTTPError, TimeoutError, KeyError) as err:
+            bt.logging.error(f"Failed to load tokens from API: {err}")
+            return []
 
+    async def _load_from_local(self) -> list[str]:
+        tokens = []
+        async with httpx.AsyncClient() as session:
+            for path in self._credential_files():
+                token = await self._token_for_file(session, path)
+                if token:
+                    tokens.append(token)
+        return tokens
 
-def load_token():
-    """
-    Load access tokens using the configured source (api or local).
-    """
-    if _get_token_source() == "api":
-        return _load_token_from_api()
-    return _load_token_from_local()
+    async def _token_for_file(self, session: httpx.AsyncClient, path: Path) -> str | None:
+        cached = self._token_cache.get(path.name)
+        if cached and time.monotonic() < cached[1]:
+            return cached[0]
+
+        try:
+            credentials = self._load_pkl_credentials(path) if path.suffix == ".pkl" else json.loads(path.read_text())
+            token, expires_in = await self._refresh(session, credentials)
+        except (
+            OSError,
+            json.JSONDecodeError,
+            KeyError,
+            ValueError,
+            pickle.UnpicklingError,
+            httpx.HTTPError,
+            TimeoutError,
+        ) as err:
+            bt.logging.error(f"Could not refresh token from {path.name}: {err}")
+            return None
+
+        self._token_cache[path.name] = (token, time.monotonic() + expires_in - _EXPIRY_MARGIN)
+        return token
+
+    @staticmethod
+    def _load_pkl_credentials(path: Path) -> dict[str, str]:
+        """Load a V1 ``.pkl`` credentials file and extract the OAuth fields.
+
+        V1 pickles ``google.oauth2.credentials.Credentials`` objects. We only
+        need ``client_id``, ``client_secret`` and ``refresh_token`` — the same
+        three fields the JSON format carries. The google-auth library is an
+        optional dependency (V2 doesn't need it for anything else), so if it
+        isn't installed we fall back to ``pickle.loads`` and pull the attributes
+        off the raw object.
+        """
+        try:
+            with open(path, "rb") as fh:
+                creds = pickle.load(fh)
+        except Exception as err:
+            raise ValueError(f"Failed to unpickle {path.name}: {err}") from err
+
+        client_id = str(getattr(creds, "client_id", "") or "")
+        client_secret = str(getattr(creds, "client_secret", "") or "")
+        refresh_token = str(getattr(creds, "refresh_token", "") or "")
+        if not (client_id and client_secret and refresh_token):
+            missing = [
+                k
+                for k, v in [
+                    ("client_id", client_id),
+                    ("client_secret", client_secret),
+                    ("refresh_token", refresh_token),
+                ]
+                if not v
+            ]
+            raise ValueError(f"{path.name} missing OAuth fields: {missing}")
+        return {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+        }
+
+    @staticmethod
+    async def _refresh(session: httpx.AsyncClient, credentials: dict) -> tuple[str, float]:
+        """Exchange a refresh token for a fresh access token at Google's OAuth endpoint."""
+        payload = {
+            "client_id": credentials["client_id"],
+            "client_secret": credentials["client_secret"],
+            "refresh_token": credentials["refresh_token"],
+            "grant_type": "refresh_token",
+        }
+        response = await session.post(GOOGLE_TOKEN_URL, data=payload, timeout=_REQUEST_TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        return data["access_token"], float(data.get("expires_in", 3600))

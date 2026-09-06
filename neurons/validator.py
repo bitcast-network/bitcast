@@ -1,80 +1,95 @@
-import time
-import os
-import wandb
-import threading
-import bittensor as bt
-import random
+"""Bitcast validator entry point: ``python -m neurons.validator``."""
 
-from bitcast.base.validator import BaseValidatorNeuron
+import asyncio
+
+import bittensor as bt
+
+from bitcast.config import BitcastConfig, build_config, get_settings
+from bitcast.loki import init_loki, shutdown_loki
+from bitcast.sentry import init_sentry
+from bitcast.utils.publisher import Publisher
 from bitcast.validator import forward
-from bitcast.validator.utils.config import __version__, WANDB_PROJECT
-from bitcast.utils.cloudwatch_logging import get_cloudwatch_handler
-from core.auto_update import run_auto_update
+from bitcast.validator.base import BaseValidatorNeuron
+from bitcast.validator.llm.client import LLMClient
+from bitcast.validator.reward.orchestrator import RewardOrchestrator
+from bitcast.validator.reward.pricing import PricingService
+from bitcast.validator.youtube.cache import HistoricalVideoRegistry
+from bitcast.validator.youtube.evaluator import YouTubeEvaluator
+
 
 class Validator(BaseValidatorNeuron):
-    """
-    Your validator neuron class. You should use this class to define your validator's behavior. In particular, you should replace the forward function with your own logic.
+    """Runs the Bitcast reward cycle and sets weights on chain."""
 
-    This class inherits from the BaseValidatorNeuron class, which in turn inherits from BaseNeuron. The BaseNeuron class takes care of routine tasks such as setting up wallet, subtensor, metagraph, logging directory, parsing config, etc. You can override any of the methods in BaseNeuron if you need to customize the behavior.
+    def __init__(self, config: BitcastConfig) -> None:
+        super().__init__(config)
+        settings = get_settings()
+        state = config.state_path()
 
-    This class provides reasonable default behavior for a validator such as keeping a moving average of the scores of the miners and using them to set weights at the end of each epoch. Additionally, the scores are reset for new hotkeys at the end of each epoch.
-    """
+        # Initialise Loki log aggregation with per-validator labels
+        from bitcast import __version__
 
-    def __init__(self, config=None):
-        super(Validator, self).__init__(config=config)
+        init_loki(
+            settings,
+            labels={
+                "uid": str(self.uid),
+                "hotkey": self.wallet.hotkey.ss58_address,
+                "netuid": str(config.netuid),
+                "mechid": str(settings.mechid),
+                "neuron": "validator",
+                "version": __version__,
+            },
+        )
 
+        history = None
+        if not settings.eco_mode:
+            history = HistoricalVideoRegistry(state / "historical_videos.jsonl")
+        # LLM cache lives at state/cache/llm.jsonl — persists across restarts
+        # on EFS as a plain JSONL file (NFS-safe, editable from cache-admin).
+        self.llm = llm = LLMClient(cache_path=state / "cache" / "llm.jsonl")
+        # YouTube search fallback cache — saves 100 API credits per channel
+        # on cold start. Also JSONL for the same NFS-safety reasons.
+        evaluator = YouTubeEvaluator(
+            llm=llm,
+            history=history,
+            search_cache_path=state / "cache" / "youtube_search.jsonl",
+        )
+        publisher = Publisher(self.wallet) if settings.enable_data_publish else None
+        pricing = PricingService(self.subtensor, netuid=config.netuid, mechid=settings.mechid)
+        self.orchestrator = RewardOrchestrator(evaluators=[evaluator], pricing=pricing, publisher=publisher)
+        # Cache path for briefs persistence — used by forward.py on each cycle.
+        self.briefs_cache_path = state / "briefs.json"
+
+        # Compact append-only JSONL caches on startup. Sliding-TTL refreshes
+        # and per-restart dedup resets accumulate stale lines across runs;
+        # compacting once per boot bounds file growth to one process lifetime.
+        # Safe on a running validator (tmp + rename); EFS quirk: if another
+        # process holds an open fd on the old inode it keeps the stale view,
+        # but the validator is the only reader and it just opened these files.
+        llm_before = llm.compact_cache()
+        search_before = evaluator.compact_search_cache()
+        history_before = history.compact() if history is not None else 0
+        bt.logging.info(f"Cache compaction on boot: llm={llm_before} search={search_before} history={history_before}")
+
+    async def forward(self) -> None:
+        await forward.forward(self, self.orchestrator)
+
+
+def main() -> None:
+    bt.logging.set_console()
+    config = build_config("validator")
+    init_sentry(get_settings())
+    bt.logging.info(f"Starting validator with config: {config}")
+
+    async def _run() -> None:
+        validator = Validator(config)
         try:
-            cw_handler = get_cloudwatch_handler(
-                log_group="/bitcast/youtube-validator",
-                stream_name=f"validator-uid-{self.uid}",
-            )
-            if cw_handler:
-                bt.logging._logger.addHandler(cw_handler)
-                bt.logging.info("CloudWatch logging enabled")
-        except Exception as e:
-            bt.logging.warning(f"Failed to set up CloudWatch logging: {e}")
+            await validator.run()
+        finally:
+            await validator.llm.aclose()
+            await shutdown_loki()
 
-        # Initialize wandb only if disable_set_weights is False
-        if not self.config.neuron.disable_set_weights:
-            try:
-                wandb.init(
-                    entity="bitcast_network",
-                    project=WANDB_PROJECT,
-                    name=f"validator-{self.uid}-{__version__}",
-                    config=self.config,
-                    reinit="finish_previous"
-                )
-            except Exception as e:
-                bt.logging.error(f"Failed to initialize wandb run: {e}")
+    asyncio.run(_run())
 
-        bt.logging.info("load_state()")
-        self.load_state()
-
-    async def forward(self):
-        """
-        Validator forward pass. Consists of:
-        - Generating the query
-        - Querying the miners
-        - Getting the responses
-        - Rewarding the miners
-        - Updating the scores
-        """
-        return await forward(self)
-
-def auto_update_loop(config):
-    while True:
-        if not config.neuron.disable_auto_update:
-            run_auto_update('validator')
-        sleep_time = random.randint(600, 900)  # Random time between 10 and 15 minutes
-        time.sleep(sleep_time)
 
 if __name__ == "__main__":
-
-    # Start the auto-update loop in a separate thread
-    with Validator() as validator:
-        update_thread = threading.Thread(target=auto_update_loop, args=(validator.config,), daemon=True)
-        update_thread.start()
-
-        while True:
-            bt.logging.info(f"Validator running | uid {validator.uid} | {time.time()}")
-            time.sleep(30)
+    main()
