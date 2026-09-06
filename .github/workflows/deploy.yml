@@ -80,10 +80,32 @@ jobs:
         run: |
           IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Deploying $IMAGE to $SERVICE (canary)"
-          aws ecs describe-task-definition \
+          # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
+          # not the latest revision: deploy-driven revisions drift away from the
+          # reviewed terraform template (this bit us when an interim deploy
+          # dropped the LOKI_* rows that terraform had added).
+          TEMPLATE_TASK=""
+          LATEST_REV=$(aws ecs describe-task-definition \
             --task-definition "$SERVICE" \
-            --query 'taskDefinition' \
-            --output json > "task-def.json"
+            --query 'taskDefinition.revision' \
+            --output text)
+          for REV in $(seq "$LATEST_REV" -1 1); do
+            CANDIDATE_JSON=$(aws ecs describe-task-definition \
+              --task-definition "${SERVICE}:${REV}" \
+              --include TAGS \
+              --output json 2>/dev/null) || continue
+            if jq -e 'any((.tags // .Tags)[]?; (.key // .Key) == "ManagedBy" and (.value // .Value) == "terraform")' \
+                <<<"$CANDIDATE_JSON" > /dev/null; then
+              TEMPLATE_TASK="${SERVICE}:${REV}"
+              jq '.taskDefinition' <<<"$CANDIDATE_JSON" > "task-def.json"
+              break
+            fi
+          done
+          if [ -z "$TEMPLATE_TASK" ]; then
+            echo "No terraform-managed template revision found for $SERVICE" >&2
+            exit 1
+          fi
+          echo "Using terraform template: $TEMPLATE_TASK"
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
             "task-def.json" > "clean.json"
           jq --arg IMAGE "$IMAGE" \
@@ -132,10 +154,32 @@ jobs:
         run: |
           IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Deploying $IMAGE to $SERVICE (owner/production)"
-          aws ecs describe-task-definition \
+          # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
+          # not the latest revision: deploy-driven revisions drift away from the
+          # reviewed terraform template (this bit us when an interim deploy
+          # dropped the LOKI_* rows that terraform had added).
+          TEMPLATE_TASK=""
+          LATEST_REV=$(aws ecs describe-task-definition \
             --task-definition "$SERVICE" \
-            --query 'taskDefinition' \
-            --output json > "task-def.json"
+            --query 'taskDefinition.revision' \
+            --output text)
+          for REV in $(seq "$LATEST_REV" -1 1); do
+            CANDIDATE_JSON=$(aws ecs describe-task-definition \
+              --task-definition "${SERVICE}:${REV}" \
+              --include TAGS \
+              --output json 2>/dev/null) || continue
+            if jq -e 'any((.tags // .Tags)[]?; (.key // .Key) == "ManagedBy" and (.value // .Value) == "terraform")' \
+                <<<"$CANDIDATE_JSON" > /dev/null; then
+              TEMPLATE_TASK="${SERVICE}:${REV}"
+              jq '.taskDefinition' <<<"$CANDIDATE_JSON" > "task-def.json"
+              break
+            fi
+          done
+          if [ -z "$TEMPLATE_TASK" ]; then
+            echo "No terraform-managed template revision found for $SERVICE" >&2
+            exit 1
+          fi
+          echo "Using terraform template: $TEMPLATE_TASK"
           jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
             "task-def.json" > "clean.json"
           jq --arg IMAGE "$IMAGE" \
