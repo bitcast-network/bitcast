@@ -1,0 +1,170 @@
+name: Deploy Validator to AWS ECS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER || 'bitcast' }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'bitcast-youtube-validator' }}
+
+jobs:
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image-tag: ${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
+
+      - name: Build, tag, and push image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build --no-cache -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          # Also tag as latest for Terraform task def reference
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  deploy-canary:
+    name: Deploy Canary (validator1)
+    needs: build
+    runs-on: ubuntu-latest
+    # No environment gate — canary deploys immediately on every push to main.
+    # If canary breaks, simply don't approve the owner deploy below.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
+
+      - name: Deploy canary to ECS
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          SERVICE: ${{ vars.ECS_SERVICE_CANARY || 'bitcast-youtube-validator1' }}
+        run: |
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "Deploying $IMAGE to $SERVICE (canary)"
+          aws ecs describe-task-definition \
+            --task-definition "$SERVICE" \
+            --query 'taskDefinition' \
+            --output json > "task-def.json"
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            "task-def.json" > "clean.json"
+          jq --arg IMAGE "$IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE' \
+            "clean.json" > "new.json"
+          # Re-attach Loki push credentials (removed from source for the public
+          # repo). No-ops when secrets are unset.
+          jq '.containerDefinitions[0].environment = ((.containerDefinitions[0].environment // []) | map(select(.name | startswith("LOKI_") | not)))' "new.json" > "tmp.json" && mv "tmp.json" "new.json"
+          for PAIR in "LOKI_URL:${LOKI_URL:-}" "LOKI_USERNAME:${LOKI_USERNAME:-}" "LOKI_TOKEN:${LOKI_TOKEN:-}"; do
+            NAME="${PAIR%%:*}"; VAL="${PAIR#*:}"
+            if [ -n "$VAL" ]; then
+              jq --arg n "$NAME" --arg v "$VAL" \
+                '.containerDefinitions[0].environment += [{name: $n, value: $v}]' \
+                "new.json" > "tmp.json" && mv "tmp.json" "new.json"
+            fi
+          done
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file://new.json" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$SERVICE" \
+            --task-definition "$ARN" \
+            --force-new-deployment
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$SERVICE"
+          echo "✅ Canary ($SERVICE) deployed"
+
+  deploy-owner:
+    name: Deploy Owner (production gate)
+    needs: [build, deploy-canary]
+    runs-on: ubuntu-latest
+    # Approval gate — requires manual "Review deployments" click in GitHub Actions.
+    # This is the safety net: if canary is broken, don't approve.
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
+
+      - name: Deploy owner to ECS
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          SERVICE: ${{ vars.ECS_SERVICE_OWNER || 'bitcast-youtube-owner' }}
+        run: |
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "Deploying $IMAGE to $SERVICE (owner/production)"
+          aws ecs describe-task-definition \
+            --task-definition "$SERVICE" \
+            --query 'taskDefinition' \
+            --output json > "task-def.json"
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            "task-def.json" > "clean.json"
+          jq --arg IMAGE "$IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE' \
+            "clean.json" > "new.json"
+          # Re-attach Loki push credentials (removed from source for the public
+          # repo). No-ops when secrets are unset.
+          jq '.containerDefinitions[0].environment = ((.containerDefinitions[0].environment // []) | map(select(.name | startswith("LOKI_") | not)))' "new.json" > "tmp.json" && mv "tmp.json" "new.json"
+          for PAIR in "LOKI_URL:${LOKI_URL:-}" "LOKI_USERNAME:${LOKI_USERNAME:-}" "LOKI_TOKEN:${LOKI_TOKEN:-}"; do
+            NAME="${PAIR%%:*}"; VAL="${PAIR#*:}"
+            if [ -n "$VAL" ]; then
+              jq --arg n "$NAME" --arg v "$VAL" \
+                '.containerDefinitions[0].environment += [{name: $n, value: $v}]' \
+                "new.json" > "tmp.json" && mv "tmp.json" "new.json"
+            fi
+          done
+          ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file://new.json" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$SERVICE" \
+            --task-definition "$ARN" \
+            --force-new-deployment
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$SERVICE"
+          echo "✅ Owner ($SERVICE) deployed"

@@ -1,180 +1,157 @@
-"""
-Global pytest configuration and fixtures for fast test execution.
+"""Shared fixtures. All tests run offline: chain, YouTube and LLM are mocked."""
 
-This file provides comprehensive mocking of external API calls to prevent
-slow network requests during testing.
-"""
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-import pytest
-from unittest.mock import patch, Mock
 import numpy as np
-
-
-@pytest.fixture(autouse=True)
-def mock_external_apis():
-    """
-    Auto-use fixture that mocks all external API calls to speed up tests.
-    This prevents real network requests during testing.
-    """
-    with patch('bitcast.validator.utils.briefs.get_briefs') as mock_briefs, \
-         patch('bitcast.validator.utils.token_pricing.get_bitcast_alpha_price') as mock_price, \
-         patch('bitcast.validator.utils.token_pricing.get_total_miner_emissions') as mock_emissions, \
-         patch('bitcast.validator.clients.llm_client.evaluate_content_against_brief') as mock_llm_eval, \
-         patch('bitcast.validator.clients.llm_client.check_for_prompt_injection') as mock_llm_inject, \
-         patch('bitcast.validator.platforms.youtube.api.transcript._fetch_transcript') as mock_transcript, \
-         patch('requests.get') as mock_requests_get:
-        
-        # Mock briefs API
-        mock_briefs.return_value = [
-            {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
-        ]
-        
-        # Mock token pricing APIs
-        mock_price.return_value = 1.0  # $1 per token
-        mock_emissions.return_value = 1000.0  # 1000 tokens per day
-        
-        # Mock blacklist API
-        
-        mock_llm_eval.return_value = (True, "Content matches brief criteria")
-        mock_llm_inject.return_value = False
-        
-        # Mock transcript API
-        mock_transcript.return_value = [{"text": "Sample video transcript"}]
-        
-        # Mock generic requests
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"success": True}
-        mock_response.raise_for_status.return_value = None
-        mock_requests_get.return_value = mock_response
-        
-        yield {
-            'briefs': mock_briefs,
-            'price': mock_price,
-            'emissions': mock_emissions,
-            'llm_eval': mock_llm_eval,
-            'llm_inject': mock_llm_inject,
-            'transcript': mock_transcript,
-            'requests': mock_requests_get
-        }
-
-
-@pytest.fixture(autouse=True)
-def disable_delays():
-    """
-    Auto-use fixture that disables sleep calls and retry delays during testing.
-    This makes tests run much faster by removing all artificial delays.
-    """
-    with patch('time.sleep') as mock_sleep, \
-         patch('tenacity.wait_fixed') as mock_wait_fixed, \
-         patch('tenacity.stop_after_attempt') as mock_stop_after:
-        
-        # Disable all sleep calls
-        mock_sleep.return_value = None
-        
-        # Make retry mechanisms immediate (no wait between attempts)
-        mock_wait_fixed.return_value = lambda x: 0  # No wait time
-        mock_stop_after.return_value = lambda x: x <= 1  # Stop after 1 attempt
-        
-        yield
+import pytest
 
 
 @pytest.fixture
-def mock_youtube_api_calls():
-    """
-    Fixture that mocks YouTube API calls for tests that need them.
-    """
-    with patch('bitcast.validator.platforms.youtube.api.clients.initialize_youtube_clients') as mock_clients, \
-         patch('bitcast.validator.platforms.youtube.api.channel.get_channel_data') as mock_channel_data, \
-         patch('bitcast.validator.platforms.youtube.api.channel.get_channel_analytics') as mock_channel_analytics, \
-         patch('bitcast.validator.platforms.youtube.api.video.get_all_uploads') as mock_uploads, \
-         patch('bitcast.validator.platforms.youtube.api.video.get_video_data_batch') as mock_video_data, \
-         patch('bitcast.validator.platforms.youtube.api.video.get_video_analytics') as mock_video_analytics:
-        
-        # Mock YouTube API clients
-        mock_data_client = Mock()
-        mock_analytics_client = Mock()
-        mock_clients.return_value = (mock_data_client, mock_analytics_client)
-        
-        # Mock channel data
-        mock_channel_data.return_value = {
-            "id": "test_channel_id",
-            "snippet": {
-                "title": "Test Channel",
-                "publishedAt": "2020-01-01T00:00:00Z",
-                "subscriberCount": 10000
-            }
-        }
-        
-        # Mock channel analytics
-        mock_channel_analytics.return_value = {
-            "views": 1000000,
-            "averageViewDuration": 120,
-            "subscriberCount": 10000
-        }
-        
-        # Mock video operations
-        mock_uploads.return_value = ["video1", "video2", "video3"]
-        mock_video_data.return_value = {
-            "video1": {
-                "videoId": "video1",
-                "title": "Test Video 1",
-                "publishedAt": "2024-01-01T00:00:00Z",
-                "viewCount": 1000,
-                "duration": "PT5M30S"
-            }
-        }
-        mock_video_analytics.return_value = {
-            "averageViewPercentage": 75,
-            "estimatedRevenue": 10.0
-        }
-        
-        yield {
-            'clients': mock_clients,
-            'channel_data': mock_channel_data,
-            'channel_analytics': mock_channel_analytics,
-            'uploads': mock_uploads,
-            'video_data': mock_video_data,
-            'video_analytics': mock_video_analytics
-        }
+def today():
+    return datetime.now(UTC).date()
 
 
 @pytest.fixture
-def fast_test_data():
-    """
-    Fixture providing common test data for fast test execution.
-    """
-    return {
-        'uids': [0, 123, 456, 789],
-        'briefs': [
-            {"id": "brief1", "title": "Test Brief 1", "format": "dedicated", "weight": 100},
-            {"id": "brief2", "title": "Test Brief 2", "format": "ad-read", "weight": 100}
-        ],
-        'mock_rewards': np.array([0.4, 0.3, 0.2, 0.1]),
-        'mock_stats': [
-            {"uid": 0, "scores": {"brief1": 0.0}, "yt_account": {}},
-            {"uid": 123, "scores": {"brief1": 0.5, "brief2": 0.3}, "yt_account": {}},
-            {"uid": 456, "scores": {"brief1": 0.2, "brief2": 0.4}, "yt_account": {}},
-            {"uid": 789, "scores": {"brief1": 0.1, "brief2": 0.2}, "yt_account": {}}
-        ]
-    }
+def briefs(today):
+    """Two active briefs relative to the real clock (evaluator paths use now())."""
+    start = (today - timedelta(days=7)).isoformat()
+    end = (today + timedelta(days=7)).isoformat()
+    return [
+        {"id": "brief-1", "brief": "Make a video about widgets.", "start_date": start, "end_date": end, "weight": 5},
+        {
+            "id": "brief-2",
+            "brief": "Mention gadgets.",
+            "start_date": start,
+            "end_date": end,
+            "weight": 1,
+            "format": "ad-read",
+        },
+    ]
 
 
-# Performance optimization: disable logging during tests unless explicitly enabled
-@pytest.fixture(autouse=True)
-def fast_logging():
-    """
-    Reduce logging verbosity during tests for better performance.
-    """
-    import logging
-    import bittensor as bt
-    
-    # Set higher log level to reduce output during tests
-    logging.getLogger().setLevel(logging.WARNING)
-    bt.logging.set_debug(False)
-    
-    yield
-    
-    # Restore normal logging after tests
-    logging.getLogger().setLevel(logging.INFO) 
+class FakeLLM:
+    """Deterministic LLM stub: matches briefs whose id is in ``matching_ids``."""
+
+    def __init__(self, matching_ids=("brief-1",), injection=False):
+        self.matching_ids = set(matching_ids)
+        self.injection = injection
+        self.calls = 0
+
+    async def evaluate_content_against_brief(self, brief, duration, description, transcript):
+        self.calls += 1
+        matched = brief["id"] in self.matching_ids
+        return matched, "matched" if matched else "not matched"
+
+    async def check_for_prompt_injection(self, description, transcript):
+        return self.injection
+
+
+@pytest.fixture
+def fake_llm():
+    return FakeLLM()
+
+
+# ---------------------------------------------------------------------------
+# Chain fakes — satisfy bitcast.chain.interface Protocols so weight_utils and
+# chain-submit paths run fully offline. No subtensor, no network.
+# ---------------------------------------------------------------------------
+
+
+class FakeMetagraph:
+    """Minimal metagraph satisfying chain.interface.MetagraphLike."""
+
+    def __init__(self, n: int = 8, hotkeys: list[str] | None = None) -> None:
+        self._n = n
+        self.hotkeys = hotkeys or [f"hotkey{i}" for i in range(n)]
+        self.axons: list[Any] = []
+        self.uids = np.arange(n)
+        self.last_update = np.zeros(n)
+
+    @property
+    def n(self) -> np.int64:
+        return np.int64(self._n)
+
+    def sync(self, subtensor: Any = None) -> None:
+        pass
+
+
+@dataclass
+class FakeExtrinsicResponse:
+    """Mirrors ``bittensor.core.types.ExtrinsicResponse``, the real return of
+    ``Subtensor.set_weights``: attribute access plus tuple-like unpacking."""
+
+    success: bool = True
+    message: str = "ok"
+
+    def __iter__(self):
+        return iter((self.success, self.message))
+
+    def __getitem__(self, index: int):
+        return (self.success, self.message)[index]
+
+    def __len__(self) -> int:
+        return 2
+
+
+class FakeSubtensor:
+    """Minimal subtensor satisfying chain.interface.SubtensorLike."""
+
+    chain_endpoint = "fake://local"
+
+    def __init__(self, n: int = 8, min_allowed: int = 0, max_weight: float = 1.0) -> None:
+        self.n = n
+        self.set_weights_calls: list[dict[str, Any]] = []
+        self.set_weights_result = FakeExtrinsicResponse()
+        # Hyperparameters tests can override per-case (constructor or attribute).
+        self.min_allowed = min_allowed
+        self.max_weight = max_weight
+
+    def get_current_block(self) -> int:
+        return 1000
+
+    def metagraph(self, netuid: int) -> FakeMetagraph:
+        return FakeMetagraph(self.n)
+
+    def is_hotkey_registered(self, hotkey_ss58: str, netuid=None, block=None) -> bool:
+        return True
+
+    def min_allowed_weights(self, netuid: int, block=None) -> int:
+        return self.min_allowed
+
+    def max_weight_limit(self, netuid: int, block=None) -> float:
+        return self.max_weight
+
+    def set_weights(self, wallet, netuid, uids, weights, **kwargs):
+        self.set_weights_calls.append({"uids": uids, "weights": weights, "kwargs": {"netuid": netuid, **kwargs}})
+        return self.set_weights_result
+
+    def serve_axon(self, netuid: int, axon: Any) -> None:
+        pass
+
+
+class FakeKeypair:
+    ss58_address = "5FakeValidatorHotkeyAddressForTests0000000000000"
+
+    def sign(self, data: str) -> bytes:
+        return b"signed:" + data.encode()[:16]
+
+
+class FakeWallet:
+    hotkey = FakeKeypair()
+
+
+@pytest.fixture
+def fake_metagraph():
+    return FakeMetagraph()
+
+
+@pytest.fixture
+def fake_subtensor():
+    return FakeSubtensor()
+
+
+@pytest.fixture
+def fake_wallet():
+    return FakeWallet()

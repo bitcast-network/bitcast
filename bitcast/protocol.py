@@ -1,14 +1,14 @@
-import typing
+"""Wire protocol between Bitcast validators and miners."""
+
 import bittensor as bt
 
-class AccessTokenSynapse(bt.Synapse):
-    """
-    A protocol representation for access token requests and responses.
-    This synapse is used to request access tokens from a miner and receive the response.
 
-    Attributes:
-    - YT_access_tokens: A list of string values representing YouTube access tokens. 
-      Initially None for requests, and set to the actual tokens for responses.
-      Maximum number of tokens is configurable.
+class AccessTokenSynapse(bt.Synapse):
+    """Request/response carrying YouTube OAuth access tokens.
+
+    A validator sends this synapse with ``YT_access_tokens=None``; the miner
+    fills in its current access tokens so the validator can evaluate the
+    associated YouTube channels.
     """
-    YT_access_tokens: typing.Optional[typing.List[str]] = None
+
+    YT_access_tokens: list[str] | None = None

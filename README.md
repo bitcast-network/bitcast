@@ -1,113 +1,109 @@
-<p align="center">
-  <a href="https://www.bitcast.network/">
-    <img src="assets/lockup_gradient.svg" alt="Bitcast Logo" width="800" />
-  </a>
-</p>
+# Bitcast V2 — Decentralized Creator Economy (SN93)
 
-# Bitcast — The Decentralized Creator Economy
+Reengineered Bitcast subnet: a clean, lean, async-first Python codebase on Bittensor 10.x.
 
-Bitcast is a decentralized platform that incentivizes content creators to connect brands with audiences. Creators publish YouTube videos to satisfy defined briefs and earn rewards based on engagement metrics.
+## Overview
 
----
+Bitcast connects brands with audiences through content creators. Creators (miners) publish
+YouTube videos satisfying brand briefs; validators verify engagement via the YouTube
+Analytics API, score videos in USD terms, and convert those scores into on-chain weights.
 
-## ⚙️ High-Level Architecture
+- **Miners** serve YouTube OAuth access tokens for the channels they operate.
+- **Validators** fetch active briefs, evaluate every miner's channels/videos against them
+  (LLM-assisted brief matching), and set weights so emissions track earned USD value.
+- Unallocated emission is absorbed by the burn UID (0).
 
-- **Miners**: Produce and publish YouTube content for one or more briefs.  
-- **Validators**: Obtain temporary OAuth tokens to securely access YouTube Analytics and validate performance.  
-- **Brands**: Define and publish content briefs (initially focused on the Bittensor ecosystem).  
-- **Briefs Server**: Hosts the [active briefs](https://www.dashboard.bitcast.network/briefs).  
-- **Bittensor Network**: Manages on-chain compensation, rewarding Validators and Miners with the [Bitcast alpha token](https://www.coingecko.com/en/coins/bitcast).
+## Layout
 
----
+```
+bitcast/
+├── protocol.py          # AccessTokenSynapse — the single wire message
+├── config.py            # ALL configuration: consensus constants, env settings, CLI
+├── neuron.py            # Shared wallet/subtensor/metagraph lifecycle
+├── miner/               # Token management (OAuth refresh) + axon server
+├── validator/
+│   ├── base.py          # Score state, EMA updates, weight-setting cadence
+│   ├── forward.py       # Main loop: briefs → query → evaluate → score → weights
+│   ├── weights.py       # Weight processing and chain submission
+│   ├── reward/          # Orchestrator, models, scaling math, pricing
+│   ├── youtube/         # YouTube API client, vetting, scoring, brief matching
+│   └── llm/             # OpenRouter/Chute client + verbatim prompts
+└── utils/               # Briefs client, signed dashboard publisher, TTL cache
+```
 
-## 🚀 Getting Started
+## Setup
 
-### For Miners
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env   # fill in API keys
+```
 
-1. **Review Requirements**  
-   Ensure your YouTube account and videos meet the [minimum requirements](bitcast/miner/README.md).
+## Run
 
-2. **Publish Content**  
-   Create videos targeting one or more active briefs.
+```bash
+# Miner
+python -m neurons.miner --netuid 93 --subtensor.network finney \
+    --wallet.name miner --wallet.hotkey default
 
-3. **Earn Rewards**  
-   Videos that satisfy briefs are rewarded based on **YouTube Premium revenue** stats.
+# Validator
+python -m neurons.validator --netuid 93 --subtensor.network finney \
+    --wallet.name validator --wallet.hotkey default
+```
 
-4. **Agency Operations**  
-   Run a single miner with up to 5 YouTube accounts to operate as a content agency, aggregating multiple creators under one mining operation.
+Miner credentials: put one JSON file per YouTube account in `~/.bitcast/secrets/`, each
+containing `client_id`, `client_secret` and `refresh_token` (or set `TOKEN_SOURCE=api`).
 
-See the [Miner Setup Guide](bitcast/miner/README.md) for:
-- Installation and configuration  
-- OAuth and account integration  
-- Miner registration on the network  
-- Reward tracking and monitoring
+## Development
 
-### For Validators
+```bash
+pytest                 # offline test suite (chain/YouTube/LLM all mocked)
+ruff check .           # lint
+ruff format .          # format
+```
 
-Validators maintain the integrity of the network by:
-- Retrieving analytics data via OAuth  
-- Verifying content engagement  
-- Disbursing on-chain rewards to Miners
+## Observability: Loki score audit telemetry
 
-Refer to the [Validator Setup Guide](bitcast/validator/README.md) for detailed instructions.
+Loki is enabled by default for the shared Bitcast dataset. Operators can set
+`LOKI_URL`, `LOKI_USERNAME`, and `LOKI_TOKEN` together to use another Grafana
+Cloud stack. Do not add credentials to labels or log lines. Logging is batched
+and best-effort, so a telemetry failure cannot affect validation, EMA state,
+weight calculation, or chain submission.
 
----
+Each reward cycle emits one JSON `miner_score` line per miner. Its safe schema
+is limited to `validator_uid`, `cycle_id`, `cycle_step`, `miner_uid`,
+`raw_reward` (pre-EMA), `ema_before`, and `ema_after`. When a weight submission
+succeeds in the following sync, that same line also contains
+`submitted_weight` (the processed float submitted to the SDK) and
+`onchain_weight_uint16` (the converted chain value). These are intentionally
+different values: raw reward feeds EMA; EMA scores are normalized/processed into
+the submitted weight; the uint16 is the final on-chain encoding.
 
-## 📊 Scoring & Rewards System
+Validator identity stays in bounded Loki labels (`uid`, `hotkey`, `netuid`,
+`neuron`, `version`); miner UID is a JSON field, never a label. For example, to
+compare miner UID 68 on owner UID 0 and canary UID 60:
 
-Bitcast employs a dynamic, multi-layered scoring and rewards mechanism to fairly distribute emissions and incentivize high-quality participation. The system is designed to prioritize genuine engagement and prevent manipulation.
+```logql
+{neuron="validator", netuid="93", uid=~"0|60"} | json | event="miner_score" | miner_uid="68"
+```
 
-### 1. Briefs & Boost Multipliers
+Plot raw reward and EMA across both validators:
 
-- Every [brief](https://dashboard.bitcast.network/) is assigned a **boost** value.
-  - **Boost** acts as a multiplier on the score of videos that fulfill the brief, giving higher priority to briefs from sponsors or clients.
+```logql
+avg_over_time({neuron="validator", netuid="93", uid=~"0|60"} | json | event="miner_score" | miner_uid="68" | unwrap ema_after [6h]) by (uid)
+```
 
-### 2. Video Eligibility & Format Types
+Inspect only actual successful weight submissions (records without these fields
+were score cycles where no weights were submitted):
 
-- **Eligibility:**  
-  - Videos must have both their transcript and description fully satisfy the requirements of an active brief.
-- **Format Types:**  
-  Each brief specifies a required video format, which determines both eligibility and reward scaling:
-  - **Dedicated:**  
-    - Sponsor’s topic is the main focus (≥80% of video).
-    - Each YouTube account can be rewarded for up to **2 videos per dedicated brief** (oldest 2 by publish date).
-    - Receives **100% of the reward**.
-  - **Ad-Read:**  
-    - Sponsor’s message appears as a short, distinct segment.
-    - Each YouTube account can be rewarded for up to **5 videos per ad-read brief** (oldest 5 by publish date).
-    - Receives **20% of the dedicated reward**.
-  - **Integration:**  
-    - Sponsor's content is woven into the video content itself.
-    - Video limits are configured per-brief via `max_count`.
-    - Receives **20% of the dedicated reward** (same as ad-read).
+```logql
+{neuron="validator", netuid="93", uid=~"0|60"} | json | event="miner_score" | miner_uid="68" | onchain_weight_uint16!=""
+```
 
-### 3. Performance Metrics & Anti-Exploitation Controls
+## Docker
 
-- **Reward Calculation:**  
-  - Rewards are based on the 7-day moving average of YouTube Premium Revenue (`estimatedRedPartnerRevenue`).
-  - For **non-YPP YouTubers**, Premium Revenue is estimated using the video’s minutes watched (`estimatedMinutesWatched`) multiplied by 0.00005.
-  - For each eligible video, the (actual or estimated) Premium Revenue is multiplied by a scaling factor to determine the daily reward (in USD).
-  - This daily USD reward is then converted into a weight relative to the subnet’s total daily miner emissions (USD).
-  - By anchoring rewards to USD, we align with industry-standard metrics (CPM), making the system more transparent and familiar for miners.
-- **Lookback & Revenue Cap:**  
-  - To prevent exploitation via fake engagement, Bitcast applies a lookback window:
-    - For each video, the **average premium revenue over the 7-day period is capped at the median daily revenue for the channel from the previous month**.
-    - YouTube audit and remove engagement that they deem to be fake within 1 month. The lookback factors this audit in a prevents exploitation.
-- **Reward Timing:**  
-  - Only videos matching active briefs are considered.
-  - Videos earn rewards for the first 14 days after they are published.
-  - There is a **3-day delay** in rewards (to align with YouTube's engagement verification), so rewards always lag behind video engagement by 3 days.
-
-### 4. Emissions Model
-
-- The **boost multiplier** increases the score of qualifying videos.
-- Each brief has a **maximum emissions cap**, preventing any single brief from dominating the total emissions.
-- **Unclaimed emissions** are automatically allocated to the subnet treasury.
-
----
-
-## 🤝 Contact & Support
-
-For assistance or questions, join our Discord support channel:
-
-[Bitcast Support on Bittensor Discord](https://discord.com/channels/799672011265015819/1362489640841380045)
+```bash
+docker build -t bitcast .
+docker run --env-file .env bitcast                       # validator
+docker run --env-file .env bitcast python -m neurons.miner --netuid 93
+```

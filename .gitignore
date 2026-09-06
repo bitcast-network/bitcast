@@ -1,18 +1,49 @@
-.env
+# Python
 __pycache__/
-.pytest_cache/
-venv/
-venv_bitcast/
-*.pkl
-cache_directory/
-bitcast/cache/
-client_secret.json
-nodes.json
-wandb/
+*.py[cod]
+*$py.class
 *.egg-info/
+dist/
 build/
-.cursor/
-.dev_planning/
-.vscode
-historical_videos.jsonl
-terraform/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Bittensor
+wallet/
+coldkey*
+hotkey*
+*.key
+
+# Data
+data/
+*.db
+*.sqlite
+
+# Claude
+.claude/
