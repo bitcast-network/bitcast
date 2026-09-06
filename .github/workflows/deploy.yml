@@ -81,17 +81,6 @@ jobs:
           jq --arg IMAGE "$IMAGE" \
             '.containerDefinitions[0].image = $IMAGE' \
             "clean.json" > "new.json"
-          # Re-attach Loki push credentials (removed from source for the public
-          # repo). No-ops when secrets are unset.
-          jq '.containerDefinitions[0].environment = ((.containerDefinitions[0].environment // []) | map(select(.name | startswith("LOKI_") | not)))' "new.json" > "tmp.json" && mv "tmp.json" "new.json"
-          for PAIR in "LOKI_URL:${LOKI_URL:-}" "LOKI_USERNAME:${LOKI_USERNAME:-}" "LOKI_TOKEN:${LOKI_TOKEN:-}"; do
-            NAME="${PAIR%%:*}"; VAL="${PAIR#*:}"
-            if [ -n "$VAL" ]; then
-              jq --arg n "$NAME" --arg v "$VAL" \
-                '.containerDefinitions[0].environment += [{name: $n, value: $v}]' \
-                "new.json" > "tmp.json" && mv "tmp.json" "new.json"
-            fi
-          done
           ARN=$(aws ecs register-task-definition \
             --cli-input-json "file://new.json" \
             --query 'taskDefinition.taskDefinitionArn' \
@@ -144,17 +133,6 @@ jobs:
           jq --arg IMAGE "$IMAGE" \
             '.containerDefinitions[0].image = $IMAGE' \
             "clean.json" > "new.json"
-          # Re-attach Loki push credentials (removed from source for the public
-          # repo). No-ops when secrets are unset.
-          jq '.containerDefinitions[0].environment = ((.containerDefinitions[0].environment // []) | map(select(.name | startswith("LOKI_") | not)))' "new.json" > "tmp.json" && mv "tmp.json" "new.json"
-          for PAIR in "LOKI_URL:${LOKI_URL:-}" "LOKI_USERNAME:${LOKI_USERNAME:-}" "LOKI_TOKEN:${LOKI_TOKEN:-}"; do
-            NAME="${PAIR%%:*}"; VAL="${PAIR#*:}"
-            if [ -n "$VAL" ]; then
-              jq --arg n "$NAME" --arg v "$VAL" \
-                '.containerDefinitions[0].environment += [{name: $n, value: $v}]' \
-                "new.json" > "tmp.json" && mv "tmp.json" "new.json"
-            fi
-          done
           ARN=$(aws ecs register-task-definition \
             --cli-input-json "file://new.json" \
             --query 'taskDefinition.taskDefinitionArn' \
