@@ -13,6 +13,19 @@ Analytics API, score videos in USD terms, and convert those scores into on-chain
   (LLM-assisted brief matching), and set weights so emissions track earned USD value.
 - Unallocated emission is absorbed by the burn UID (0).
 
+## Two mechanisms, one subnet
+
+SN93 runs two mechanisms on finney. This repository implements **mechanism 0** — the
+YouTube creator-economy mechanism (~2% of subnet emission). The **mechanism 1**
+X/Twitter mechanism (~98% of emission) is implemented in
+[bitcast-network/bitcast-x](https://github.com/bitcast-network/bitcast-x).
+
+## Verifying subnet liveness
+
+SN93 uses commit-reveal validators, so raw on-chain `last_update` does not reflect miner
+activity. See [AGENTS.md](./AGENTS.md) for read-only commands to verify validator, miner,
+and emission activity directly against chain state.
+
 ## Layout
 
 ```
