@@ -13,6 +13,12 @@ Analytics API, score videos in USD terms, and convert those scores into on-chain
   (LLM-assisted brief matching), and set weights so emissions track earned USD value.
 - Unallocated emission is absorbed by the burn UID (0).
 
+## Verifying subnet liveness
+
+SN93 uses commit-reveal validators, so raw on-chain `last_update` does not reflect miner
+activity. See [AGENTS.md](./AGENTS.md) for read-only commands to verify validator, miner,
+and emission activity directly against chain state.
+
 ## Layout
 
 ```

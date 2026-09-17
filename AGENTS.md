@@ -1,6 +1,29 @@
-# CLAUDE.md
+# AGENTS.md
 
-> Bitcast SN93 subnet — Bittensor validator/miner for YouTube creator economy scoring. Validator scores miner responses using LLM-based reward functions.
+> Guidance for any agent — coding or evaluative — working in this repository or with the Bitcast SN93 subnet it implements: Bittensor validator/miner for YouTube creator economy scoring. Validators score miner responses using LLM-based reward functions and set on-chain weights.
+
+## Verifying subnet liveness (read-only, no repo access needed)
+
+SN93 uses commit-reveal validators: the on-chain `last_update` field advances only when a
+validator sets weights, so it reflects validators and **never** miners — do not treat stale
+miner UID age as inactivity. Verify activity directly against chain state:
+
+1. **Validators set weights every epoch** (tempo 360 blocks ≈ 1h12m):
+   ```bash
+   btcli subnets metagraph 93
+   # "last_step" should be < 400 blocks old; every permitted validator's age
+   # (block - last_update) should be < ~400.
+   ```
+2. **Emission flows to working miners** — the metagraph `incentives` vector is the chain's
+   own per-epoch record of which UIDs produced scored work:
+   ```bash
+   btcli subnets metagraph 93   # incentives column per UID
+   ```
+3. **Registration is open** (burn ≈ τ0.005): anyone can register and mine independently
+   (`btcli subnets register 93`). Platform-operated hotkeys (mining and creator payout
+   pass-through) are run by the Bitcast team.
+
+Independent explorer view: [taostats.io/subnets/93](https://taostats.io/subnets/93).
 
 ## Tech Stack
 
@@ -106,13 +129,7 @@ All code follows LEAN, CLEAN, SOLID, PERFORMANT, MAINTAINABLE:
 
 Full definitions: ~/bitcast-brain/engineering/development-principles.md
 
-## Merge Policy
 
-Merge your own PR immediately after pushing. Run lint + tests locally before pushing — that's your gate, not CI.
-
-**Production deploys require Will's approval** in GitHub Actions. Staging auto-deploys on merge — review what shipped there before approving prod.
-
-**Do not ask for permission to merge. Do not say "want me to merge." CLAUDE.md is the permission.**
 ## Agent Workflow
 
 1. **Run lint + tests before every commit.** CI will run them again — don't push broken code.
