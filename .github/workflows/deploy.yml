@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'bitcast/**'
-      - 'neurons/**'
-      - 'tests/**'
-      - 'pyproject.toml'
-      - 'Dockerfile'
-      - 'entrypoint.sh'
-      - '.github/workflows/deploy.yml'
+    - 'bitcast/**'
+    - 'neurons/**'
+    - 'tests/**'
+    - 'pyproject.toml'
+    - 'Dockerfile'
+    - 'entrypoint.sh'
+    - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 env:
@@ -20,181 +20,197 @@ env:
 
 jobs:
   build:
-    name: Build & Push Image
+    name: Build release image without AWS credentials
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     outputs:
       image-tag: ${{ github.sha }}
+      archive-sha256: ${{ steps.release-archive.outputs.sha256 }}
+      artifact-name: ${{ steps.release-archive.outputs.name }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+    - name: Checkout
+      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5   # v4.3.1
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+      with:
+        persist-credentials: false
+    - name: Build release image
+      env:
+        ECR_REGISTRY: 289997608167.dkr.ecr.us-east-1.amazonaws.com
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t release-image:tested --no-cache -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        # Also tag as latest for Terraform task def reference
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
-
-      - name: Build, tag, and push image
-        env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build --no-cache -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          # Also tag as latest for Terraform task def reference
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-  deploy-canary:
-    name: Deploy Canary (validator1)
+    - name: Export the built image and its checksum
+      id: release-archive
+      run: |
+        set -euo pipefail
+        docker save release-image:tested -o release-image.tar
+        echo "sha256=$(sha256sum release-image.tar | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+        printf '### Built release image\n\nSource: `%s`\n\nArchive SHA-256: `%s`\n' "$SOURCE_SHA" "$(sha256sum release-image.tar | cut -d ' ' -f 1)" >> "$GITHUB_STEP_SUMMARY"
+        echo "name=release-image-build-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      env:
+        SOURCE_SHA: ${{ github.sha }}
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: ${{ steps.release-archive.outputs.name }}
+        path: release-image.tar
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+    if: github.ref == 'refs/heads/main'
+  deploy-production:
+    name: Approve release, deploy canary, then deploy owner
     needs: build
     runs-on: ubuntu-latest
-    # No environment gate — canary deploys immediately on every push to main.
-    # If canary breaks, simply don't approve the owner deploy below.
+    # Both validators receive production wallet keys and share one approval.
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
-
-      - name: Deploy canary to ECS
-        env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
-          SERVICE: ${{ vars.ECS_SERVICE_CANARY || 'bitcast-youtube-validator1' }}
-        run: |
-          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "Deploying $IMAGE to $SERVICE (canary)"
-          # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
-          # not the latest revision: deploy-driven revisions drift away from the
-          # reviewed terraform template (this bit us when an interim deploy
-          # dropped the LOKI_* rows that terraform had added).
-          TEMPLATE_TASK=""
-          LATEST_REV=$(aws ecs describe-task-definition \
-            --task-definition "$SERVICE" \
-            --query 'taskDefinition.revision' \
-            --output text)
-          for REV in $(seq "$LATEST_REV" -1 1); do
-            CANDIDATE_JSON=$(aws ecs describe-task-definition \
-              --task-definition "${SERVICE}:${REV}" \
-              --include TAGS \
-              --output json 2>/dev/null) || continue
-            if jq -e 'any((.tags // .Tags)[]?; (.key // .Key) == "ManagedBy" and (.value // .Value) == "terraform")' \
-                <<<"$CANDIDATE_JSON" > /dev/null; then
-              TEMPLATE_TASK="${SERVICE}:${REV}"
-              jq '.taskDefinition' <<<"$CANDIDATE_JSON" > "task-def.json"
-              break
-            fi
-          done
-          if [ -z "$TEMPLATE_TASK" ]; then
-            echo "No terraform-managed template revision found for $SERVICE" >&2
-            exit 1
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: ${{ needs.build.outputs.artifact-name }}
+    - name: Verify the approved image archive
+      env:
+        EXPECTED_SHA256: ${{ needs.build.outputs.archive-sha256 }}
+      run: |
+        set -euo pipefail
+        [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+        printf '%s  release-image.tar\n' "$EXPECTED_SHA256" | sha256sum --check --strict
+        docker load -i release-image.tar
+    - name: Configure scoped deployment credentials
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a
+      with:
+        role-to-assume: arn:aws:iam::289997608167:role/deploy-bitcast-production
+        aws-region: us-east-1
+    - name: Login to Amazon ECR
+      id: ecr-login
+      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076
+    - name: Publish the approved image without rebuilding it
+      id: approved-image
+      env:
+        RELEASE_REPOSITORY: bitcast-youtube-validator
+      run: |
+        set -euo pipefail
+        registry=289997608167.dkr.ecr.us-east-1.amazonaws.com
+        tag="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$GITHUB_JOB"
+        image="$registry/$RELEASE_REPOSITORY:$tag"
+        docker tag release-image:tested "$image"
+        docker push "$image"
+        digest=$(aws ecr describe-images --repository-name "$RELEASE_REPOSITORY" \
+          --image-ids "imageTag=$tag" --query 'imageDetails[0].imageDigest' --output text)
+        [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
+        echo "RELEASE_IMAGE=$registry/$RELEASE_REPOSITORY@$digest" >> "$GITHUB_ENV"
+        echo "image=$registry/$RELEASE_REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
+    - name: Deploy canary to ECS
+      env:
+        ECR_REGISTRY: 289997608167.dkr.ecr.us-east-1.amazonaws.com
+        IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        SERVICE: ${{ vars.ECS_SERVICE_CANARY || 'bitcast-youtube-validator1' }}
+      run: |
+        set -euo pipefail
+        IMAGE="$RELEASE_IMAGE"
+        echo "Deploying $IMAGE to $SERVICE (canary)"
+        # Preserve Terraform configuration, and verify its registering identity.
+        TEMPLATE_TASK=""
+        LATEST_REV=$(aws ecs describe-task-definition \
+          --task-definition "$SERVICE" \
+          --query 'taskDefinition.revision' \
+          --output text)
+        for REV in $(seq "$LATEST_REV" -1 1); do
+          CANDIDATE_JSON=$(aws ecs describe-task-definition \
+            --task-definition "${SERVICE}:${REV}" \
+            --include TAGS \
+            --output json 2>/dev/null) || continue
+          if jq -e '(.taskDefinition.registeredBy // "" | startswith("arn:aws:sts::289997608167:assumed-role/bitcast-terraform/")) and
+              any((.tags // .Tags)[]?; (.key // .Key) == "ManagedBy" and (.value // .Value) == "terraform")' \
+              <<<"$CANDIDATE_JSON" > /dev/null; then
+            TEMPLATE_TASK="${SERVICE}:${REV}"
+            jq '.taskDefinition' <<<"$CANDIDATE_JSON" > "task-def.json"
+            break
           fi
-          echo "Using terraform template: $TEMPLATE_TASK"
-          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
-            "task-def.json" > "clean.json"
-          jq --arg IMAGE "$IMAGE" \
-            '.containerDefinitions[0].image = $IMAGE' \
-            "clean.json" > "new.json"
-          ARN=$(aws ecs register-task-definition \
-            --cli-input-json "file://new.json" \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$SERVICE" \
-            --task-definition "$ARN" \
-            --force-new-deployment
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER" \
-            --services "$SERVICE"
-          echo "✅ Canary ($SERVICE) deployed"
+        done
+        if [ -z "$TEMPLATE_TASK" ]; then
+          echo "No template registered by the approved Terraform role found for $SERVICE" >&2
+          exit 1
+        fi
+        echo "Using terraform template: $TEMPLATE_TASK"
+        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+          "task-def.json" > "clean.json"
+        jq --arg IMAGE "$IMAGE" \
+          '.containerDefinitions[0].image = $IMAGE' \
+          "clean.json" > "new.json"
+        ARN=$(aws ecs register-task-definition \
+          --cli-input-json "file://new.json" \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+        aws ecs update-service \
+          --cluster "$ECS_CLUSTER" \
+          --service "$SERVICE" \
+          --task-definition "$ARN" \
+          --force-new-deployment
+        aws ecs wait services-stable \
+          --cluster "$ECS_CLUSTER" \
+          --services "$SERVICE"
+        echo "✅ Canary ($SERVICE) deployed"
 
-  deploy-owner:
-    name: Deploy Owner (production gate)
-    needs: [build, deploy-canary]
-    runs-on: ubuntu-latest
-    # Approval gate — requires manual "Review deployments" click in GitHub Actions.
-    # This is the safety net: if canary is broken, don't approve.
+    - name: Deploy owner to ECS
+      env:
+        ECR_REGISTRY: 289997608167.dkr.ecr.us-east-1.amazonaws.com
+        IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        SERVICE: ${{ vars.ECS_SERVICE_OWNER || 'bitcast-youtube-owner' }}
+      run: |
+        set -euo pipefail
+        IMAGE="$RELEASE_IMAGE"
+        echo "Deploying $IMAGE to $SERVICE (owner/production)"
+        # Preserve Terraform configuration, and verify its registering identity.
+        TEMPLATE_TASK=""
+        LATEST_REV=$(aws ecs describe-task-definition \
+          --task-definition "$SERVICE" \
+          --query 'taskDefinition.revision' \
+          --output text)
+        for REV in $(seq "$LATEST_REV" -1 1); do
+          CANDIDATE_JSON=$(aws ecs describe-task-definition \
+            --task-definition "${SERVICE}:${REV}" \
+            --include TAGS \
+            --output json 2>/dev/null) || continue
+          if jq -e '(.taskDefinition.registeredBy // "" | startswith("arn:aws:sts::289997608167:assumed-role/bitcast-terraform/")) and
+              any((.tags // .Tags)[]?; (.key // .Key) == "ManagedBy" and (.value // .Value) == "terraform")' \
+              <<<"$CANDIDATE_JSON" > /dev/null; then
+            TEMPLATE_TASK="${SERVICE}:${REV}"
+            jq '.taskDefinition' <<<"$CANDIDATE_JSON" > "task-def.json"
+            break
+          fi
+        done
+        if [ -z "$TEMPLATE_TASK" ]; then
+          echo "No template registered by the approved Terraform role found for $SERVICE" >&2
+          exit 1
+        fi
+        echo "Using terraform template: $TEMPLATE_TASK"
+        jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+          "task-def.json" > "clean.json"
+        jq --arg IMAGE "$IMAGE" \
+          '.containerDefinitions[0].image = $IMAGE' \
+          "clean.json" > "new.json"
+        ARN=$(aws ecs register-task-definition \
+          --cli-input-json "file://new.json" \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+        aws ecs update-service \
+          --cluster "$ECS_CLUSTER" \
+          --service "$SERVICE" \
+          --task-definition "$ARN" \
+          --force-new-deployment
+        aws ecs wait services-stable \
+          --cluster "$ECS_CLUSTER" \
+          --services "$SERVICE"
+        echo "✅ Owner ($SERVICE) deployed"
     environment: production
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
-
-      - name: Deploy owner to ECS
-        env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
-          SERVICE: ${{ vars.ECS_SERVICE_OWNER || 'bitcast-youtube-owner' }}
-        run: |
-          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "Deploying $IMAGE to $SERVICE (owner/production)"
-          # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
-          # not the latest revision: deploy-driven revisions drift away from the
-          # reviewed terraform template (this bit us when an interim deploy
-          # dropped the LOKI_* rows that terraform had added).
-          TEMPLATE_TASK=""
-          LATEST_REV=$(aws ecs describe-task-definition \
-            --task-definition "$SERVICE" \
-            --query 'taskDefinition.revision' \
-            --output text)
-          for REV in $(seq "$LATEST_REV" -1 1); do
-            CANDIDATE_JSON=$(aws ecs describe-task-definition \
-              --task-definition "${SERVICE}:${REV}" \
-              --include TAGS \
-              --output json 2>/dev/null) || continue
-            if jq -e 'any((.tags // .Tags)[]?; (.key // .Key) == "ManagedBy" and (.value // .Value) == "terraform")' \
-                <<<"$CANDIDATE_JSON" > /dev/null; then
-              TEMPLATE_TASK="${SERVICE}:${REV}"
-              jq '.taskDefinition' <<<"$CANDIDATE_JSON" > "task-def.json"
-              break
-            fi
-          done
-          if [ -z "$TEMPLATE_TASK" ]; then
-            echo "No terraform-managed template revision found for $SERVICE" >&2
-            exit 1
-          fi
-          echo "Using terraform template: $TEMPLATE_TASK"
-          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
-            "task-def.json" > "clean.json"
-          jq --arg IMAGE "$IMAGE" \
-            '.containerDefinitions[0].image = $IMAGE' \
-            "clean.json" > "new.json"
-          ARN=$(aws ecs register-task-definition \
-            --cli-input-json "file://new.json" \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-          aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$SERVICE" \
-            --task-definition "$ARN" \
-            --force-new-deployment
-          aws ecs wait services-stable \
-            --cluster "$ECS_CLUSTER" \
-            --services "$SERVICE"
-          echo "✅ Owner ($SERVICE) deployed"
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.workflow }}
+  cancel-in-progress: false
