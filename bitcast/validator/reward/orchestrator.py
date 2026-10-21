@@ -206,12 +206,14 @@ class RewardOrchestrator:
     async def _calculate_emission_targets(self, score_matrix: ScoreMatrix, briefs: list[dict]) -> list[EmissionTarget]:
         """Convert USD scores to weights as fractions of the daily emission budget."""
         usd_matrix = score_matrix.matrix
-        try:
-            total_daily_usd = await self.pricing.get_total_daily_usd()
-            raw_weights = usd_matrix / total_daily_usd if total_daily_usd > 0 else np.zeros_like(usd_matrix)
-        except Exception as err:
-            bt.logging.warning(f"Emission pricing unavailable ({err!r}); zeroing weights.")
-            raw_weights = np.zeros_like(usd_matrix)
+        # A pricing failure must never zero the cycle (2026-09-30 incident: a
+        # transient CoinGecko 403 zeroed a whole creator day and the loss was
+        # only found when a creator complained). Weighting tolerates a stale
+        # price; if no price exists at all the cycle aborts loudly — the
+        # outer handler burns the run and the failure is visible, instead of
+        # silently paying everyone zero.
+        total_daily_usd = await self.pricing.get_total_daily_usd(allow_stale=True)
+        raw_weights = usd_matrix / total_daily_usd if total_daily_usd > 0 else np.zeros_like(usd_matrix)
 
         return [
             EmissionTarget(
@@ -287,17 +289,20 @@ class RewardOrchestrator:
         if self.publisher is None:
             return
         if result.platform == "youtube":
+            # Publication feeds creator-facing alpha_target history; a zeroed
+            # price here writes fake "earned 0" rows (the 2026-09-30 shape).
+            # Stale prices are fine to publish, but if no price exists skip
+            # the publication rather than persist lies — the weight path
+            # (_calculate_emission_targets) independently aborts the cycle.
             try:
-                self._add_alpha_targets(
-                    result,
-                    await self.pricing.get_alpha_price_usd(),
-                    await self.pricing.get_total_daily_usd(),
-                )
+                alpha_price_usd = await self.pricing.get_alpha_price_usd(allow_stale=True)
+                total_daily_usd = await self.pricing.get_total_daily_usd(allow_stale=True)
+                self._add_alpha_targets(result, alpha_price_usd, total_daily_usd)
             except Exception as err:
                 bt.logging.warning(
-                    f"Alpha pricing unavailable for published YouTube metrics ({err!r}); zeroing alpha targets."
+                    f"Alpha pricing unavailable for published YouTube metrics ({err!r}); skipping publication."
                 )
-                self._add_alpha_targets(result, 0.0)
+                return
         try:
             await self.publisher.publish_account_results(result)
         except Exception as err:
