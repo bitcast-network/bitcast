@@ -1,5 +1,6 @@
 """Reward orchestrator pipeline with fully mocked chain, miners and pricing."""
 
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -49,18 +50,25 @@ class BatchingEvaluator(StubEvaluator):
 
 
 class StubPricing:
-    async def get_total_daily_usd(self) -> float:
+    async def get_alpha_price_usd(self, *, allow_stale: bool = False) -> float:
+        return 36.0
+
+    async def get_total_daily_usd(self, *, allow_stale: bool = False) -> float:
         return DAILY_BUDGET_USD
 
 
 class FailingPricing:
-    async def get_total_daily_usd(self) -> float:
+    """No cache, no reachable source — the fail-loudly contract."""
+
+    async def get_alpha_price_usd(self, *, allow_stale: bool = False) -> float:
+        raise ConnectionError("price feed down")
+
+    async def get_total_daily_usd(self, *, allow_stale: bool = False) -> float:
         raise ConnectionError("price feed down")
 
 
 class AlphaPricing(StubPricing):
-    async def get_alpha_price_usd(self) -> float:
-        return 36.0
+    pass
 
 
 class CapturingPublisher:
@@ -137,6 +145,55 @@ async def test_pricing_failure_burns_everything(active_briefs):
     rewards, _ = await orchestrator.calculate_rewards(make_validator(), [0, 1], active_briefs)
     assert rewards[0] == pytest.approx(1.0)
     assert rewards[1] == 0.0
+
+
+async def test_pricing_failure_skips_publication_instead_of_zeroing(active_briefs):
+    """No price at all -> publication skipped (no fake 0-alpha rows), weights still burn via the loud abort."""
+    publisher = CapturingPublisher()
+    orchestrator = RewardOrchestrator([VideoMetricsEvaluator()], FailingPricing(), publisher)
+
+    rewards, _ = await orchestrator.calculate_rewards(make_validator(num_uids=2), [0, 1], active_briefs)
+
+    # The run itself fell back to burn (fail loudly, visible). The only
+    # published result may be the burn marker — never a youtube result with
+    # fabricated zero alpha targets.
+    assert rewards[0] == pytest.approx(1.0)
+    assert all(r.platform != "youtube" for r in publisher.results)
+
+
+async def test_stale_price_still_weights_instead_of_burning(active_briefs, monkeypatch):
+    """Every source down but a cached price exists -> use the stale price, weights stay correct."""
+    import bitcast.validator.reward.pricing as pricing_mod
+
+    class OnlyStaleCachePricing(pricing_mod.PricingService):
+        async def _fetch_alpha_price_coingecko(self):
+            raise ConnectionError("403")
+
+        async def _fetch_alpha_price_coinpaprika(self):
+            raise ConnectionError("down")
+
+    service = OnlyStaleCachePricing(subtensor=None)
+    service._cache["price"] = (5.0, time.monotonic() - 7200)  # 2h old
+    assert await service.get_alpha_price_usd(allow_stale=True) == 5.0
+    with pytest.raises(pricing_mod.PricingUnavailableError):
+        await service.get_alpha_price_usd(allow_stale=False)
+
+
+async def test_pricing_service_falls_back_to_second_source(active_briefs):
+    """CoinGecko down -> CoinPaprika answers -> real price, no exception."""
+    import bitcast.validator.reward.pricing as pricing_mod
+
+    class GeoDownPricing(pricing_mod.PricingService):
+        async def _fetch_alpha_price_coingecko(self):
+            raise ConnectionError("403 for you")
+
+        async def _fetch_alpha_price_coinpaprika(self):
+            return 5.25
+
+    service = GeoDownPricing(subtensor=None)
+    assert await service.get_alpha_price_usd() == 5.25
+    # and it is cached as fresh
+    assert await service.get_alpha_price_usd() == 5.25
 
 
 async def test_published_youtube_video_metrics_include_alpha_target(active_briefs):
