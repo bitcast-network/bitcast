@@ -296,7 +296,8 @@ class RewardOrchestrator:
             # (_calculate_emission_targets) independently aborts the cycle.
             try:
                 alpha_price_usd = await self.pricing.get_alpha_price_usd(allow_stale=True)
-                self._add_alpha_targets(result, alpha_price_usd, await self.pricing.get_total_daily_usd(allow_stale=True))
+                total_daily_usd = await self.pricing.get_total_daily_usd(allow_stale=True)
+                self._add_alpha_targets(result, alpha_price_usd, total_daily_usd)
             except Exception as err:
                 bt.logging.warning(
                     f"Alpha pricing unavailable for published YouTube metrics ({err!r}); skipping publication."
