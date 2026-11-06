@@ -67,6 +67,27 @@ python -m neurons.validator --netuid 93 --subtensor.network finney \
 Miner credentials: put one JSON file per YouTube account in `~/.bitcast/secrets/`, each
 containing `client_id`, `client_secret` and `refresh_token` (or set `TOKEN_SOURCE=api`).
 
+API-backed miners coalesce concurrent refreshes and cache the response for at most
+60 seconds (`API_TOKEN_CACHE_SECONDS`, 0–60; default 60). This is a bounded reuse
+window, not an inferred OAuth expiry: the current API returns freshly exchanged
+roughly one-hour tokens but does not expose expiry metadata. New connections,
+removals and recovery from refresh failure become visible within that window.
+Expired cache entries are never served on refresh failure. The wire protocol and
+validator scoring formulas are unchanged. Local credential expiry caching is unchanged.
+
+Validators only query axons advertising public unicast IP addresses, including
+on local test networks; private, loopback, link-local and multicast axons are
+rejected before any request. Run integration fixtures with a mocked dendrite.
+The default publication endpoint is `https://ingestion.bitcast.network`; operators
+using a separate ingestion deployment must set `DATA_CLIENT_URL`.
+
+Deployment note: the hosted miner's September 2026 V1 image is not built by this
+repository's validator-only deploy workflow. Promoting this miner requires an
+explicit miner image release together with the command `python -m neurons.miner`
+and removal of the V1-only `--neuron.disable_auto_update` flag. Do not remove that
+flag while retaining V1: it enables V1 automatic updates. No validator protocol
+cutover is needed for the token cache.
+
 ## Development
 
 ```bash

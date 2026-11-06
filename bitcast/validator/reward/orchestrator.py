@@ -1,6 +1,7 @@
 """Coordinates the reward pipeline: query -> evaluate -> aggregate -> constrain -> emit."""
 
 from abc import ABC, abstractmethod
+from ipaddress import ip_address
 from typing import Any, Protocol, runtime_checkable
 
 import bittensor as bt
@@ -113,8 +114,12 @@ class RewardOrchestrator:
 
     async def _query_miner(self, validator: Any, uid: int) -> MinerResponse:
         try:
+            axon = validator.metagraph.axons[uid]
+            address = ip_address(axon.ip)
+            if not address.is_global or address.is_multicast:
+                return MinerResponse.error(uid, "Miner axon must use a public unicast IP address")
             responses = await validator.dendrite(
-                axons=[validator.metagraph.axons[uid]],
+                axons=[axon],
                 synapse=AccessTokenSynapse(),
                 timeout=validator.config.neuron.timeout,
                 deserialize=False,

@@ -7,6 +7,10 @@ from bitcast.config import CONSENSUS, EndpointSettings, Settings, build_config
 
 
 class TestDerivedEndpoints:
+    def test_publication_defaults_to_https(self, monkeypatch):
+        monkeypatch.delenv("DATA_CLIENT_URL", raising=False)
+        assert EndpointSettings().data_client_url == "https://ingestion.bitcast.network"
+
     def test_briefs_endpoint_derives_from_the_api_url(self):
         endpoints = EndpointSettings(bitcast_api_url="https://api.example")
         assert endpoints.briefs_endpoint == "https://api.example/api/v2/validator/briefs"
