@@ -15,9 +15,10 @@ Two sources, selected by ``TOKEN_SOURCE``:
 * ``api`` — the Bitcast credentials API serves ready-to-use access tokens
   (it owns the refresh tokens).
 
-Tokens are loaded fresh on every validator request so they are never stale.
+API responses are coalesced and cached briefly; local tokens use their OAuth expiry.
 """
 
+import asyncio
 import json
 import pickle
 import time
@@ -45,6 +46,9 @@ class TokenManager:
         self.settings = settings or get_settings()
         self.secrets_dir = Path(self.settings.secrets_dir).expanduser()
         self._token_cache: dict[str, tuple[str, float]] = {}  # file name -> (token, expires_at)
+        self._api_tokens: list[str] = []
+        self._api_cache_until = 0.0
+        self._api_lock = asyncio.Lock()
 
     def init(self) -> None:
         """Validate the configured token source; raise before serving if unusable."""
@@ -68,7 +72,13 @@ class TokenManager:
     async def load_tokens(self) -> list[str]:
         """Current access tokens for every configured account."""
         if self.settings.token_source == "api":
-            return await self._load_from_api()
+            async with self._api_lock:
+                if time.monotonic() >= self._api_cache_until:
+                    # Start the TTL before fetching: slow refreshes must not extend it.
+                    started = time.monotonic()
+                    self._api_tokens = await self._load_from_api()
+                    self._api_cache_until = started + self.settings.miner.api_token_cache_seconds
+                return self._api_tokens.copy()
         return await self._load_from_local()
 
     async def _load_from_api(self) -> list[str]:

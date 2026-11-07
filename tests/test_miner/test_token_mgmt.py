@@ -1,5 +1,6 @@
 """Miner token management: config validation, refresh flow, caching."""
 
+import asyncio
 import json
 import time
 
@@ -107,6 +108,48 @@ class TestLocalTokens:
 
         monkeypatch.setattr(TokenManager, "_refresh", staticmethod(fake_refresh))
         assert len(await manager.load_tokens()) == 2
+
+
+class TestApiTokens:
+    async def test_concurrent_requests_share_refresh_and_return_independent_lists(self, secrets_dir, monkeypatch):
+        manager = TokenManager(make_settings(secrets_dir, token_source="api"))
+        calls = 0
+
+        async def fetch():
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0)
+            return ["fresh"]
+
+        monkeypatch.setattr(manager, "_load_from_api", fetch)
+        results = await asyncio.gather(*(manager.load_tokens() for _ in range(10)))
+        assert results == [["fresh"]] * 10
+        assert calls == 1
+        results[0].clear()
+        assert await manager.load_tokens() == ["fresh"]
+
+    async def test_expiry_failure_never_serves_stale_tokens(self, secrets_dir, monkeypatch):
+        manager = TokenManager(make_settings(secrets_dir, token_source="api"))
+        now = 100.0
+        calls = 0
+
+        async def fetch():
+            nonlocal calls
+            calls += 1
+            return ["fresh"] if calls == 1 else []
+
+        monkeypatch.setattr("bitcast.miner.token_mgmt.time.monotonic", lambda: now)
+        monkeypatch.setattr(manager, "_load_from_api", fetch)
+        assert await manager.load_tokens() == ["fresh"]
+        now = 159.0
+        assert await manager.load_tokens() == ["fresh"]
+        now = 160.0
+        assert await manager.load_tokens() == []
+        assert await manager.load_tokens() == []
+        assert calls == 2
+        now = 220.0
+        assert await manager.load_tokens() == []
+        assert calls == 3
 
 
 class TestPklCredentials:

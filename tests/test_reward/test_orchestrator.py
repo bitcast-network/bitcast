@@ -106,7 +106,7 @@ def make_validator(num_uids: int = 3, tokens_per_miner: int = 1):
     return SimpleNamespace(
         metagraph=SimpleNamespace(
             n=num_uids,
-            axons=[None] * num_uids,
+            axons=[SimpleNamespace(ip="8.8.8.8")] * num_uids,
             S=[0.0] * num_uids,
             alpha_stake=[0.0] * num_uids,
             I=[0.0] * num_uids,
@@ -115,6 +115,42 @@ def make_validator(num_uids: int = 3, tokens_per_miner: int = 1):
         dendrite=StubDendrite(),
         config=SimpleNamespace(neuron=SimpleNamespace(timeout=10)),
     )
+
+
+@pytest.mark.parametrize(
+    "ip",
+    [
+        "127.0.0.1",
+        "10.0.0.1",
+        "169.254.170.2",
+        "100.64.0.1",
+        "224.0.0.1",
+        "::1",
+        "fc00::1",
+        "::ffff:127.0.0.1",
+        "fe80::1",
+        "ff02::1",
+        "not-an-ip",
+    ],
+)
+async def test_nonpublic_axons_are_rejected_without_network_call(ip):
+    from unittest.mock import AsyncMock
+
+    validator = make_validator()
+    validator.metagraph.axons[1] = SimpleNamespace(ip=ip)
+    validator.dendrite = AsyncMock()
+    response = await RewardOrchestrator([StubEvaluator()], StubPricing())._query_miner(validator, 1)
+    assert not response.is_valid
+    validator.dendrite.assert_not_called()
+
+
+@pytest.mark.parametrize("ip", ["8.8.8.8", "2606:4700:4700::1111"])
+async def test_public_axons_remain_queryable(ip):
+    validator = make_validator()
+    validator.metagraph.axons[1] = SimpleNamespace(ip=ip)
+    response = await RewardOrchestrator([StubEvaluator()], StubPricing())._query_miner(validator, 1)
+    assert response.is_valid
+    assert response.tokens == ["token-0"]
 
 
 @pytest.fixture

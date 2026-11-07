@@ -153,7 +153,7 @@ class EndpointSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore", populate_by_name=True)
 
     bitcast_api_url: str = Field(default="https://bitcast-api.bitcast.network", alias="BITCAST_API_URL")
-    data_client_url: str = Field(default="http://44.254.20.95", alias="DATA_CLIENT_URL")
+    data_client_url: str = Field(default="https://ingestion.bitcast.network", alias="DATA_CLIENT_URL")
     mechid: int = Field(default=0, alias="MECHID")  # subnet mechanism id for emission split
     # Full-URL override for the briefs server, independent of bitcast_api_url.
     briefs_endpoint_override: str | None = Field(default=None, alias="BITCAST_BRIEFS_ENDPOINT")
@@ -200,6 +200,7 @@ class MinerSettings(BaseSettings):
 
     token_source: str = Field(default="local", alias="TOKEN_SOURCE")  # "local" | "api"
     secrets_dir: str = Field(default="~/.bitcast/secrets", alias="BITCAST_SECRETS_DIR")
+    api_token_cache_seconds: float = Field(default=60.0, ge=0, le=60, alias="API_TOKEN_CACHE_SECONDS")
 
     @field_validator("token_source", mode="before")
     @classmethod
