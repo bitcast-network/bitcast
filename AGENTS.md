@@ -103,18 +103,19 @@ an error rather than silently mis-scored.
 ## CI/CD
 
 - **ci.yml**: ruff lint → ruff format check → mypy → pytest (runs on all PRs and main)
-- **deploy.yml**: Build image → push to ECR → deploy to ECS (runs on push to main). Canary deploys immediately with no gate; owner requires manual approval via the `production` environment. Deployment targets are parameterized via GitHub repo variables:
+- **deploy.yml**: Build without AWS credentials → upload a one-day image archive → verify SHA-256 and load in each deploy job → push to ECR if the commit tag is missing → deploy to ECS. Runs on matching pushes to main or manual dispatch. Canary runs first in the `canary` environment without reviewers; owner requires manual approval in `Production`. Roles are pinned directly to `arn:aws:iam::289997608167:role/deploy-bitcast-canary` and `arn:aws:iam::289997608167:role/deploy-bitcast-production`, respectively; repository/org role variables are not used.
+
+  Before merging the scoped-role migration, apply bitcast-infra #967 to create the canary role, and create the `canary` environment restricted to `main` with no reviewers. Preserve the existing `Production` reviewer gate. This replaces the shared roles retired by bitcast-infra #768. Deployment targets remain parameterized via GitHub repo variables:
 
   | Variable | Fallback when unset | Purpose |
   |---|---|---|
-  | `AWS_DEPLOY_ROLE_ARN` | **none** | OIDC role for GitHub Actions |
   | `AWS_REGION` | `us-east-1` | Region for ECR/ECS calls |
   | `ECS_CLUSTER` | `bitcast` | ECS cluster name |
   | `ECR_REPOSITORY` | `bitcast-youtube-validator` | ECR repo to push image to |
   | `ECS_SERVICE_CANARY` | `bitcast-youtube-validator1` | ECS service for canary deploy |
   | `ECS_SERVICE_OWNER` | `bitcast-youtube-owner` | ECS service for production deploy |
 
-  Every variable except `AWS_DEPLOY_ROLE_ARN` has a **hardcoded Bitcast default** via `${{ vars.X || 'default' }}` — they are not no-ops when unset. A fork that leaves them blank fails at *Configure AWS credentials* (no role to assume), not at the ECS step. Operators forking this repo must set their own values in **Settings → Secrets and variables → Actions → Variables**; setting only some of them means the rest silently target Bitcast's default service names.
+  Every target variable has a **hardcoded Bitcast default** via `${{ vars.X || 'default' }}`. The scoped roles authorize only their designated ECR repository and ECS services; variable overrides do not grant additional permissions. Fork operators must replace the pinned role ARNs with their own roles and configure their own target variables in **Settings → Secrets and variables → Actions → Variables**. Bitcast roles trust only the Bitcast repository's named deployment environments.
 
   Canary and owner are separate ECS services with separate task definitions: **owner is wired to Prod and canary to Dev by ECS task configuration**. That split is intentional — do not add dual-write behavior in application code.
 
