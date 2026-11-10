@@ -84,27 +84,31 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
 
-      - name: Push image if missing
+      - name: Push image
+        id: push
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
         run: |
+          # Tags in this repository are mutable, so deploy by the digest this push
+          # produced, never by tag.
           IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          if ! aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" > /dev/null; then
-            docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$IMAGE"
-            docker push "$IMAGE"
+          docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$IMAGE"
+          docker push "$IMAGE"
+          DIGEST_REF=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
+            | awk -v prefix="$ECR_REGISTRY/$ECR_REPOSITORY@sha256:" 'index($0, prefix) == 1 { print; exit }')
+          if [ -z "$DIGEST_REF" ]; then
+            echo "::error::No registry digest recorded for $IMAGE after push"
+            exit 1
           fi
-          # Preserve the latest tag used by Terraform task definitions.
-          docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
-          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          echo "Pushed $DIGEST_REF"
+          echo "image=$DIGEST_REF" >> "$GITHUB_OUTPUT"
 
       - name: Deploy canary to ECS
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          IMAGE: ${{ steps.push.outputs.image }}
           SERVICE: ${{ vars.ECS_SERVICE_CANARY || 'bitcast-youtube-validator1' }}
         run: |
-          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Deploying $IMAGE to $SERVICE (canary)"
           # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
           # not the latest revision: deploy-driven revisions drift away from the
@@ -184,24 +188,35 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
 
-      - name: Push image if missing
+      - name: Push image
+        id: push
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
         run: |
+          # Push this run's verified archive even if the tag exists: the ungated
+          # canary can write to this mutable repository, so the owner deploys only
+          # the digest of its own push. `latest` (no Terraform consumer; the
+          # templates pin digests) moves only behind this approval.
           IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          if ! aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids "imageTag=$IMAGE_TAG" > /dev/null; then
-            docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$IMAGE"
-            docker push "$IMAGE"
+          docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$IMAGE"
+          docker push "$IMAGE"
+          DIGEST_REF=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
+            | awk -v prefix="$ECR_REGISTRY/$ECR_REPOSITORY@sha256:" 'index($0, prefix) == 1 { print; exit }')
+          if [ -z "$DIGEST_REF" ]; then
+            echo "::error::No registry digest recorded for $IMAGE after push"
+            exit 1
           fi
+          docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          echo "Pushed $DIGEST_REF"
+          echo "image=$DIGEST_REF" >> "$GITHUB_OUTPUT"
 
       - name: Deploy owner to ECS
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+          IMAGE: ${{ steps.push.outputs.image }}
           SERVICE: ${{ vars.ECS_SERVICE_OWNER || 'bitcast-youtube-owner' }}
         run: |
-          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Deploying $IMAGE to $SERVICE (owner/production)"
           # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
           # not the latest revision: deploy-driven revisions drift away from the
