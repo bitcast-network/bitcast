@@ -49,7 +49,8 @@ jobs:
         with:
           name: validator-image
           path: image.tar.gz
-          retention-days: 1
+          # The owner deploy waits for approval; keep the archive long enough to approve later.
+          retention-days: 7
           if-no-files-found: error
 
   deploy-canary:
