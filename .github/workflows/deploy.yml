@@ -20,65 +20,96 @@ env:
 
 jobs:
   build:
-    name: Build & Push Image
+    name: Build Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     outputs:
       image-tag: ${{ github.sha }}
+      archive-sha256: ${{ steps.archive.outputs.sha256 }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
-
-      - name: Build, tag, and push image
+      - name: Build image
         env:
-          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: docker build --no-cache -t "local/bitcast-youtube-validator:$IMAGE_TAG" .
+
+      - name: Save image archive
+        id: archive
+        env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build --no-cache -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          # Also tag as latest for Terraform task def reference
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker save "local/bitcast-youtube-validator:$IMAGE_TAG" | gzip -1 > image.tar.gz
+          echo "sha256=$(sha256sum image.tar.gz | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload image archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: validator-image
+          path: image.tar.gz
+          # The owner deploy waits for approval; keep the archive long enough to approve later.
+          retention-days: 7
+          if-no-files-found: error
 
   deploy-canary:
     name: Deploy Canary (validator1)
     needs: build
     runs-on: ubuntu-latest
-    # No environment gate — canary deploys immediately on every push to main.
-    # If canary breaks, simply don't approve the owner deploy below.
+    # No reviewers: canary still deploys before the Production approval gate.
+    environment: canary
     permissions:
       contents: read
       id-token: write
     steps:
+      - name: Download image archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: validator-image
+
+      - name: Verify and load image
+        env:
+          ARCHIVE_SHA256: ${{ needs.build.outputs.archive-sha256 }}
+        run: |
+          echo "$ARCHIVE_SHA256  image.tar.gz" | sha256sum --check --strict
+          gunzip -c image.tar.gz | docker load
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::289997608167:role/deploy-bitcast-canary
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
 
-      - name: Deploy canary to ECS
+      - name: Push image
+        id: push
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          # Tags in this repository are mutable, so deploy by the digest this push
+          # produced, never by tag.
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$IMAGE"
+          docker push "$IMAGE"
+          DIGEST_REF=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
+            | awk -v prefix="$ECR_REGISTRY/$ECR_REPOSITORY@sha256:" 'index($0, prefix) == 1 { print; exit }')
+          if [ -z "$DIGEST_REF" ]; then
+            echo "::error::No registry digest recorded for $IMAGE after push"
+            exit 1
+          fi
+          echo "Pushed $DIGEST_REF"
+          echo "image=$DIGEST_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy canary to ECS
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
           SERVICE: ${{ vars.ECS_SERVICE_CANARY || 'bitcast-youtube-validator1' }}
         run: |
-          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Deploying $IMAGE to $SERVICE (canary)"
           # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
           # not the latest revision: deploy-driven revisions drift away from the
@@ -131,28 +162,62 @@ jobs:
     runs-on: ubuntu-latest
     # Approval gate — requires manual "Review deployments" click in GitHub Actions.
     # This is the safety net: if canary is broken, don't approve.
-    environment: production
+    environment: Production
     permissions:
       contents: read
       id-token: write
     steps:
+      - name: Download image archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: validator-image
+
+      - name: Verify and load image
+        env:
+          ARCHIVE_SHA256: ${{ needs.build.outputs.archive-sha256 }}
+        run: |
+          echo "$ARCHIVE_SHA256  image.tar.gz" | sha256sum --check --strict
+          gunzip -c image.tar.gz | docker load
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: arn:aws:iam::289997608167:role/deploy-bitcast-production
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@4625ce35226a7557230889aae2f52eb50ec3dcda # v2.0.1
 
-      - name: Deploy owner to ECS
+      - name: Push image
+        id: push
         env:
           ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+        run: |
+          # Push this run's verified archive even if the tag exists: the ungated
+          # canary can write to this mutable repository, so the owner deploys only
+          # the digest of its own push. `latest` (no Terraform consumer; the
+          # templates pin digests) moves only behind this approval.
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$IMAGE"
+          docker push "$IMAGE"
+          DIGEST_REF=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
+            | awk -v prefix="$ECR_REGISTRY/$ECR_REPOSITORY@sha256:" 'index($0, prefix) == 1 { print; exit }')
+          if [ -z "$DIGEST_REF" ]; then
+            echo "::error::No registry digest recorded for $IMAGE after push"
+            exit 1
+          fi
+          docker tag "local/bitcast-youtube-validator:$IMAGE_TAG" "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          docker push "$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          echo "Pushed $DIGEST_REF"
+          echo "image=$DIGEST_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy owner to ECS
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
           SERVICE: ${{ vars.ECS_SERVICE_OWNER || 'bitcast-youtube-owner' }}
         run: |
-          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           echo "Deploying $IMAGE to $SERVICE (owner/production)"
           # Clone the newest TERRAFORM-MANAGED revision (ManagedBy=terraform tag),
           # not the latest revision: deploy-driven revisions drift away from the
