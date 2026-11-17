@@ -43,6 +43,20 @@ class TestPublishDateRange:
         assert not brief_matcher.check_publish_date_range({}, "not-a-date")
 
 
+class TestChannelSelection:
+    def test_open_brief_passes_every_channel(self):
+        assert brief_matcher.check_channel_selected({"id": "b"}, "UCany")
+
+    def test_campaign_brief_passes_only_selected_channels(self):
+        brief = {"id": "b", "allowed_channels": ["UCa", "UCb"]}
+        assert brief_matcher.check_channel_selected(brief, "UCb")
+        assert not brief_matcher.check_channel_selected(brief, "UCc")
+        assert not brief_matcher.check_channel_selected(brief, "")
+
+    def test_campaign_without_selection_pays_nobody(self):
+        assert not brief_matcher.check_channel_selected({"id": "b", "allowed_channels": []}, "UCa")
+
+
 class TestMatching:
     async def test_only_eligible_briefs_hit_the_llm(self, briefs):
         llm = FakeLLM(matching_ids={"brief-1", "brief-2"})

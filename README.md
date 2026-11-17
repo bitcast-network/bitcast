@@ -12,6 +12,9 @@ Analytics API, score videos in USD terms, and convert those scores into on-chain
 - **Validators** fetch active briefs, evaluate every miner's channels/videos against them
   (LLM-assisted brief matching), and set weights so emissions track earned USD value.
 - Unallocated emission is absorbed by the burn UID (0).
+- **Campaign briefs** (Outfold brand campaigns) carry `allowed_channels`, the YouTube
+  channel IDs the brand selected. Validators score such a brief only for those channels;
+  an empty list pays nobody. Briefs without the field are open to every channel.
 
 ## Two mechanisms, one subnet
 

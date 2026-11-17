@@ -20,7 +20,7 @@ from bitcast.validator.reward.models import AccountResult, EvaluationResult, Min
 from bitcast.validator.reward.orchestrator import PlatformEvaluator
 from bitcast.validator.youtube import scoring
 from bitcast.validator.youtube.api import YouTubeClient, get_video_transcript
-from bitcast.validator.youtube.brief_matcher import LLMMatcher, match_briefs, prescreen_briefs
+from bitcast.validator.youtube.brief_matcher import PRESCREEN_FAILED, LLMMatcher, match_briefs, prescreen_briefs
 from bitcast.validator.youtube.cache import CycleState, HistoricalVideoRegistry, SearchCache
 from bitcast.validator.youtube.timestamps import parse_timestamp
 
@@ -205,10 +205,10 @@ class YouTubeEvaluator(PlatformEvaluator):
         if not decision["video_vet_result"]:
             return entry
 
-        eligible = prescreen_briefs(briefs, video_data)
+        eligible = prescreen_briefs(briefs, video_data, channel_id)
         decision["preScreeningCheck"] = eligible
         if not any(eligible):
-            decision["brief_reasonings"] = ["Failed prescreening (unique identifier or publish window)"] * len(briefs)
+            decision["brief_reasonings"] = [PRESCREEN_FAILED] * len(briefs)
             return entry
 
         transcript = await get_video_transcript(video_id, session)
