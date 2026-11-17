@@ -14,7 +14,9 @@ Analytics API, score videos in USD terms, and convert those scores into on-chain
 - Unallocated emission is absorbed by the burn UID (0).
 - **Campaign briefs** (Outfold brand campaigns) carry `allowed_channels`, the YouTube
   channel IDs the brand selected. Validators score such a brief only for those channels;
-  an empty list pays nobody. Briefs without the field are open to every channel.
+  an empty list pays nobody. Briefs without the field are open to every channel. During a
+  briefs outage validators keep scoring from their last good copy (memory, then disk), so
+  selection changes apply from the first successful fetch afterwards.
 
 ## Two mechanisms, one subnet
 
