@@ -10,7 +10,7 @@ from bitcast.config import YT_VIDEO_RELEASE_BUFFER
 from bitcast.validator.youtube.timestamps import parse_timestamp
 
 _MAX_CONCURRENT_LLM_CALLS = 5
-PRESCREEN_FAILED = "Failed prescreening (campaign selection, unique identifier or publish window)"
+PRESCREEN_FAILED = "Failed prescreening (allowed channels, unique identifier or publish window)"
 
 
 class LLMMatcher(Protocol):
@@ -24,9 +24,9 @@ class LLMMatcher(Protocol):
 
 
 def check_channel_selected(brief: dict, channel_id: str) -> bool:
-    """Pass unless the brief is a campaign brief that did not select this channel.
+    """Pass unless the brief restricts its channels and this one is not listed.
 
-    Campaign briefs list the channels they pay in ``allowed_channels``; an empty
+    Restricted briefs list the channels they pay in ``allowed_channels``; an empty
     list pays nobody. Briefs without the field are open to every channel.
     """
     allowed_channels = brief.get("allowed_channels")

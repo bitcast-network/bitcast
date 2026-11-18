@@ -245,8 +245,8 @@ class TestBriefsDiskFallback:
         briefs = await get_briefs(include_all=True, cache_path=cache_path)
         assert briefs == cached
 
-    async def test_campaign_selection_survives_an_outage_restart(self, tmp_path: Path, monkeypatch):
-        """A cold start during an outage keeps the last fetched selection instead of opening the brief."""
+    async def test_allowed_channels_survive_an_outage_restart(self, tmp_path: Path, monkeypatch):
+        """A cold start during an outage keeps the last fetched allow list instead of opening the brief."""
         import bitcast.utils.briefs as briefs_mod
 
         cache_path = tmp_path / "briefs.json"

@@ -123,8 +123,8 @@ async def test_full_account_evaluation_scores_matched_brief(patched_youtube, bri
     assert result.aggregated_scores["brief-2"] == 0.0
 
 
-class TestCampaignSelection:
-    """Campaign briefs pay only the channels their campaign selected."""
+class TestAllowedChannels:
+    """Briefs with allowed_channels pay only the listed channels."""
 
     async def test_unselected_channel_earns_nothing(self, patched_youtube, briefs, fake_llm):
         briefs[0]["allowed_channels"] = ["UCother"]

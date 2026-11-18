@@ -47,13 +47,13 @@ class TestChannelSelection:
     def test_open_brief_passes_every_channel(self):
         assert brief_matcher.check_channel_selected({"id": "b"}, "UCany")
 
-    def test_campaign_brief_passes_only_selected_channels(self):
+    def test_restricted_brief_passes_only_listed_channels(self):
         brief = {"id": "b", "allowed_channels": ["UCa", "UCb"]}
         assert brief_matcher.check_channel_selected(brief, "UCb")
         assert not brief_matcher.check_channel_selected(brief, "UCc")
         assert not brief_matcher.check_channel_selected(brief, "")
 
-    def test_campaign_without_selection_pays_nobody(self):
+    def test_empty_list_pays_nobody(self):
         assert not brief_matcher.check_channel_selected({"id": "b", "allowed_channels": []}, "UCa")
 
 
