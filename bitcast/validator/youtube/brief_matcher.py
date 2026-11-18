@@ -10,6 +10,7 @@ from bitcast.config import YT_VIDEO_RELEASE_BUFFER
 from bitcast.validator.youtube.timestamps import parse_timestamp
 
 _MAX_CONCURRENT_LLM_CALLS = 5
+PRESCREEN_FAILED = "Failed prescreening (allowed channels, unique identifier or publish window)"
 
 
 class LLMMatcher(Protocol):
@@ -20,6 +21,16 @@ class LLMMatcher(Protocol):
     ) -> tuple[bool, str]: ...
 
     async def check_for_prompt_injection(self, description: str, transcript: list | str) -> bool: ...
+
+
+def check_channel_selected(brief: dict, channel_id: str) -> bool:
+    """Pass unless the brief restricts its channels and this one is not listed.
+
+    Restricted briefs list the channels they pay in ``allowed_channels``; an empty
+    list pays nobody. Briefs without the field are open to every channel.
+    """
+    allowed_channels = brief.get("allowed_channels")
+    return allowed_channels is None or channel_id in allowed_channels
 
 
 def check_unique_identifier(brief: dict, description: str | None) -> bool:
@@ -45,12 +56,14 @@ def check_publish_date_range(brief: dict, published_at: str) -> bool:
     return allowed_start <= published.date() and published <= allowed_end
 
 
-def prescreen_briefs(briefs: list[dict], video_data: dict) -> list[bool]:
+def prescreen_briefs(briefs: list[dict], video_data: dict, channel_id: str) -> list[bool]:
     """Per-brief eligibility before any transcript or LLM cost is paid."""
     description = video_data.get("description")
     published_at = video_data.get("publishedAt", "")
     return [
-        check_unique_identifier(brief, description) and check_publish_date_range(brief, published_at)
+        check_channel_selected(brief, channel_id)
+        and check_unique_identifier(brief, description)
+        and check_publish_date_range(brief, published_at)
         for brief in briefs
     ]
 
@@ -76,7 +89,7 @@ async def match_briefs(
 
     async def evaluate(brief: dict, is_eligible: bool) -> tuple[bool, str]:
         if not is_eligible:
-            return False, "Failed prescreening (unique identifier or publish window)"
+            return False, PRESCREEN_FAILED
         async with semaphore:
             return await llm.evaluate_content_against_brief(
                 brief, video_data.get("duration", ""), video_data.get("description", ""), transcript

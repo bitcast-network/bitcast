@@ -245,6 +245,27 @@ class TestBriefsDiskFallback:
         briefs = await get_briefs(include_all=True, cache_path=cache_path)
         assert briefs == cached
 
+    async def test_allowed_channels_survive_an_outage_restart(self, tmp_path: Path, monkeypatch):
+        """A cold start during an outage keeps the last fetched allow list instead of opening the brief."""
+        import bitcast.utils.briefs as briefs_mod
+
+        cache_path = tmp_path / "briefs.json"
+        served = [{"id": "c1", "start_date": "2026-01-01", "end_date": "2030-01-01", "allowed_channels": ["UCa"]}]
+
+        async def ok(*args, **kwargs):
+            return httpx.Response(200, json={"items": served}, request=httpx.Request("GET", "https://briefs"))
+
+        async def boom(*args, **kwargs):
+            raise httpx.ConnectError("server down")
+
+        monkeypatch.setattr("bitcast.utils.briefs.request_with_retry", ok)
+        await get_briefs(include_all=True, cache_path=cache_path)
+
+        briefs_mod._last_good_briefs = None  # process restart
+        monkeypatch.setattr("bitcast.utils.briefs.request_with_retry", boom)
+        briefs = await get_briefs(include_all=True, cache_path=cache_path)
+        assert briefs[0]["allowed_channels"] == ["UCa"]
+
     async def test_no_cache_no_server_raises(self, monkeypatch):
         async def boom(*args, **kwargs):
             raise httpx.ConnectError("server down")

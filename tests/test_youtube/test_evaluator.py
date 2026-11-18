@@ -123,6 +123,29 @@ async def test_full_account_evaluation_scores_matched_brief(patched_youtube, bri
     assert result.aggregated_scores["brief-2"] == 0.0
 
 
+class TestAllowedChannels:
+    """Briefs with allowed_channels pay only the listed channels."""
+
+    async def test_unselected_channel_earns_nothing(self, patched_youtube, briefs, fake_llm):
+        briefs[0]["allowed_channels"] = ["UCother"]
+        youtube = YouTubeEvaluator(llm=fake_llm)
+        result = await youtube.evaluate_accounts(MinerResponse(uid=5, tokens=["token-1"]), briefs, {})
+
+        video = result.account_results["account_1"].videos["vid1"]
+        assert video["decision_details"]["preScreeningCheck"] == [False, True]
+        assert video["matches_brief"] is False
+        assert fake_llm.calls == 1  # only the open brief reached the LLM
+        assert result.aggregated_scores["brief-1"] == 0.0
+
+    async def test_selected_channel_earns(self, patched_youtube, briefs, fake_llm):
+        briefs[0]["allowed_channels"] = ["UCother", "UCraw"]
+        youtube = YouTubeEvaluator(llm=fake_llm)
+        result = await youtube.evaluate_accounts(MinerResponse(uid=5, tokens=["token-1"]), briefs, {})
+
+        assert result.account_results["account_1"].videos["vid1"]["matching_brief_ids"] == ["brief-1"]
+        assert result.aggregated_scores["brief-1"] > 0
+
+
 class TestReportingFields:
     """Fields nothing in scoring reads, but every dashboard downstream does."""
 
